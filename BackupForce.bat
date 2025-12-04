@@ -11,16 +11,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Set JavaFX module path (adjust if needed)
-set JAVAFX_PATH=--module-path "%JAVA_HOME%\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml
-
-REM Launch the application
+REM Launch the application with JavaFX modules
 echo Starting BackupForce...
 java -jar BackupForce.jar
 
 if %errorlevel% neq 0 (
     echo.
     echo Failed to start BackupForce
-    echo If you see module errors, ensure JavaFX is properly installed
     pause
 )
