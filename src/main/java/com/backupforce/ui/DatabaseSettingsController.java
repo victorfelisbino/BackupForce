@@ -32,7 +32,7 @@ public class DatabaseSettingsController {
     private CheckBox ssoCheckBox;
     private DatabaseConnectionInfo connectionInfo;
     private boolean saved = false;
-    private String ssoToken = null;
+    private Connection activeConnection = null; // Store authenticated connection for reuse
     
     public void initialize() {
         setupDatabaseTypes();
@@ -43,7 +43,7 @@ public class DatabaseSettingsController {
     
     private void setupDatabaseTypes() {
         databaseTypeCombo.setItems(FXCollections.observableArrayList(
-            new DatabaseType("Snowflake", Arrays.asList("Account", "Username", "Password", "Warehouse", "Database", "Schema")),
+            new DatabaseType("Snowflake", Arrays.asList("Account", "Warehouse", "Database", "Schema", "Username", "Password")),
             new DatabaseType("SQL Server", Arrays.asList("Server", "Database", "Username", "Password")),
             new DatabaseType("PostgreSQL", Arrays.asList("Host", "Port", "Database", "Schema", "Username", "Password"))
         ));
@@ -55,6 +55,13 @@ public class DatabaseSettingsController {
         DatabaseType dbType = databaseTypeCombo.getValue();
         if (dbType == null) return;
         
+        // Save the current SSO checkbox state and field values before clearing
+        boolean ssoWasSelected = ssoCheckBox != null && ssoCheckBox.isSelected();
+        Map<String, String> savedValues = new HashMap<>();
+        for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
+            savedValues.put(entry.getKey(), entry.getValue().getText());
+        }
+        
         settingsGrid.getChildren().clear();
         fieldMap.clear();
         comboMap.clear();
@@ -63,9 +70,13 @@ public class DatabaseSettingsController {
         
         // Add SSO checkbox for Snowflake
         if (dbType.name.equals("Snowflake")) {
-            ssoCheckBox = new CheckBox("Use Single Sign-On (SSO)");
+            ssoCheckBox = new CheckBox("Use Single Sign-On (Okta/SAML/SSO)");
+            ssoCheckBox.setSelected(ssoWasSelected); // Restore previous state
             ssoCheckBox.setStyle("-fx-font-weight: bold;");
-            ssoCheckBox.setOnAction(e -> updateFieldsForDatabase());
+            ssoCheckBox.setOnAction(e -> {
+                System.out.println("SSO checkbox clicked: " + ssoCheckBox.isSelected());
+                updateFieldsForDatabase();
+            });
             GridPane.setColumnIndex(ssoCheckBox, 0);
             GridPane.setColumnSpan(ssoCheckBox, 2);
             GridPane.setRowIndex(ssoCheckBox, row);
@@ -76,8 +87,8 @@ public class DatabaseSettingsController {
         boolean isSnowflakeSSO = dbType.name.equals("Snowflake") && ssoCheckBox != null && ssoCheckBox.isSelected();
         
         for (String fieldName : dbType.fields) {
-            // Skip Username and Password fields when SSO is enabled
-            if (isSnowflakeSSO && (fieldName.equals("Username") || fieldName.equals("Password"))) {
+            // Skip only Password field when SSO is enabled (Username is still needed for SSO)
+            if (isSnowflakeSSO && fieldName.equals("Password")) {
                 continue;
             }
             
@@ -85,18 +96,22 @@ public class DatabaseSettingsController {
             GridPane.setColumnIndex(label, 0);
             GridPane.setRowIndex(label, row);
             
-            // For Snowflake Account with SSO, add login button
+            // For Snowflake Account with SSO, add Connect button
             if (isSnowflakeSSO && fieldName.equals("Account")) {
                 TextField textField = new TextField();
                 textField.setPromptText(getPromptText(dbType.name, fieldName));
+                // Restore saved value
+                if (savedValues.containsKey(fieldName)) {
+                    textField.setText(savedValues.get(fieldName));
+                }
                 
-                Button ssoLoginButton = new Button("Login with SSO");
-                ssoLoginButton.setStyle("-fx-font-weight: bold; -fx-background-color: #1976d2; -fx-text-fill: white;");
-                ssoLoginButton.setOnAction(e -> authenticateWithSSO(textField.getText()));
+                Button connectButton = new Button("Connect to Snowflake");
+                connectButton.setStyle("-fx-font-weight: bold; -fx-background-color: #1976d2; -fx-text-fill: white;");
+                connectButton.setOnAction(e -> connectToSnowflake(textField.getText(), true));
                 
                 HBox hbox = new HBox(5);
                 hbox.setAlignment(Pos.CENTER_LEFT);
-                hbox.getChildren().addAll(textField, ssoLoginButton);
+                hbox.getChildren().addAll(textField, connectButton);
                 
                 GridPane.setColumnIndex(hbox, 1);
                 GridPane.setRowIndex(hbox, row);
@@ -104,27 +119,36 @@ public class DatabaseSettingsController {
                 settingsGrid.getChildren().addAll(label, hbox);
                 fieldMap.put(fieldName, textField);
             }
-            // For Snowflake Database and Schema, use ComboBox with refresh button
+            // For Snowflake Database, Schema, and Warehouse - use ComboBox (populated after connection)
             else if (dbType.name.equals("Snowflake") && (fieldName.equals("Database") || fieldName.equals("Schema") || fieldName.equals("Warehouse"))) {
-                HBox hbox = new HBox(5);
-                hbox.setAlignment(Pos.CENTER_LEFT);
-                
                 ComboBox<String> comboBox = new ComboBox<>();
                 comboBox.setEditable(true);
-                comboBox.setPrefWidth(200);
-                comboBox.setPromptText(getPromptText(dbType.name, fieldName));
+                comboBox.setPrefWidth(250);
+                comboBox.setPromptText("Connect first to load " + fieldName.toLowerCase() + "s");
+                comboBox.setDisable(true); // Disabled until connection is made
                 
-                Button refreshButton = new Button("↻");
-                refreshButton.setStyle("-fx-font-size: 14px; -fx-padding: 4 8 4 8;");
-                refreshButton.setTooltip(new Tooltip("Load " + fieldName.toLowerCase() + "s from Snowflake"));
-                refreshButton.setOnAction(e -> loadSnowflakeOptions(fieldName, comboBox));
+                GridPane.setColumnIndex(comboBox, 1);
+                GridPane.setRowIndex(comboBox, row);
                 
-                hbox.getChildren().addAll(comboBox, refreshButton);
-                GridPane.setColumnIndex(hbox, 1);
-                GridPane.setRowIndex(hbox, row);
-                
-                settingsGrid.getChildren().addAll(label, hbox);
+                settingsGrid.getChildren().addAll(label, comboBox);
                 comboMap.put(fieldName, comboBox);
+                
+                // Setup cascading: when warehouse changes, reload databases
+                if (fieldName.equals("Warehouse")) {
+                    comboBox.valueProperty().addListener((obs, old, newVal) -> {
+                        if (newVal != null && !newVal.equals(old)) {
+                            loadDatabases();
+                        }
+                    });
+                }
+                // When database changes, reload schemas
+                else if (fieldName.equals("Database")) {
+                    comboBox.valueProperty().addListener((obs, old, newVal) -> {
+                        if (newVal != null && !newVal.equals(old)) {
+                            loadSchemas();
+                        }
+                    });
+                }
                 
                 // Create a hidden TextField for compatibility with existing code
                 TextField hiddenField = new TextField();
@@ -144,6 +168,11 @@ public class DatabaseSettingsController {
                 }
                 
                 textField.setPromptText(getPromptText(dbType.name, fieldName));
+                // Restore saved value
+                if (savedValues.containsKey(fieldName)) {
+                    textField.setText(savedValues.get(fieldName));
+                }
+                
                 GridPane.setColumnIndex(textField, 1);
                 GridPane.setRowIndex(textField, row);
                 
@@ -153,17 +182,35 @@ public class DatabaseSettingsController {
             row++;
         }
         
-        // Try to load saved values for this database type
-        loadFieldValues(dbType.name);
+        // Try to load saved values for this database type (but don't overwrite user-entered values)
+        if (savedValues.isEmpty()) {
+            loadFieldValues(dbType.name);
+        }
+        
+        // For Snowflake with username/password, add Connect button after all fields
+        if (dbType.name.equals("Snowflake") && !isSnowflakeSSO) {
+            Button connectButton = new Button("Connect to Snowflake");
+            connectButton.setStyle("-fx-font-weight: bold; -fx-background-color: #1976d2; -fx-text-fill: white; -fx-padding: 8 16 8 16;");
+            connectButton.setOnAction(e -> {
+                String account = fieldMap.get("Account").getText().trim();
+                connectToSnowflake(account, false);
+            });
+            
+            GridPane.setColumnIndex(connectButton, 1);
+            GridPane.setRowIndex(connectButton, row);
+            settingsGrid.getChildren().add(connectButton);
+            row++;
+        }
     }
     
     private String getPromptText(String dbType, String field) {
         if (dbType.equals("Snowflake")) {
             switch (field) {
-                case "Account": return "mycompany";
+                case "Account": return "loves (from URL: loves.snowflakecomputing.com)";
                 case "Warehouse": return "COMPUTE_WH";
                 case "Database": return "SALESFORCE_BACKUP";
                 case "Schema": return "PUBLIC";
+                case "Username": return "your.email@loves.com";
             }
         } else if (dbType.equals("PostgreSQL")) {
             switch (field) {
@@ -230,171 +277,173 @@ public class DatabaseSettingsController {
         }
     }
     
-    private void loadSnowflakeOptions(String fieldName, ComboBox<String> comboBox) {
-        // Get connection parameters
-        String account = fieldMap.get("Account").getText().trim();
-        
-        if (account.isEmpty()) {
-            statusLabel.setText("Please enter Account first");
-            statusLabel.setStyle("-fx-text-fill: #c62828;");
-            return;
-        }
-        
-        boolean useSSO = ssoCheckBox != null && ssoCheckBox.isSelected();
-        String username = null;
-        String password = null;
-        
-        if (!useSSO) {
-            username = fieldMap.get("Username").getText().trim();
-            password = fieldMap.get("Password").getText().trim();
-            
-            if (username.isEmpty() || password.isEmpty()) {
-                statusLabel.setText("Please enter Username and Password first");
-                statusLabel.setStyle("-fx-text-fill: #c62828;");
-                return;
-            }
-        } else if (ssoToken == null) {
-            statusLabel.setText("Please login with SSO first");
-            statusLabel.setStyle("-fx-text-fill: #c62828;");
-            return;
-        }
-        
-        statusLabel.setText("Loading " + fieldName.toLowerCase() + "s from Snowflake...");
-        statusLabel.setStyle("-fx-text-fill: #1976d2;");
-        
-        final String finalUsername = username;
-        final String finalPassword = password;
-        final boolean finalUseSSO = useSSO;
-        
-        Task<List<String>> loadTask = new Task<List<String>>() {
-            @Override
-            protected List<String> call() throws Exception {
-                List<String> items = new ArrayList<>();
-                
-                String url = String.format("jdbc:snowflake://%s.snowflakecomputing.com", account);
-                Properties props = new Properties();
-                
-                if (finalUseSSO && ssoToken != null) {
-                    // Use externalbrowser for SSO - it will reuse the authenticated session
-                    props.put("authenticator", "externalbrowser");
-                } else {
-                    props.put("user", finalUsername);
-                    props.put("password", finalPassword);
-                }
-                
-                try (Connection conn = DriverManager.getConnection(url, props)) {
-                    if (fieldName.equals("Warehouse")) {
-                        // Load warehouses
-                        try (Statement stmt = conn.createStatement();
-                             ResultSet rs = stmt.executeQuery("SHOW WAREHOUSES")) {
-                            while (rs.next()) {
-                                items.add(rs.getString("name"));
-                            }
-                        }
-                    } else if (fieldName.equals("Database")) {
-                        // Load databases
-                        try (Statement stmt = conn.createStatement();
-                             ResultSet rs = stmt.executeQuery("SHOW DATABASES")) {
-                            while (rs.next()) {
-                                items.add(rs.getString("name"));
-                            }
-                        }
-                    } else if (fieldName.equals("Schema")) {
-                        // Load schemas from selected database
-                        String database = fieldMap.get("Database").getText().trim();
-                        if (database.isEmpty()) {
-                            throw new Exception("Please select a database first");
-                        }
-                        try (Statement stmt = conn.createStatement();
-                             ResultSet rs = stmt.executeQuery("SHOW SCHEMAS IN DATABASE " + database)) {
-                            while (rs.next()) {
-                                items.add(rs.getString("name"));
-                            }
-                        }
-                    }
-                }
-                
-                return items;
-            }
-        };
-        
-        loadTask.setOnSucceeded(e -> {
-            List<String> items = loadTask.getValue();
-            comboBox.setItems(FXCollections.observableArrayList(items));
-            statusLabel.setText(String.format("✓ Loaded %d %s(s)", items.size(), fieldName.toLowerCase()));
-            statusLabel.setStyle("-fx-text-fill: #2e7d32;");
-            
-            if (!items.isEmpty()) {
-                comboBox.getSelectionModel().selectFirst();
-            }
-        });
-        
-        loadTask.setOnFailed(e -> {
-            Throwable ex = loadTask.getException();
-            logger.error("Failed to load " + fieldName, ex);
-            statusLabel.setText("✗ Failed to load: " + ex.getMessage());
-            statusLabel.setStyle("-fx-text-fill: #c62828;");
-        });
-        
-        new Thread(loadTask).start();
-    }
     
-    private void authenticateWithSSO(String account) {
+    private void connectToSnowflake(String account, boolean useSSO) {
         if (account == null || account.trim().isEmpty()) {
             statusLabel.setText("Please enter your Snowflake account name first");
             statusLabel.setStyle("-fx-text-fill: #c62828;");
             return;
         }
         
-        statusLabel.setText("Testing SSO connection (browser will open)...");
+        // Get username - required for both SSO and password auth
+        String username = fieldMap.get("Username").getText().trim();
+        if (username.isEmpty()) {
+            statusLabel.setText("Please enter your Username (email)");
+            statusLabel.setStyle("-fx-text-fill: #c62828;");
+            return;
+        }
+        
+        String password = null;
+        if (!useSSO) {
+            password = fieldMap.get("Password").getText().trim();
+            if (password.isEmpty()) {
+                statusLabel.setText("Please enter your Password");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+        }
+        
+        statusLabel.setText(useSSO ? "Connecting with SSO (browser will open)..." : "Connecting to Snowflake...");
         statusLabel.setStyle("-fx-text-fill: #1976d2;");
         
-        Task<Boolean> authTask = new Task<Boolean>() {
+        final String finalUsername = username;
+        final String finalPassword = password;
+        
+        Task<Connection> connectTask = new Task<Connection>() {
             @Override
-            protected Boolean call() throws Exception {
-                // Use Snowflake's external browser authenticator
+            protected Connection call() throws Exception {
                 String url = String.format("jdbc:snowflake://%s.snowflakecomputing.com", account.trim());
                 Properties props = new Properties();
-                props.put("authenticator", "externalbrowser");
+                props.put("user", finalUsername);
                 
-                // This will open the user's default browser for SSO authentication
-                // and establish a connection to verify it works
-                try (Connection conn = DriverManager.getConnection(url, props)) {
-                    // Test the connection by running a simple query
-                    try (Statement stmt = conn.createStatement();
-                         ResultSet rs = stmt.executeQuery("SELECT CURRENT_USER()")) {
-                        return rs.next();
-                    }
+                if (useSSO) {
+                    props.put("authenticator", "externalbrowser");
+                } else {
+                    props.put("password", finalPassword);
                 }
+                
+                // Establish and return the connection
+                return DriverManager.getConnection(url, props);
             }
         };
         
-        authTask.setOnSucceeded(e -> {
-            if (authTask.getValue()) {
-                ssoToken = "authenticated"; // Just a flag to indicate SSO is set up
-                statusLabel.setText("✓ SSO authentication successful! You can now use this account.");
-                statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
-            } else {
-                statusLabel.setText("✗ SSO authentication failed");
-                statusLabel.setStyle("-fx-text-fill: #c62828;");
-                ssoToken = null;
-            }
+        connectTask.setOnSucceeded(e -> {
+            activeConnection = connectTask.getValue();
+            statusLabel.setText("✓ Connected successfully! Loading warehouses...");
+            statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+            
+            // Enable the dropdowns
+            comboMap.get("Warehouse").setDisable(false);
+            comboMap.get("Database").setDisable(false);
+            comboMap.get("Schema").setDisable(false);
+            
+            // Auto-load warehouses
+            loadWarehouses();
         });
         
-        authTask.setOnFailed(e -> {
-            Throwable ex = authTask.getException();
-            logger.error("SSO authentication failed", ex);
+        connectTask.setOnFailed(e -> {
+            Throwable ex = connectTask.getException();
+            logger.error("Snowflake connection failed", ex);
             String errorMsg = ex.getMessage();
             if (errorMsg != null && errorMsg.contains("User cancelled")) {
-                statusLabel.setText("✗ SSO cancelled by user");
+                statusLabel.setText("✗ Connection cancelled by user");
             } else {
-                statusLabel.setText("✗ SSO failed: " + (errorMsg != null ? errorMsg : ex.getClass().getSimpleName()));
+                statusLabel.setText("✗ Connection failed: " + (errorMsg != null ? errorMsg : ex.getClass().getSimpleName()));
             }
             statusLabel.setStyle("-fx-text-fill: #c62828;");
-            ssoToken = null;
+            activeConnection = null;
         });
         
-        new Thread(authTask).start();
+        new Thread(connectTask).start();
+    }
+    
+    private void loadWarehouses() {
+        loadSnowflakeResource("Warehouse", "SHOW WAREHOUSES", comboMap.get("Warehouse"));
+    }
+    
+    private void loadDatabases() {
+        String warehouse = comboMap.get("Warehouse").getValue();
+        if (warehouse == null || warehouse.trim().isEmpty()) {
+            return;
+        }
+        
+        // Set warehouse context and load databases
+        Task<Void> setWarehouseTask = new Task<Void>() {
+            @Override
+            protected Void call() throws Exception {
+                try (Statement stmt = activeConnection.createStatement()) {
+                    stmt.execute("USE WAREHOUSE " + warehouse);
+                }
+                return null;
+            }
+        };
+        
+        setWarehouseTask.setOnSucceeded(e -> {
+            loadSnowflakeResource("Database", "SHOW DATABASES", comboMap.get("Database"));
+        });
+        
+        setWarehouseTask.setOnFailed(e -> {
+            logger.error("Failed to set warehouse", e.getSource().getException());
+        });
+        
+        new Thread(setWarehouseTask).start();
+    }
+    
+    private void loadSchemas() {
+        String database = comboMap.get("Database").getValue();
+        if (database == null || database.trim().isEmpty()) {
+            return;
+        }
+        
+        loadSnowflakeResource("Schema", "SHOW SCHEMAS IN DATABASE " + database, comboMap.get("Schema"));
+    }
+    
+    private void loadSnowflakeResource(String resourceType, String query, ComboBox<String> comboBox) {
+        if (activeConnection == null) {
+            statusLabel.setText("Please connect to Snowflake first");
+            statusLabel.setStyle("-fx-text-fill: #c62828;");
+            return;
+        }
+        
+        statusLabel.setText("Loading " + resourceType.toLowerCase() + "s...");
+        statusLabel.setStyle("-fx-text-fill: #1976d2;");
+        
+        Task<List<String>> loadTask = new Task<List<String>>() {
+            @Override
+            protected List<String> call() throws Exception {
+                List<String> items = new ArrayList<>();
+                try (Statement stmt = activeConnection.createStatement();
+                     ResultSet rs = stmt.executeQuery(query)) {
+                    while (rs.next()) {
+                        items.add(rs.getString("name"));
+                    }
+                }
+                return items;
+            }
+        };
+        
+        loadTask.setOnSucceeded(e -> {
+            List<String> items = loadTask.getValue();
+            Platform.runLater(() -> {
+                comboBox.setItems(FXCollections.observableArrayList(items));
+                if (!items.isEmpty()) {
+                    comboBox.getSelectionModel().selectFirst();
+                }
+                statusLabel.setText(String.format("✓ Loaded %d %s(s)", items.size(), resourceType.toLowerCase()));
+                statusLabel.setStyle("-fx-text-fill: #2e7d32;");
+            });
+        });
+        
+        loadTask.setOnFailed(e -> {
+            Throwable ex = loadTask.getException();
+            logger.error("Failed to load " + resourceType, ex);
+            Platform.runLater(() -> {
+                statusLabel.setText("✗ Failed to load " + resourceType.toLowerCase() + "s: " + ex.getMessage());
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+            });
+        });
+        
+        new Thread(loadTask).start();
     }
     
     @FXML
@@ -565,6 +614,16 @@ public class DatabaseSettingsController {
     }
     
     private void closeDialog() {
+        // Clean up active connection
+        if (activeConnection != null) {
+            try {
+                activeConnection.close();
+            } catch (SQLException e) {
+                logger.error("Error closing connection", e);
+            }
+            activeConnection = null;
+        }
+        
         Stage stage = (Stage) settingsGrid.getScene().getWindow();
         stage.close();
     }
