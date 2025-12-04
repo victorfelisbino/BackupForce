@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="com.backupforce.ui.BackupController"
+            styleClass="backup-container">
+    
+    <!-- Top Section: Connection Info -->
+    <top>
+        <VBox spacing="10" styleClass="header-section">
+            <padding>
+                <Insets top="15" right="15" bottom="10" left="15"/>
+            </padding>
+            <Label fx:id="connectionLabel" text="Connected to: " styleClass="connection-label">
+                <font>
+                    <Font size="12"/>
+                </font>
+            </Label>
+            <Separator/>
+        </VBox>
+    </top>
+    
+    <!-- Center: Object Selection Table -->
+    <center>
+        <VBox spacing="10">
+            <padding>
+                <Insets top="10" right="15" bottom="10" left="15"/>
+            </padding>
+            
+            <!-- Search and Selection Controls -->
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <TextField fx:id="searchField" promptText="Search objects..." 
+                          prefWidth="300" styleClass="search-field"/>
+                <Label fx:id="selectionCountLabel" text="0 selected" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="selectAllButton" text="Select All" onAction="#handleSelectAll" 
+                       styleClass="secondary-button"/>
+                <Button fx:id="deselectAllButton" text="Deselect All" onAction="#handleDeselectAll" 
+                       styleClass="secondary-button"/>
+            </HBox>
+            
+            <!-- Table -->
+            <TableView fx:id="objectTable" VBox.vgrow="ALWAYS" styleClass="object-table">
+                <columns>
+                    <TableColumn fx:id="selectColumn" text="Select" prefWidth="60" 
+                                minWidth="60" maxWidth="60"/>
+                    <TableColumn fx:id="nameColumn" text="Object Name" prefWidth="200" 
+                                minWidth="150"/>
+                    <TableColumn fx:id="labelColumn" text="Label" prefWidth="250" 
+                                minWidth="150"/>
+                    <TableColumn fx:id="statusColumn" text="Status" prefWidth="150" 
+                                minWidth="100"/>
+                </columns>
+                <columnResizePolicy>
+                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                </columnResizePolicy>
+            </TableView>
+        </VBox>
+    </center>
+    
+    <!-- Bottom: Output Folder, Progress, and Controls -->
+    <bottom>
+        <VBox spacing="15" styleClass="bottom-section">
+            <padding>
+                <Insets top="10" right="15" bottom="15" left="15"/>
+            </padding>
+            
+            <Separator/>
+            
+            <!-- Output Folder Selection -->
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Output Folder:" styleClass="form-label">
+                    <font>
+                        <Font size="12"/>
+                    </font>
+                </Label>
+                <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
+                          styleClass="form-field"/>
+                <Button fx:id="browseButton" text="Browse..." onAction="#handleBrowse" 
+                       styleClass="secondary-button"/>
+            </HBox>
+            
+            <!-- Progress Section -->
+            <VBox spacing="8">
+                <Label fx:id="progressLabel" text="Ready" styleClass="progress-label">
+                    <font>
+                        <Font size="12"/>
+                    </font>
+                </Label>
+                <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="25" 
+                            styleClass="progress-bar"/>
+            </VBox>
+            
+            <!-- Action Buttons -->
+            <HBox spacing="10" alignment="CENTER">
+                <Button fx:id="startBackupButton" text="Start Backup" onAction="#handleStartBackup" 
+                       prefWidth="150" styleClass="primary-button">
+                    <font>
+                        <Font size="14"/>
+                    </font>
+                </Button>
+                <Button fx:id="stopBackupButton" text="Stop Backup" onAction="#handleStopBackup" 
+                       prefWidth="150" styleClass="danger-button">
+                    <font>
+                        <Font size="14"/>
+                    </font>
+                </Button>
+            </HBox>
+            
+            <!-- Log Area -->
+            <VBox spacing="5">
+                <Label text="Log:" styleClass="form-label">
+                    <font>
+                        <Font size="12"/>
+                    </font>
+                </Label>
+                <TextArea fx:id="logArea" prefHeight="120" editable="false" 
+                         wrapText="true" styleClass="log-area">
+                    <font>
+                        <Font name="Consolas" size="11"/>
+                    </font>
+                </TextArea>
+            </VBox>
+        </VBox>
+    </bottom>
+    
+</BorderPane>

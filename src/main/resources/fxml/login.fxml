@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.LoginController"
+      spacing="20" alignment="CENTER" styleClass="login-container">
+    
+    <padding>
+        <Insets top="40" right="40" bottom="40" left="40"/>
+    </padding>
+    
+    <!-- Header -->
+    <VBox spacing="10" alignment="CENTER">
+        <Label text="BackupForce" styleClass="app-title">
+            <font>
+                <Font name="System Bold" size="32"/>
+            </font>
+        </Label>
+        <Label text="Salesforce Backup Tool" styleClass="app-subtitle">
+            <font>
+                <Font size="14"/>
+            </font>
+        </Label>
+    </VBox>
+    
+    <!-- Login Form -->
+    <VBox spacing="15" styleClass="form-container">
+        <padding>
+            <Insets top="20" right="20" bottom="20" left="20"/>
+        </padding>
+        
+        <VBox spacing="5">
+            <Label text="Username" styleClass="form-label"/>
+            <TextField fx:id="usernameField" promptText="your.email@company.com" 
+                      styleClass="form-field"/>
+        </VBox>
+        
+        <VBox spacing="5">
+            <Label text="Password" styleClass="form-label"/>
+            <PasswordField fx:id="passwordField" promptText="Your Salesforce password" 
+                          styleClass="form-field"/>
+        </VBox>
+        
+        <VBox spacing="5">
+            <Label text="Security Token (optional)" styleClass="form-label"/>
+            <PasswordField fx:id="tokenField" promptText="Leave empty if IP is whitelisted" 
+                          styleClass="form-field"/>
+        </VBox>
+        
+        <VBox spacing="5">
+            <Label text="Environment" styleClass="form-label"/>
+            <ComboBox fx:id="environmentCombo" maxWidth="Infinity" styleClass="form-field"/>
+        </VBox>
+        
+        <CheckBox fx:id="rememberCredentialsCheckBox" text="Remember credentials" 
+                  style="-fx-font-size: 12px; -fx-padding: 5 0 0 0;"/>
+        
+        <Button fx:id="loginButton" text="Login to Salesforce" onAction="#handleLogin" 
+                maxWidth="Infinity" styleClass="primary-button">
+            <font>
+                <Font size="14"/>
+            </font>
+        </Button>
+        
+        <HBox spacing="10" alignment="CENTER">
+            <ProgressIndicator fx:id="progressIndicator" prefWidth="20" prefHeight="20"/>
+            <Label fx:id="statusLabel" text="" styleClass="status-label"/>
+        </HBox>
+    </VBox>
+    
+    <!-- Footer -->
+    <Label text="Security token not needed if your IP is whitelisted in Setup → Network Access → Trusted IP Ranges" 
+           styleClass="info-text" wrapText="true">
+        <font>
+            <Font size="11"/>
+        </font>
+    </Label>
+</VBox>

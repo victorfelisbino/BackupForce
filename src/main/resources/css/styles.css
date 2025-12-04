@@ -1,0 +1,527 @@
+/* BackupForce - Modern UI Styles */
+
+/* Global Styles */
+.root {
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #f3f2f2;
+}
+
+/* Login Container */
+.login-container {
+    -fx-background-color: linear-gradient(to bottom, #0070d2, #005fb2);
+}
+
+.app-title {
+    -fx-text-fill: white;
+}
+
+.app-subtitle {
+    -fx-text-fill: #e0f3ff;
+}
+
+.form-container {
+    -fx-background-color: white;
+    -fx-background-radius: 10px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 2);
+}
+
+/* Backup Container */
+.backup-container {
+    -fx-background-color: #f3f2f2;
+}
+
+.header-section {
+    -fx-background-color: white;
+}
+
+.connection-label {
+    -fx-text-fill: #706e6b;
+}
+
+.bottom-section {
+    -fx-background-color: white;
+}
+
+/* Form Elements */
+.form-label {
+    -fx-text-fill: #181818;
+    -fx-font-weight: bold;
+}
+
+.form-field {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px;
+    -fx-font-size: 13px;
+}
+
+.form-field:focused {
+    -fx-border-color: #0070d2;
+    -fx-border-width: 2px;
+}
+
+.search-field {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-radius: 20px;
+    -fx-background-radius: 20px;
+    -fx-padding: 8px 15px;
+}
+
+/* Buttons */
+.button {
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-padding: 8px 20px;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+}
+
+.primary-button {
+    -fx-background-color: #0070d2;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+}
+
+.primary-button:hover {
+    -fx-background-color: #005fb2;
+}
+
+.primary-button:disabled {
+    -fx-background-color: #dddbda;
+    -fx-text-fill: #706e6b;
+    -fx-opacity: 0.6;
+}
+
+.secondary-button {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-width: 1px;
+    -fx-text-fill: #181818;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #f3f2f2;
+    -fx-border-color: #0070d2;
+}
+
+.danger-button {
+    -fx-background-color: #c23934;
+    -fx-text-fill: white;
+}
+
+.danger-button:hover {
+    -fx-background-color: #9d2b27;
+}
+
+.danger-button:disabled {
+    -fx-background-color: #dddbda;
+    -fx-text-fill: #706e6b;
+    -fx-opacity: 0.6;
+}
+
+/* Table */
+.object-table {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+}
+
+.object-table .column-header {
+    -fx-background-color: #f3f2f2;
+    -fx-font-weight: bold;
+    -fx-text-fill: #181818;
+}
+
+.object-table .table-row-cell {
+    -fx-border-color: transparent;
+}
+
+.object-table .table-row-cell:selected {
+    -fx-background-color: #d8edff;
+    -fx-text-fill: #181818;
+}
+
+.object-table .table-row-cell:hover {
+    -fx-background-color: #f4f6f9;
+}
+
+.object-table .table-cell {
+    -fx-padding: 5px;
+    -fx-alignment: CENTER_LEFT;
+}
+
+/* ComboBox */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.combo-box:focused {
+    -fx-border-color: #0070d2;
+    -fx-border-width: 2px;
+}
+
+.combo-box .list-cell {
+    -fx-padding: 8px;
+}
+
+/* Progress Bar */
+.progress-bar {
+    -fx-background-color: #dddbda;
+    -fx-background-radius: 4px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #0070d2;
+    -fx-background-radius: 4px;
+    -fx-background-insets: 0;
+}
+
+.progress-label {
+    -fx-text-fill: #181818;
+    -fx-font-weight: bold;
+}
+
+/* Progress Indicator */
+.progress-indicator {
+    -fx-progress-color: white;
+}
+
+/* Log Area */
+.log-area {
+    -fx-background-color: #f9f9f9;
+    -fx-border-color: #dddbda;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: #181818;
+}
+
+.log-area .content {
+    -fx-background-color: #f9f9f9;
+}
+
+/* Status Label */
+.status-label {
+    -fx-text-fill: white;
+}
+
+/* Info Text */
+.info-text {
+    -fx-text-fill: #e0f3ff;
+    -fx-text-alignment: center;
+}
+
+/* Separator */
+.separator .line {
+    -fx-border-color: #dddbda;
+    -fx-border-width: 1px 0 0 0;
+}
+
+/* Scrollbar */
+.scroll-bar:vertical .thumb {
+    -fx-background-color: #dddbda;
+    -fx-background-radius: 5px;
+}
+
+.scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:horizontal .thumb {
+    -fx-background-color: #dddbda;
+    -fx-background-radius: 5px;
+}
+
+.scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+}
+
+/* CheckBox in Table */
+.check-box {
+    -fx-cursor: hand;
+}
+
+.check-box .box {
+    -fx-background-color: white;
+    -fx-border-color: #dddbda;
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: #0070d2;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #0070d2;
+    -fx-border-color: #0070d2;
+}
+
+
+/* Login Container */
+.login-container {
+    -fx-background-color: linear-gradient(to bottom, #0070d2, #005fb2);
+}
+
+.app-title {
+    -fx-text-fill: white;
+}
+
+.app-subtitle {
+    -fx-text-fill: #e0f3ff;
+}
+
+.form-container {
+    -fx-background-color: white;
+    -fx-background-radius: 10px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 2);
+}
+
+/* Backup Container */
+.backup-container {
+    -fx-background-color: -fx-background-light;
+}
+
+.header-section {
+    -fx-background-color: white;
+}
+
+.connection-label {
+    -fx-text-fill: -fx-text-light;
+}
+
+.bottom-section {
+    -fx-background-color: white;
+}
+
+/* Form Elements */
+.form-label {
+    -fx-text-fill: -fx-text-color;
+    -fx-font-weight: bold;
+}
+
+.form-field {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px;
+    -fx-font-size: 13px;
+}
+
+.form-field:focused {
+    -fx-border-color: -fx-primary-color;
+    -fx-border-width: 2px;
+}
+
+.search-field {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-radius: 20px;
+    -fx-background-radius: 20px;
+    -fx-padding: 8px 15px;
+}
+
+/* Buttons */
+.button {
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-padding: 8px 20px;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+}
+
+.primary-button {
+    -fx-background-color: -fx-primary-color;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+}
+
+.primary-button:hover {
+    -fx-background-color: -fx-primary-dark;
+}
+
+.primary-button:disabled {
+    -fx-background-color: -fx-border-color;
+    -fx-text-fill: -fx-text-light;
+    -fx-opacity: 0.6;
+}
+
+.secondary-button {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-width: 1px;
+    -fx-text-fill: -fx-text-color;
+}
+
+.secondary-button:hover {
+    -fx-background-color: -fx-background-light;
+    -fx-border-color: -fx-primary-color;
+}
+
+.danger-button {
+    -fx-background-color: -fx-danger-color;
+    -fx-text-fill: white;
+}
+
+.danger-button:hover {
+    -fx-background-color: derive(-fx-danger-color, -20%);
+}
+
+.danger-button:disabled {
+    -fx-background-color: -fx-border-color;
+    -fx-text-fill: -fx-text-light;
+    -fx-opacity: 0.6;
+}
+
+/* Table */
+.object-table {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+}
+
+.object-table .column-header {
+    -fx-background-color: -fx-background-light;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-color;
+}
+
+.object-table .table-row-cell {
+    -fx-border-color: transparent;
+}
+
+.object-table .table-row-cell:selected {
+    -fx-background-color: #d8edff;
+    -fx-text-fill: -fx-text-color;
+}
+
+.object-table .table-row-cell:hover {
+    -fx-background-color: #f4f6f9;
+}
+
+.object-table .table-cell {
+    -fx-padding: 5px;
+    -fx-alignment: CENTER_LEFT;
+}
+
+/* ComboBox */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.combo-box:focused {
+    -fx-border-color: -fx-primary-color;
+    -fx-border-width: 2px;
+}
+
+.combo-box .list-cell {
+    -fx-padding: 8px;
+}
+
+/* Progress Bar */
+.progress-bar {
+    -fx-background-color: -fx-border-color;
+    -fx-background-radius: 4px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: -fx-primary-color;
+    -fx-background-radius: 4px;
+    -fx-background-insets: 0;
+}
+
+.progress-label {
+    -fx-text-fill: -fx-text-color;
+    -fx-font-weight: bold;
+}
+
+/* Progress Indicator */
+.progress-indicator {
+    -fx-progress-color: white;
+}
+
+/* Log Area */
+.log-area {
+    -fx-background-color: #f9f9f9;
+    -fx-border-color: -fx-border-color;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: -fx-text-color;
+}
+
+.log-area .content {
+    -fx-background-color: #f9f9f9;
+}
+
+/* Status Label */
+.status-label {
+    -fx-text-fill: white;
+}
+
+/* Info Text */
+.info-text {
+    -fx-text-fill: #e0f3ff;
+    -fx-text-alignment: center;
+}
+
+/* Separator */
+.separator .line {
+    -fx-border-color: -fx-border-color;
+    -fx-border-width: 1px 0 0 0;
+}
+
+/* Scrollbar */
+.scroll-bar:vertical .thumb {
+    -fx-background-color: -fx-border-color;
+    -fx-background-radius: 5px;
+}
+
+.scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:horizontal .thumb {
+    -fx-background-color: -fx-border-color;
+    -fx-background-radius: 5px;
+}
+
+.scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+}
+
+/* CheckBox in Table */
+.check-box {
+    -fx-cursor: hand;
+}
+
+.check-box .box {
+    -fx-background-color: white;
+    -fx-border-color: -fx-border-color;
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: -fx-primary-color;
+}
+
+.check-box:selected .box {
+    -fx-background-color: -fx-primary-color;
+    -fx-border-color: -fx-primary-color;
+}
