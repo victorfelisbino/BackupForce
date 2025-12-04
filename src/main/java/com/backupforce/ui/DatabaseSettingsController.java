@@ -275,8 +275,8 @@ public class DatabaseSettingsController {
                 Properties props = new Properties();
                 
                 if (finalUseSSO && ssoToken != null) {
-                    props.put("authenticator", "oauth");
-                    props.put("token", ssoToken);
+                    // Use externalbrowser for SSO - it will reuse the authenticated session
+                    props.put("authenticator", "externalbrowser");
                 } else {
                     props.put("user", finalUsername);
                     props.put("password", finalPassword);
@@ -346,42 +346,50 @@ public class DatabaseSettingsController {
             return;
         }
         
-        statusLabel.setText("Opening browser for SSO authentication...");
+        statusLabel.setText("Testing SSO connection (browser will open)...");
         statusLabel.setStyle("-fx-text-fill: #1976d2;");
         
-        Task<String> authTask = new Task<String>() {
+        Task<Boolean> authTask = new Task<Boolean>() {
             @Override
-            protected String call() throws Exception {
+            protected Boolean call() throws Exception {
                 // Use Snowflake's external browser authenticator
                 String url = String.format("jdbc:snowflake://%s.snowflakecomputing.com", account.trim());
                 Properties props = new Properties();
                 props.put("authenticator", "externalbrowser");
                 
                 // This will open the user's default browser for SSO authentication
+                // and establish a connection to verify it works
                 try (Connection conn = DriverManager.getConnection(url, props)) {
-                    // Get the session token
+                    // Test the connection by running a simple query
                     try (Statement stmt = conn.createStatement();
-                         ResultSet rs = stmt.executeQuery("SELECT CURRENT_SESSION()")) {
-                        if (rs.next()) {
-                            // Connection successful - we'll store session info
-                            return "authenticated";
-                        }
+                         ResultSet rs = stmt.executeQuery("SELECT CURRENT_USER()")) {
+                        return rs.next();
                     }
                 }
-                throw new Exception("Failed to authenticate");
             }
         };
         
         authTask.setOnSucceeded(e -> {
-            ssoToken = authTask.getValue();
-            statusLabel.setText("✓ SSO authentication successful!");
-            statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+            if (authTask.getValue()) {
+                ssoToken = "authenticated"; // Just a flag to indicate SSO is set up
+                statusLabel.setText("✓ SSO authentication successful! You can now use this account.");
+                statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+            } else {
+                statusLabel.setText("✗ SSO authentication failed");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                ssoToken = null;
+            }
         });
         
         authTask.setOnFailed(e -> {
             Throwable ex = authTask.getException();
             logger.error("SSO authentication failed", ex);
-            statusLabel.setText("✗ SSO failed: " + ex.getMessage());
+            String errorMsg = ex.getMessage();
+            if (errorMsg != null && errorMsg.contains("User cancelled")) {
+                statusLabel.setText("✗ SSO cancelled by user");
+            } else {
+                statusLabel.setText("✗ SSO failed: " + (errorMsg != null ? errorMsg : ex.getClass().getSimpleName()));
+            }
             statusLabel.setStyle("-fx-text-fill: #c62828;");
             ssoToken = null;
         });
