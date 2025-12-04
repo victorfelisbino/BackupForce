@@ -18,7 +18,7 @@ public class BackupForceApp extends Application {
             Parent root = loader.load();
             
             Scene scene = new Scene(root, 500, 400);
-            // scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+            scene.getStylesheets().add(getClass().getResource("/css/modern-styles.css").toExternalForm());
             
             primaryStage.setTitle("BackupForce - Salesforce Backup Tool");
             primaryStage.setScene(scene);

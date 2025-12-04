@@ -1,0 +1,301 @@
+/* Modern 2025 Styling for BackupForce */
+
+/* Global Styles */
+.root {
+    -fx-font-family: "Segoe UI", "San Francisco", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #f5f7fa;
+}
+
+/* Header Section */
+.header-section {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #f8f9fa);
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 0 0 1 0;
+}
+
+.connection-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #24292e;
+    -fx-font-weight: 500;
+}
+
+/* Search Field */
+.search-field {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 8px 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 1);
+}
+
+.search-field:focused {
+    -fx-border-color: #0366d6;
+    -fx-effect: dropshadow(gaussian, rgba(3,102,214,0.3), 4, 0, 0, 1);
+}
+
+/* Buttons */
+.button {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 3, 0, 0, 1);
+}
+
+.primary-button {
+    -fx-background-color: linear-gradient(to bottom, #2ea44f, #2c974b);
+    -fx-text-fill: white;
+    -fx-border-width: 0;
+}
+
+.primary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #2c974b, #2a8f47);
+    -fx-effect: dropshadow(gaussian, rgba(46,164,79,0.4), 6, 0, 0, 2);
+}
+
+.primary-button:pressed {
+    -fx-background-color: #2a8f47;
+}
+
+.secondary-button {
+    -fx-background-color: white;
+    -fx-text-fill: #24292e;
+    -fx-border-color: #d1d5da;
+    -fx-border-width: 1px;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #f6f8fa;
+    -fx-border-color: #b1b5ba;
+}
+
+.secondary-button:pressed {
+    -fx-background-color: #edeff2;
+}
+
+.danger-button {
+    -fx-background-color: linear-gradient(to bottom, #d73a49, #cb2431);
+    -fx-text-fill: white;
+    -fx-border-width: 0;
+}
+
+.danger-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #cb2431, #b92129);
+    -fx-effect: dropshadow(gaussian, rgba(215,58,73,0.4), 6, 0, 0, 2);
+}
+
+.button:disabled {
+    -fx-opacity: 0.5;
+    -fx-cursor: default;
+}
+
+/* Tables */
+.table-view {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: #e1e4e8;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 1);
+}
+
+.table-view .column-header-background {
+    -fx-background-color: linear-gradient(to bottom, #fafbfc, #f6f8fa);
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 0 0 2 0;
+}
+
+.table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-font-weight: 600;
+    -fx-text-fill: #24292e;
+    -fx-font-size: 12px;
+    -fx-padding: 10px 8px;
+}
+
+.table-view .table-cell {
+    -fx-padding: 8px;
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-row-cell {
+    -fx-background-color: white;
+}
+
+.table-row-cell:hover {
+    -fx-background-color: #f6f8fa;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #e3f2fd;
+}
+
+.table-row-cell:selected .table-cell {
+    -fx-text-fill: #0d47a1;
+}
+
+/* Tab Pane */
+.tab-pane {
+    -fx-background-color: transparent;
+    -fx-border-radius: 8px;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 0 0 10 0;
+}
+
+.tab-pane .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.tab {
+    -fx-background-color: white;
+    -fx-background-radius: 8px 8px 0 0;
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 1 1 0 1;
+    -fx-border-radius: 8px 8px 0 0;
+    -fx-padding: 10px 20px;
+    -fx-font-weight: 500;
+}
+
+.tab:selected {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #f8f9fa);
+    -fx-border-color: #0366d6;
+    -fx-border-width: 2 2 0 2;
+}
+
+.tab .tab-label {
+    -fx-text-fill: #586069;
+    -fx-font-size: 13px;
+}
+
+.tab:selected .tab-label {
+    -fx-text-fill: #0366d6;
+}
+
+/* Progress Bar */
+.progress-bar {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-background-color: #e1e4e8;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #2ea44f, #34d058);
+    -fx-background-radius: 12px;
+    -fx-padding: 4px;
+}
+
+.progress-bar .track {
+    -fx-background-color: #e1e4e8;
+    -fx-background-radius: 12px;
+}
+
+/* Text Area (Log) */
+.text-area {
+    -fx-background-color: #2d333b;
+    -fx-text-fill: #adbac7;
+    -fx-background-radius: 8px;
+    -fx-border-color: #444c56;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 8px;
+}
+
+.text-area .content {
+    -fx-background-color: #2d333b;
+}
+
+.text-area .scroll-pane {
+    -fx-background-color: #2d333b;
+}
+
+.text-area .scroll-pane .viewport {
+    -fx-background-color: #2d333b;
+}
+
+/* Text Field */
+.text-field {
+    -fx-background-color: white;
+    -fx-background-radius: 6px;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-padding: 6px 10px;
+}
+
+.text-field:focused {
+    -fx-border-color: #0366d6;
+    -fx-effect: dropshadow(gaussian, rgba(3,102,214,0.3), 4, 0, 0, 1);
+}
+
+/* Labels */
+.form-label {
+    -fx-font-weight: 500;
+    -fx-text-fill: #24292e;
+}
+
+.progress-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #586069;
+    -fx-font-weight: 500;
+}
+
+/* Bottom Section */
+.bottom-section {
+    -fx-background-color: linear-gradient(to top, #ffffff, #f8f9fa);
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* Scrollbars */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #959da5;
+    -fx-background-radius: 4px;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #6a737d;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+/* Check Box */
+.check-box {
+    -fx-cursor: hand;
+}
+
+.check-box .box {
+    -fx-background-color: white;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-border-width: 1px;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #0366d6;
+    -fx-border-color: #0366d6;
+}
+
+.check-box .mark {
+    -fx-background-color: white;
+}

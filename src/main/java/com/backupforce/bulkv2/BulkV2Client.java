@@ -37,15 +37,31 @@ public class BulkV2Client {
         this.httpClient = HttpClients.createDefault();
     }
 
+    // Functional interface for progress updates
+    @FunctionalInterface
+    public interface ProgressCallback {
+        void update(String status);
+    }
+    
     public void queryObject(String objectName, String outputFolder) throws IOException, InterruptedException, ParseException {
+        queryObject(objectName, outputFolder, null);
+    }
+    
+    public void queryObject(String objectName, String outputFolder, ProgressCallback progressCallback) throws IOException, InterruptedException, ParseException {
         logger.info("Starting Bulk API v2 query for: {}", objectName);
+        
+        if (progressCallback != null) progressCallback.update("Creating job...");
         
         // Step 1: Create query job
         String jobId = createQueryJob(objectName);
         logger.info("{}: Job created with ID: {}", objectName, jobId);
         
+        if (progressCallback != null) progressCallback.update("Processing...");
+        
         // Step 2: Poll for job completion
-        waitForJobCompletion(jobId, objectName);
+        waitForJobCompletion(jobId, objectName, progressCallback);
+        
+        if (progressCallback != null) progressCallback.update("Downloading...");
         
         // Step 3: Download results
         downloadResults(jobId, objectName, outputFolder);
@@ -84,7 +100,7 @@ public class BulkV2Client {
                 if (errorMsg.contains("not supported by the Bulk API") || 
                     errorMsg.contains("INVALIDENTITY") ||
                     errorMsg.contains("compound data not supported")) {
-                    logger.warn("{}: Object not supported by Bulk API - skipping", objectName);
+                    logger.debug("{}: Object not supported by Bulk API", objectName);
                 } else {
                     logger.error("{}: Failed to create job: {}", objectName, errorMsg);
                 }
@@ -139,7 +155,7 @@ public class BulkV2Client {
         }
     }
 
-    private void waitForJobCompletion(String jobId, String objectName) throws IOException, InterruptedException, ParseException {
+    private void waitForJobCompletion(String jobId, String objectName, ProgressCallback progressCallback) throws IOException, InterruptedException, ParseException {
         String url = String.format("%s/services/data/v%s/jobs/query/%s", instanceUrl, apiVersion, jobId);
         
         String state = "";
@@ -155,6 +171,15 @@ public class BulkV2Client {
                 JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
                 
                 state = responseJson.get("state").getAsString();
+                
+                // Get progress information
+                if (progressCallback != null && responseJson.has("numberRecordsProcessed")) {
+                    int recordsProcessed = responseJson.get("numberRecordsProcessed").getAsInt();
+                    if (recordsProcessed > 0) {
+                        progressCallback.update(String.format("Processing (%,d records)...", recordsProcessed));
+                    }
+                }
+                
                 logger.debug("{}: Job state: {}", objectName, state);
                 
                 if (state.equals("Failed") || state.equals("Aborted")) {

@@ -5,8 +5,10 @@ import com.sforce.soap.partner.DescribeGlobalResult;
 import com.sforce.soap.partner.DescribeGlobalSObjectResult;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.SimpleLongProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -17,6 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,11 +36,37 @@ public class BackupController {
         "Attachment", "ContentVersion", "Document", "StaticResource"
     ));
 
-    @FXML private TableView<SObjectItem> objectTable;
-    @FXML private TableColumn<SObjectItem, Boolean> selectColumn;
-    @FXML private TableColumn<SObjectItem, String> nameColumn;
-    @FXML private TableColumn<SObjectItem, String> labelColumn;
-    @FXML private TableColumn<SObjectItem, String> statusColumn;
+    // Selection Table (before backup)
+    @FXML private TableView<SObjectItem> allObjectsTable;
+    @FXML private TableColumn<SObjectItem, Boolean> allSelectColumn;
+    @FXML private TableColumn<SObjectItem, String> allNameColumn;
+    @FXML private TableColumn<SObjectItem, String> allLabelColumn;
+    @FXML private TableColumn<SObjectItem, String> allStatusColumn;
+    
+    // All Objects Status Tab (during backup)
+    @FXML private TableView<SObjectItem> allStatusTable;
+    @FXML private TableColumn<SObjectItem, String> statusAllNameColumn;
+    @FXML private TableColumn<SObjectItem, String> statusAllLabelColumn;
+    @FXML private TableColumn<SObjectItem, String> statusAllStatusColumn;
+    
+    // In Progress Tab
+    @FXML private TableView<SObjectItem> inProgressTable;
+    @FXML private TableColumn<SObjectItem, String> progressNameColumn;
+    @FXML private TableColumn<SObjectItem, String> progressStatusColumn;
+    
+    // Completed Tab
+    @FXML private TableView<SObjectItem> completedTable;
+    @FXML private TableColumn<SObjectItem, String> completedNameColumn;
+    @FXML private TableColumn<SObjectItem, String> completedRecordsColumn;
+    @FXML private TableColumn<SObjectItem, String> completedSizeColumn;
+    @FXML private TableColumn<SObjectItem, String> completedTimeColumn;
+    
+    // Errors Tab
+    @FXML private TableView<SObjectItem> errorsTable;
+    @FXML private TableColumn<SObjectItem, String> errorNameColumn;
+    @FXML private TableColumn<SObjectItem, String> errorMessageColumn;
+    
+    @FXML private TabPane statusTabPane;
     
     @FXML private TextField outputFolderField;
     @FXML private Button browseButton;
@@ -53,24 +83,23 @@ public class BackupController {
     @FXML private TextField searchField;
     @FXML private Label selectionCountLabel;
 
+    
     private LoginController.ConnectionInfo connectionInfo;
     private ObservableList<SObjectItem> allObjects;
-    private ObservableList<SObjectItem> filteredObjects;
+    private FilteredList<SObjectItem> filteredObjects;
+    private FilteredList<SObjectItem> inProgressObjects;
+    private FilteredList<SObjectItem> completedObjects;
+    private FilteredList<SObjectItem> errorObjects;
     private BackupTask currentBackupTask;
     private Thread backupThread;
 
     @FXML
     public void initialize() {
-        // Setup table columns
-        selectColumn.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
-        selectColumn.setCellFactory(CheckBoxTableCell.forTableColumn(selectColumn));
-        selectColumn.setEditable(true);
-        
-        nameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
-        labelColumn.setCellValueFactory(cellData -> cellData.getValue().labelProperty());
-        statusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
-        
-        objectTable.setEditable(true);
+        setupAllObjectsTable();
+        setupAllStatusTable();
+        setupInProgressTable();
+        setupCompletedTable();
+        setupErrorsTable();
         
         // Set default output folder
         String userHome = System.getProperty("user.home");
@@ -85,6 +114,178 @@ public class BackupController {
         // Initialize selection counter
         updateSelectionCount();
     }
+    
+    private void setupAllObjectsTable() {
+        allSelectColumn.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
+        // Custom checkbox cell factory to disable checkboxes for unsupported objects
+        allSelectColumn.setCellFactory(column -> new TableCell<SObjectItem, Boolean>() {
+            private final javafx.scene.control.CheckBox checkBox = new javafx.scene.control.CheckBox();
+            
+            {
+                checkBox.setOnAction(e -> {
+                    SObjectItem item = getTableRow().getItem();
+                    if (item != null && !item.isDisabled()) {
+                        item.setSelected(checkBox.isSelected());
+                        updateSelectionCount();
+                    }
+                });
+            }
+            
+            @Override
+            protected void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    SObjectItem sObjectItem = getTableRow().getItem();
+                    if (sObjectItem != null) {
+                        checkBox.setSelected(sObjectItem.isSelected());
+                        checkBox.setDisable(sObjectItem.isDisabled());
+                        setGraphic(checkBox);
+                    }
+                }
+            }
+        });
+        allSelectColumn.setEditable(true);
+        
+        allNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
+        allLabelColumn.setCellValueFactory(cellData -> cellData.getValue().labelProperty());
+        allStatusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        // Color coding for status
+        allStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    if (item.startsWith("✓")) {
+                        setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                    } else if (item.startsWith("✗")) {
+                        setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    } else if (item.startsWith("⊘")) {
+                        setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+                    } else if (item.startsWith("\u2298")) {
+                        setStyle("-fx-text-fill: gray; -fx-font-style: italic;");
+                    } else if (item.contains("Processing") || item.contains("Creating") || item.contains("Downloading")) {
+                        setStyle("-fx-text-fill: blue;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
+        
+        // Gray out disabled rows
+        allObjectsTable.setRowFactory(tv -> new TableRow<SObjectItem>() {
+            @Override
+            protected void updateItem(SObjectItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setStyle("");
+                } else if (item.isDisabled()) {
+                    setStyle("-fx-opacity: 0.5; -fx-text-fill: gray;");
+                } else {
+                    setStyle("");
+                }
+            }
+        });
+        
+        allObjectsTable.setEditable(true);
+    }
+    
+    private void setupAllStatusTable() {
+        statusAllNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
+        statusAllLabelColumn.setCellValueFactory(cellData -> cellData.getValue().labelProperty());
+        statusAllStatusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        // Color coding for status
+        statusAllStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    if (item.startsWith("✓")) {
+                        setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+                    } else if (item.startsWith("✗")) {
+                        setStyle("-fx-text-fill: #c62828; -fx-font-weight: bold;");
+                    } else if (item.startsWith("⊘")) {
+                        setStyle("-fx-text-fill: #f57c00; -fx-font-weight: bold;");
+                    } else if (item.startsWith("\u2298")) {
+                        setStyle("-fx-text-fill: #9e9e9e; -fx-font-style: italic;");
+                    } else if (item.contains("Processing") || item.contains("Creating") || item.contains("Downloading")) {
+                        setStyle("-fx-text-fill: #1976d2; -fx-font-weight: 500;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
+    }
+    
+    private void setupInProgressTable() {
+        progressNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
+        progressStatusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        progressStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    setStyle("-fx-text-fill: blue;");
+                }
+            }
+        });
+    }
+    
+    private void setupCompletedTable() {
+        completedNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
+        completedRecordsColumn.setCellValueFactory(cellData -> cellData.getValue().recordCountProperty());
+        completedSizeColumn.setCellValueFactory(cellData -> cellData.getValue().fileSizeProperty());
+        completedTimeColumn.setCellValueFactory(cellData -> cellData.getValue().durationProperty());
+        
+        // Green styling for completed items
+        completedTable.setRowFactory(tv -> new TableRow<SObjectItem>() {
+            @Override
+            protected void updateItem(SObjectItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setStyle("");
+                } else {
+                    setStyle("-fx-background-color: #e8f5e9;");
+                }
+            }
+        });
+    }
+    
+    private void setupErrorsTable() {
+        errorNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
+        errorMessageColumn.setCellValueFactory(cellData -> cellData.getValue().errorMessageProperty());
+        
+        // Red styling for error items
+        errorsTable.setRowFactory(tv -> new TableRow<SObjectItem>() {
+            @Override
+            protected void updateItem(SObjectItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setStyle("");
+                } else {
+                    setStyle("-fx-background-color: #ffebee;");
+                }
+            }
+        });
+    }
 
     public void setConnectionInfo(LoginController.ConnectionInfo connInfo) {
         this.connectionInfo = connInfo;
@@ -92,6 +293,15 @@ public class BackupController {
         loadObjects();
     }
 
+    // Known objects that are not supported by Bulk API
+    private static final Set<String> KNOWN_UNSUPPORTED = new HashSet<>(Arrays.asList(
+        "AcceptedEventRelation", "ActivityHistory", "AggregateResult", "AttachedContentDocument",
+        "CaseStatus", "CombinedAttachment", "ContractStatus", "DeclinedEventRelation",
+        "EventRelation", "Name", "NoteAndAttachment", "OpenActivity", "OwnedContentDocument",
+        "PartnerRole", "RecentlyViewed", "SolutionStatus", "TaskPriority", "TaskStatus",
+        "UndecidedEventRelation", "UserRecordAccess"
+    ));
+    
     private void loadObjects() {
         Task<List<SObjectItem>> loadTask = new Task<List<SObjectItem>>() {
             @Override
@@ -104,7 +314,15 @@ public class BackupController {
                 List<SObjectItem> items = new ArrayList<>();
                 for (DescribeGlobalSObjectResult sobject : sobjects) {
                     if (sobject.isQueryable()) {
-                        items.add(new SObjectItem(sobject.getName(), sobject.getLabel()));
+                        SObjectItem item = new SObjectItem(sobject.getName(), sobject.getLabel());
+                        
+                        // Check if object is known to be unsupported by Bulk API
+                        if (KNOWN_UNSUPPORTED.contains(sobject.getName())) {
+                            item.setDisabled(true);
+                            item.setStatus("⊘ Not supported by Bulk API");
+                        }
+                        
+                        items.add(item);
                     }
                 }
                 
@@ -117,14 +335,31 @@ public class BackupController {
 
         loadTask.setOnSucceeded(event -> {
             allObjects = FXCollections.observableArrayList(loadTask.getValue());
-            filteredObjects = FXCollections.observableArrayList(allObjects);
             
-            // Add listener to each item's selected property
+            // Create filtered lists for each tab
+            filteredObjects = new FilteredList<>(allObjects, p -> true);
+            inProgressObjects = new FilteredList<>(allObjects, 
+                item -> item.getStatus().contains("Processing") || 
+                        item.getStatus().contains("Creating") || 
+                        item.getStatus().contains("Downloading"));
+            completedObjects = new FilteredList<>(allObjects, 
+                item -> item.getStatus().startsWith("✓"));
+            errorObjects = new FilteredList<>(allObjects, 
+                item -> item.getStatus().startsWith("✗"));
+            
+            // Add listener to each item's selected property and status property
             for (SObjectItem item : allObjects) {
                 item.selectedProperty().addListener((obs, oldVal, newVal) -> updateSelectionCount());
+                item.statusProperty().addListener((obs, oldVal, newVal) -> updateFilteredLists());
             }
             
-            objectTable.setItems(filteredObjects);
+            // Set items to tables
+            allObjectsTable.setItems(filteredObjects);
+            allStatusTable.setItems(allObjects);
+            inProgressTable.setItems(inProgressObjects);
+            completedTable.setItems(completedObjects);
+            errorsTable.setItems(errorObjects);
+            
             logMessage("Loaded " + allObjects.size() + " queryable objects");
             progressLabel.setText("Ready");
             updateSelectionCount();
@@ -144,15 +379,51 @@ public class BackupController {
         if (allObjects == null) return;
         
         if (searchText == null || searchText.trim().isEmpty()) {
-            filteredObjects.setAll(allObjects);
+            filteredObjects.setPredicate(p -> true);
         } else {
             String search = searchText.toLowerCase();
-            List<SObjectItem> filtered = allObjects.stream()
-                .filter(item -> item.getName().toLowerCase().contains(search) 
-                             || item.getLabel().toLowerCase().contains(search))
-                .collect(Collectors.toList());
-            filteredObjects.setAll(filtered);
+            filteredObjects.setPredicate(item -> 
+                item.getName().toLowerCase().contains(search) || 
+                item.getLabel().toLowerCase().contains(search));
         }
+    }
+    
+    private void updateFilteredLists() {
+        if (inProgressObjects == null || completedObjects == null || errorObjects == null) {
+            return;
+        }
+        
+        // Force re-evaluation by setting predicate to null first, then to the actual predicate
+        inProgressObjects.setPredicate(null);
+        inProgressObjects.setPredicate(item -> {
+            String status = item.getStatus();
+            return status != null && (status.contains("Processing") || 
+                                     status.contains("Creating") || 
+                                     status.contains("Downloading") ||
+                                     status.contains("records"));
+        });
+        
+        completedObjects.setPredicate(null);
+        completedObjects.setPredicate(item -> {
+            String status = item.getStatus();
+            return status != null && status.startsWith("✓");
+        });
+        
+        errorObjects.setPredicate(null);
+        errorObjects.setPredicate(item -> {
+            String status = item.getStatus();
+            return status != null && (status.startsWith("✗") || status.startsWith("⊘"));
+        });
+        
+        // Update tab labels with counts
+        Platform.runLater(() -> {
+            if (statusTabPane != null && statusTabPane.getTabs().size() >= 4) {
+                statusTabPane.getTabs().get(0).setText("All (" + allObjects.size() + ")");
+                statusTabPane.getTabs().get(1).setText("In Progress (" + inProgressObjects.size() + ")");
+                statusTabPane.getTabs().get(2).setText("Completed (" + completedObjects.size() + ")");
+                statusTabPane.getTabs().get(3).setText("Errors (" + errorObjects.size() + ")");
+            }
+        });
     }
     
     private void updateSelectionCount() {
@@ -191,7 +462,7 @@ public class BackupController {
     private void handleSelectAll() {
         if (filteredObjects != null) {
             filteredObjects.forEach(item -> item.setSelected(true));
-            objectTable.refresh();
+            allObjectsTable.refresh();
             updateSelectionCount();
         }
     }
@@ -200,7 +471,7 @@ public class BackupController {
     private void handleDeselectAll() {
         if (filteredObjects != null) {
             filteredObjects.forEach(item -> item.setSelected(false));
-            objectTable.refresh();
+            allObjectsTable.refresh();
             updateSelectionCount();
         }
     }
@@ -209,6 +480,7 @@ public class BackupController {
     private void handleStartBackup() {
         List<SObjectItem> selectedObjects = allObjects.stream()
             .filter(SObjectItem::isSelected)
+            .filter(item -> !item.isDisabled())
             .collect(Collectors.toList());
         
         if (selectedObjects.isEmpty()) {
@@ -259,7 +531,7 @@ public class BackupController {
         // Disable controls
         startBackupButton.setDisable(true);
         stopBackupButton.setDisable(false);
-        objectTable.setDisable(true);
+        allObjectsTable.setDisable(true);
         browseButton.setDisable(true);
         selectAllButton.setDisable(true);
         deselectAllButton.setDisable(true);
@@ -268,14 +540,31 @@ public class BackupController {
         progressBar.setProgress(0);
         progressLabel.setText("Starting backup...");
         
+        // Switch to tab view
+        Platform.runLater(() -> {
+            allObjectsTable.setVisible(false);
+            allObjectsTable.setManaged(false);
+            statusTabPane.setVisible(true);
+            statusTabPane.setManaged(true);
+        });
+        
         logMessage("=".repeat(60));
         logMessage("BACKUP STARTED");
         logMessage("Objects to backup: " + selectedObjects.size());
         logMessage("Output folder: " + outputFolder);
         logMessage("=".repeat(60));
         
-        // Reset all statuses
-        allObjects.forEach(item -> item.setStatus(""));
+        // Reset all statuses and extra fields
+        allObjects.forEach(item -> {
+            item.setStatus("");
+            item.setRecordCount("");
+            item.setFileSize("");
+            item.setDuration("");
+            item.setErrorMessage("");
+        });
+        
+        // Refresh filtered lists
+        updateFilteredLists();
         
         // Start backup
         currentBackupTask = new BackupTask(selectedObjects, outputFolder);
@@ -284,7 +573,7 @@ public class BackupController {
             Platform.runLater(() -> {
                 startBackupButton.setDisable(false);
                 stopBackupButton.setDisable(true);
-                objectTable.setDisable(false);
+                allObjectsTable.setDisable(false);
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
@@ -295,7 +584,7 @@ public class BackupController {
             Platform.runLater(() -> {
                 startBackupButton.setDisable(false);
                 stopBackupButton.setDisable(true);
-                objectTable.setDisable(false);
+                allObjectsTable.setDisable(false);
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
@@ -308,7 +597,7 @@ public class BackupController {
             Platform.runLater(() -> {
                 startBackupButton.setDisable(false);
                 stopBackupButton.setDisable(true);
-                objectTable.setDisable(false);
+                allObjectsTable.setDisable(false);
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
@@ -391,27 +680,57 @@ public class BackupController {
                     
                     String objectName = item.getName();
                     
-                    // Log memory status for large objects
+                    // Only log for large objects
                     if (LARGE_OBJECTS.contains(objectName)) {
                         Runtime runtime = Runtime.getRuntime();
                         long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
                         long maxMemory = runtime.maxMemory() / 1024 / 1024;
-                        logMessage(String.format("[%s] WARNING: Large object backup starting (Memory: %d/%d MB)",
+                        logMessage(String.format("[%s] WARNING: Large object - Memory: %d/%d MB",
                             objectName, usedMemory, maxMemory));
-                    } else {
-                        logMessage("[" + objectName + "] Starting backup...");
                     }
                     
                     try {
                         Platform.runLater(() -> item.setStatus("Processing..."));
                         
                         long objectStart = System.currentTimeMillis();
-                        bulkClient.queryObject(objectName, outputFolder);
+                        bulkClient.queryObject(objectName, outputFolder, (status) -> {
+                            // Update status in real-time
+                            Platform.runLater(() -> item.setStatus(status));
+                        });
                         long objectTime = System.currentTimeMillis() - objectStart;
                         
                         successful.incrementAndGet();
-                        Platform.runLater(() -> item.setStatus("✓ Completed"));
-                        logMessage("[" + objectName + "] ✓ Completed in " + objectTime / 1000.0 + "s");
+                        
+                        // Get file info
+                        File csvFile = new File(outputFolder, objectName + ".csv");
+                        long fileSize = csvFile.exists() ? csvFile.length() : 0;
+                        long recordCount = 0;
+                        
+                        // Count records from CSV (subtract 1 for header)
+                        if (csvFile.exists()) {
+                            try {
+                                recordCount = Files.lines(Paths.get(csvFile.getPath())).count() - 1;
+                            } catch (Exception ex) {
+                                // Ignore count errors
+                            }
+                        }
+                        
+                        final long finalRecordCount = recordCount;
+                        final String formattedSize = formatFileSize(fileSize);
+                        final String formattedDuration = formatDuration(objectTime);
+                        
+                        Platform.runLater(() -> {
+                            item.setStatus("✓ Completed");
+                            item.setRecordCount(String.format("%,d", finalRecordCount));
+                            item.setFileSize(formattedSize);
+                            item.setDuration(formattedDuration);
+                        });
+                        
+                        // Only log completion for large objects or slow backups
+                        if (LARGE_OBJECTS.contains(objectName) || objectTime > 5000) {
+                            logMessage("[" + objectName + "] ✓ Completed in " + objectTime / 1000.0 + "s - " + 
+                                      finalRecordCount + " records, " + formattedSize);
+                        }
                         
                         // Check memory after large object backup
                         if (LARGE_OBJECTS.contains(objectName)) {
@@ -430,17 +749,43 @@ public class BackupController {
                         
                     } catch (OutOfMemoryError oom) {
                         failed.incrementAndGet();
-                        Platform.runLater(() -> item.setStatus("✗ Out of Memory"));
-                        logMessage("[" + objectName + "] ✗ OUT OF MEMORY ERROR!");
-                        logMessage("[" + objectName + "] This object is too large. Try:");
-                        logMessage("[" + objectName + "]   • Backup this object individually");
-                        logMessage("[" + objectName + "]   • Increase heap size: mvn javafx:run -Dexec.args='-Xmx4g'");
+                        String errorText = "OUT OF MEMORY - Try increasing heap size: java -Xmx4g -jar BackupForce.jar";
+                        Platform.runLater(() -> {
+                            item.setStatus("✗ Out of Memory");
+                            item.setErrorMessage(errorText);
+                        });
+                        logMessage("✗ FAILED: " + objectName + " - OUT OF MEMORY");
+                        logMessage("  → Try increasing heap size: java -Xmx4g -jar BackupForce.jar");
                         logger.error("Out of memory backing up " + objectName, oom);
                     } catch (Exception e) {
-                        failed.incrementAndGet();
-                        Platform.runLater(() -> item.setStatus("✗ Failed"));
                         String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                        logMessage("[" + objectName + "] ✗ Failed: " + errorMsg);
+                        
+                        // Check if object is unsupported (not a real failure)
+                        if (errorMsg.contains("not supported by the Bulk API") || 
+                            errorMsg.contains("INVALIDENTITY")) {
+                            // Don't count as failed - it's just not supported
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ Not Supported");
+                                item.setErrorMessage("Object not supported by Bulk API");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - Not supported by Bulk API");
+                        } else {
+                            // Actual failure
+                            failed.incrementAndGet();
+                            
+                            // Extract meaningful error message
+                            String cleanError = errorMsg;
+                            if (errorMsg.contains("Failed to create query job:")) {
+                                cleanError = errorMsg.substring(errorMsg.indexOf(":") + 1).trim();
+                            }
+                            
+                            final String finalError = cleanError;
+                            Platform.runLater(() -> {
+                                item.setStatus("✗ Failed");
+                                item.setErrorMessage(finalError);
+                            });
+                            logMessage("✗ FAILED: " + objectName + " - " + cleanError);
+                        }
                         logger.error("Backup failed for " + objectName, e);
                         
                     } finally {
@@ -453,19 +798,11 @@ public class BackupController {
                                 completedCount, totalObjects, successful.get(), failed.get(), progress * 100));
                         });
                         
-                        // Log progress updates more frequently
-                        if (completedCount % 5 == 0 || completedCount == totalObjects) {
+                        // Status bar shows progress, only log milestones
+                        if (completedCount % 100 == 0 || completedCount == totalObjects) {
                             long elapsed = System.currentTimeMillis() - startTime;
-                            double avgTimePerObject = (double) elapsed / completedCount;
-                            long remaining = (long) ((totalObjects - completedCount) * avgTimePerObject);
-                            
-                            logMessage("");
-                            logMessage(String.format("--- Progress Update: %d/%d completed (%.1f%%) ---",
-                                completedCount, totalObjects, progress * 100));
-                            logMessage(String.format("    Successful: %d | Failed: %d", successful.get(), failed.get()));
-                            logMessage(String.format("    Elapsed: %ds | ETA: %ds",
-                                elapsed / 1000, remaining / 1000));
-                            logMessage("");
+                            logMessage(String.format("Progress: %d/%d (%.1f%%) - %d successful, %d failed",
+                                completedCount, totalObjects, progress * 100, successful.get(), failed.get()));
                         }
                     }
                 });
@@ -517,7 +854,7 @@ public class BackupController {
             Platform.runLater(() -> {
                 startBackupButton.setDisable(false);
                 stopBackupButton.setDisable(true);
-                objectTable.setDisable(false);
+                allObjectsTable.setDisable(false);
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
@@ -528,19 +865,48 @@ public class BackupController {
             return super.cancel(mayInterruptIfRunning);
         }
     }
+    
+    // Utility methods
+    private static String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = "KMGTPE".charAt(exp-1) + "";
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+    }
+    
+    private static String formatDuration(long milliseconds) {
+        long seconds = milliseconds / 1000;
+        if (seconds < 60) return seconds + "s";
+        long minutes = seconds / 60;
+        seconds = seconds % 60;
+        if (minutes < 60) return String.format("%dm %ds", minutes, seconds);
+        long hours = minutes / 60;
+        minutes = minutes % 60;
+        return String.format("%dh %dm", hours, minutes);
+    }
 
     // Model class for SObject items
     public static class SObjectItem {
         private final SimpleStringProperty name;
         private final SimpleStringProperty label;
         private final SimpleStringProperty status;
+        private final SimpleStringProperty recordCount;
+        private final SimpleStringProperty fileSize;
+        private final SimpleStringProperty duration;
+        private final SimpleStringProperty errorMessage;
         private boolean selected;
+        private boolean disabled;
 
         public SObjectItem(String name, String label) {
             this.name = new SimpleStringProperty(name);
             this.label = new SimpleStringProperty(label);
             this.status = new SimpleStringProperty("");
+            this.recordCount = new SimpleStringProperty("");
+            this.fileSize = new SimpleStringProperty("");
+            this.duration = new SimpleStringProperty("");
+            this.errorMessage = new SimpleStringProperty("");
             this.selected = false;
+            this.disabled = false;
         }
 
         public String getName() { return name.get(); }
@@ -553,16 +919,41 @@ public class BackupController {
         public void setStatus(String value) { status.set(value); }
         public SimpleStringProperty statusProperty() { return status; }
         
+        public String getRecordCount() { return recordCount.get(); }
+        public void setRecordCount(String value) { recordCount.set(value); }
+        public SimpleStringProperty recordCountProperty() { return recordCount; }
+        
+        public String getFileSize() { return fileSize.get(); }
+        public void setFileSize(String value) { fileSize.set(value); }
+        public SimpleStringProperty fileSizeProperty() { return fileSize; }
+        
+        public String getDuration() { return duration.get(); }
+        public void setDuration(String value) { duration.set(value); }
+        public SimpleStringProperty durationProperty() { return duration; }
+        
+        public String getErrorMessage() { return errorMessage.get(); }
+        public void setErrorMessage(String value) { errorMessage.set(value); }
+        public SimpleStringProperty errorMessageProperty() { return errorMessage; }
+        
         public boolean isSelected() { return selected; }
-        public void setSelected(boolean value) { this.selected = value; }
+        public void setSelected(boolean value) { 
+            if (!disabled) {
+                this.selected = value;
+            }
+        }
         public javafx.beans.property.BooleanProperty selectedProperty() {
             return new javafx.beans.property.SimpleBooleanProperty(selected) {
                 @Override
                 public void set(boolean newValue) {
                     super.set(newValue);
-                    selected = newValue;
+                    if (!disabled) {
+                        selected = newValue;
+                    }
                 }
             };
         }
+        
+        public boolean isDisabled() { return disabled; }
+        public void setDisabled(boolean value) { this.disabled = value; }
     }
 }
