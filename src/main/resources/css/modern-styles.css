@@ -299,3 +299,96 @@
 .check-box .mark {
     -fx-background-color: white;
 }
+
+/* Radio Button */
+.radio-button {
+    -fx-cursor: hand;
+    -fx-font-size: 12px;
+}
+
+.radio-button .radio {
+    -fx-background-color: white;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+}
+
+.radio-button:selected .radio {
+    -fx-border-color: #0366d6;
+    -fx-border-width: 2px;
+}
+
+.radio-button .dot {
+    -fx-background-color: #0366d6;
+    -fx-background-radius: 5px;
+    -fx-padding: 3px;
+}
+
+/* Config Section */
+.config-section {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: #e1e4e8;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 12px 15px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 1);
+}
+
+.section-header {
+    -fx-font-weight: 600;
+    -fx-text-fill: #24292e;
+}
+
+/* Status Label */
+.status-label {
+    -fx-font-size: 12px;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 6px;
+}
+
+/* Combo Box */
+.combo-box {
+    -fx-background-color: white;
+    -fx-background-radius: 6px;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-padding: 6px 10px;
+}
+
+.combo-box:focused {
+    -fx-border-color: #0366d6;
+    -fx-effect: dropshadow(gaussian, rgba(3,102,214,0.3), 4, 0, 0, 1);
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: white;
+    -fx-border-color: #d1d5da;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 8, 0, 0, 2);
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: white;
+    -fx-padding: 8px 12px;
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: #f6f8fa;
+}
+
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+    -fx-text-fill: #0d47a1;
+}
+
+/* Header Label */
+.header-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #24292e;
+}

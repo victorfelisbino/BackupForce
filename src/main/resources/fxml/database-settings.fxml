@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.DatabaseSettingsController"
+      prefWidth="550" prefHeight="500" 
+      styleClass="root" 
+      spacing="20">
+    
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+    
+    <Label text="Database Connection Settings" styleClass="header-label"/>
+    
+    <!-- Database Type Selection -->
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Database Type:" minWidth="120"/>
+        <ComboBox fx:id="databaseTypeCombo" prefWidth="300" 
+                  promptText="Select database type"/>
+    </HBox>
+    
+    <Separator/>
+    
+    <GridPane fx:id="settingsGrid" hgap="10" vgap="15">
+        <columnConstraints>
+            <ColumnConstraints minWidth="120" prefWidth="120"/>
+            <ColumnConstraints hgrow="ALWAYS"/>
+        </columnConstraints>
+        
+        <!-- Dynamic fields will be added based on database type -->
+        
+    </GridPane>
+    
+    <!-- Remember credentials -->
+    <CheckBox fx:id="rememberCheckBox" text="Remember credentials"/>
+    
+    <HBox spacing="10" alignment="CENTER">
+        <Button text="Test Connection" onAction="#handleTestConnection" 
+                styleClass="secondary-button" prefWidth="140"/>
+        <Button text="Save" onAction="#handleSave" 
+                styleClass="primary-button" prefWidth="100"/>
+        <Button text="Cancel" onAction="#handleCancel" 
+                styleClass="secondary-button" prefWidth="100"/>
+    </HBox>
+    
+    <Label fx:id="statusLabel" styleClass="status-label" wrapText="true"/>
+    
+</VBox>

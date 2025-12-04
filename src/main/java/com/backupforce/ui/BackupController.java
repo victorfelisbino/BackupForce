@@ -1,6 +1,9 @@
 package com.backupforce.ui;
 
 import com.backupforce.bulkv2.BulkV2Client;
+import com.backupforce.sink.DataSink;
+import com.backupforce.sink.DataSinkFactory;
+import com.backupforce.ui.DatabaseSettingsController.DatabaseConnectionInfo;
 import com.sforce.soap.partner.DescribeGlobalResult;
 import com.sforce.soap.partner.DescribeGlobalSObjectResult;
 import javafx.application.Platform;
@@ -11,14 +14,21 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -68,12 +78,19 @@ public class BackupController {
     
     @FXML private TabPane statusTabPane;
     
+    @FXML private RadioButton csvRadioButton;
+    @FXML private RadioButton databaseRadioButton;
+    @FXML private ToggleGroup backupTargetGroup;
+    @FXML private Button databaseSettingsButton;
+    @FXML private HBox outputFolderBox;
+    
     @FXML private TextField outputFolderField;
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
     @FXML private Button deselectAllButton;
     @FXML private Button startBackupButton;
     @FXML private Button stopBackupButton;
+    @FXML private Button exportResultsButton;
     
     @FXML private ProgressBar progressBar;
     @FXML private Label progressLabel;
@@ -85,6 +102,7 @@ public class BackupController {
 
     
     private LoginController.ConnectionInfo connectionInfo;
+    private DatabaseSettingsController.DatabaseConnectionInfo databaseConnectionInfo;
     private ObservableList<SObjectItem> allObjects;
     private FilteredList<SObjectItem> filteredObjects;
     private FilteredList<SObjectItem> inProgressObjects;
@@ -104,6 +122,20 @@ public class BackupController {
         // Set default output folder
         String userHome = System.getProperty("user.home");
         outputFolderField.setText(userHome + "\\BackupForce\\backup");
+        
+        // Setup backup target listeners
+        csvRadioButton.setSelected(true);
+        backupTargetGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == csvRadioButton) {
+                databaseSettingsButton.setDisable(true);
+                outputFolderBox.setVisible(true);
+                outputFolderBox.setManaged(true);
+            } else {
+                databaseSettingsButton.setDisable(false);
+                outputFolderBox.setVisible(false);
+                outputFolderBox.setManaged(false);
+            }
+        });
         
         // Setup search filter
         searchField.textProperty().addListener((observable, oldValue, newValue) -> filterObjects(newValue));
@@ -459,6 +491,69 @@ public class BackupController {
     }
 
     @FXML
+    private void handleDatabaseSettings() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/database-settings.fxml"));
+            Parent root = loader.load();
+            
+            DatabaseSettingsController controller = loader.getController();
+            
+            Stage dialog = new Stage();
+            dialog.setTitle("Database Settings");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(databaseSettingsButton.getScene().getWindow());
+            
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/modern-styles.css").toExternalForm());
+            dialog.setScene(scene);
+            dialog.setResizable(false);
+            
+            dialog.showAndWait();
+            
+            if (controller.isSaved()) {
+                databaseConnectionInfo = controller.getConnectionInfo();
+                logger.info("Database settings saved: {}", databaseConnectionInfo.getDatabaseType());
+            }
+        } catch (IOException e) {
+            logger.error("Error opening database settings", e);
+            showError("Failed to open database settings: " + e.getMessage());
+        }
+    }
+
+    private DataSink createDataSinkFromConfig(DatabaseConnectionInfo config) {
+        Map<String, String> fields = config.getFields();
+        switch (config.getDatabaseType()) {
+            case "Snowflake":
+                return DataSinkFactory.createSnowflakeSink(
+                    fields.get("Account"), 
+                    fields.get("Warehouse"), 
+                    fields.get("Database"), 
+                    fields.get("Schema"),
+                    fields.get("Username"), 
+                    fields.get("Password")
+                );
+            case "SQL Server":
+                return DataSinkFactory.createSqlServerSink(
+                    fields.get("Server"), 
+                    fields.get("Database"),
+                    fields.get("Username"), 
+                    fields.get("Password")
+                );
+            case "PostgreSQL":
+                return DataSinkFactory.createPostgresSink(
+                    fields.get("Host"), 
+                    Integer.parseInt(fields.getOrDefault("Port", "5432")),
+                    fields.get("Database"), 
+                    fields.get("Schema"),
+                    fields.get("Username"), 
+                    fields.get("Password")
+                );
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + config.getDatabaseType());
+        }
+    }
+
+    @FXML
     private void handleSelectAll() {
         if (filteredObjects != null) {
             filteredObjects.forEach(item -> item.setSelected(true));
@@ -516,16 +611,37 @@ public class BackupController {
             }
         }
         
-        String outputFolder = outputFolderField.getText().trim();
-        if (outputFolder.isEmpty()) {
-            showError("Please specify an output folder");
-            return;
-        }
-        
-        // Create output directory if it doesn't exist
-        File outputDir = new File(outputFolder);
-        if (!outputDir.exists()) {
-            outputDir.mkdirs();
+        // Validate backup target
+        String outputFolder;
+        String displayFolder;
+        DataSink dataSink;
+        if (csvRadioButton.isSelected()) {
+            outputFolder = outputFolderField.getText().trim();
+            if (outputFolder.isEmpty()) {
+                showError("Please specify an output folder");
+                return;
+            }
+            
+            // Create output directory if it doesn't exist
+            File outputDir = new File(outputFolder);
+            if (!outputDir.exists()) {
+                outputDir.mkdirs();
+            }
+            
+            dataSink = DataSinkFactory.createCsvFileSink(outputFolder);
+            displayFolder = outputFolder;
+        } else {
+            if (databaseConnectionInfo == null) {
+                showError("Please configure database settings first");
+                return;
+            }
+            
+            dataSink = createDataSinkFromConfig(databaseConnectionInfo);
+            // For database backup, create temp folder for CSV files from Bulk API
+            outputFolder = System.getProperty("java.io.tmpdir") + File.separator + "backupforce_" + System.currentTimeMillis();
+            File tempDir = new File(outputFolder);
+            tempDir.mkdirs();
+            displayFolder = "Database: " + dataSink.getDisplayName();
         }
         
         // Disable controls
@@ -535,6 +651,9 @@ public class BackupController {
         browseButton.setDisable(true);
         selectAllButton.setDisable(true);
         deselectAllButton.setDisable(true);
+        csvRadioButton.setDisable(true);
+        databaseRadioButton.setDisable(true);
+        databaseSettingsButton.setDisable(true);
         
         logArea.clear();
         progressBar.setProgress(0);
@@ -551,7 +670,7 @@ public class BackupController {
         logMessage("=".repeat(60));
         logMessage("BACKUP STARTED");
         logMessage("Objects to backup: " + selectedObjects.size());
-        logMessage("Output folder: " + outputFolder);
+        logMessage("Output: " + displayFolder);
         logMessage("=".repeat(60));
         
         // Reset all statuses and extra fields
@@ -567,7 +686,7 @@ public class BackupController {
         updateFilteredLists();
         
         // Start backup
-        currentBackupTask = new BackupTask(selectedObjects, outputFolder);
+        currentBackupTask = new BackupTask(selectedObjects, outputFolder, displayFolder, dataSink);
         
         currentBackupTask.setOnSucceeded(event -> {
             Platform.runLater(() -> {
@@ -577,6 +696,10 @@ public class BackupController {
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
+                csvRadioButton.setDisable(false);
+                databaseRadioButton.setDisable(false);
+                databaseSettingsButton.setDisable(false);
+                exportResultsButton.setDisable(false);
             });
         });
         
@@ -588,6 +711,10 @@ public class BackupController {
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
+                csvRadioButton.setDisable(false);
+                databaseRadioButton.setDisable(false);
+                databaseSettingsButton.setDisable(false);
+                exportResultsButton.setDisable(false);
                 progressLabel.setText("Backup failed");
                 logMessage("Backup failed: " + currentBackupTask.getException().getMessage());
             });
@@ -601,6 +728,10 @@ public class BackupController {
                 browseButton.setDisable(false);
                 selectAllButton.setDisable(false);
                 deselectAllButton.setDisable(false);
+                csvRadioButton.setDisable(false);
+                databaseRadioButton.setDisable(false);
+                databaseSettingsButton.setDisable(false);
+                exportResultsButton.setDisable(false);
                 progressLabel.setText("Backup cancelled");
             });
         });
@@ -616,6 +747,171 @@ public class BackupController {
             currentBackupTask.cancel();
             logMessage("Stopping backup...");
         }
+    }
+    
+    @FXML
+    private void handleExportResults() {
+        List<SObjectItem> completedItems = allObjects.stream()
+            .filter(item -> item.getStatus().contains("Completed") || item.getStatus().contains("Failed") || item.getStatus().contains("Not Supported"))
+            .collect(Collectors.toList());
+        
+        if (completedItems.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("No Results");
+            alert.setHeaderText("No backup results to export");
+            alert.setContentText("Please run a backup first.");
+            alert.showAndWait();
+            return;
+        }
+        
+        // Generate table in different formats
+        String markdownTable = generateMarkdownTable(completedItems);
+        String plainTextTable = generatePlainTextTable(completedItems);
+        String csvTable = generateCSVTable(completedItems);
+        
+        // Create a dialog with tabs for different formats
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Export Backup Results");
+        dialog.setHeaderText("Choose format and copy to clipboard");
+        
+        TabPane tabPane = new TabPane();
+        
+        // Markdown tab (good for Teams, Slack)
+        Tab markdownTab = new Tab("Markdown (Teams/Slack)");
+        TextArea markdownArea = new TextArea(markdownTable);
+        markdownArea.setEditable(false);
+        markdownArea.setWrapText(false);
+        markdownArea.setPrefSize(600, 400);
+        markdownArea.setStyle("-fx-font-family: 'Consolas', monospace;");
+        Button copyMarkdownBtn = new Button("Copy to Clipboard");
+        copyMarkdownBtn.setOnAction(e -> {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(markdownTable);
+            clipboard.setContent(content);
+            copyMarkdownBtn.setText("✓ Copied!");
+            Platform.runLater(() -> {
+                try { Thread.sleep(2000); } catch (Exception ex) {}
+                copyMarkdownBtn.setText("Copy to Clipboard");
+            });
+        });
+        VBox markdownBox = new VBox(10, markdownArea, copyMarkdownBtn);
+        markdownBox.setPadding(new javafx.geometry.Insets(10));
+        markdownTab.setContent(markdownBox);
+        
+        // Plain text tab
+        Tab plainTab = new Tab("Plain Text");
+        TextArea plainArea = new TextArea(plainTextTable);
+        plainArea.setEditable(false);
+        plainArea.setWrapText(false);
+        plainArea.setPrefSize(600, 400);
+        plainArea.setStyle("-fx-font-family: 'Consolas', monospace;");
+        Button copyPlainBtn = new Button("Copy to Clipboard");
+        copyPlainBtn.setOnAction(e -> {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(plainTextTable);
+            clipboard.setContent(content);
+            copyPlainBtn.setText("✓ Copied!");
+            Platform.runLater(() -> {
+                try { Thread.sleep(2000); } catch (Exception ex) {}
+                copyPlainBtn.setText("Copy to Clipboard");
+            });
+        });
+        VBox plainBox = new VBox(10, plainArea, copyPlainBtn);
+        plainBox.setPadding(new javafx.geometry.Insets(10));
+        plainTab.setContent(plainBox);
+        
+        // CSV tab
+        Tab csvTab = new Tab("CSV");
+        TextArea csvArea = new TextArea(csvTable);
+        csvArea.setEditable(false);
+        csvArea.setWrapText(false);
+        csvArea.setPrefSize(600, 400);
+        csvArea.setStyle("-fx-font-family: 'Consolas', monospace;");
+        Button copyCsvBtn = new Button("Copy to Clipboard");
+        copyCsvBtn.setOnAction(e -> {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(csvTable);
+            clipboard.setContent(content);
+            copyCsvBtn.setText("✓ Copied!");
+            Platform.runLater(() -> {
+                try { Thread.sleep(2000); } catch (Exception ex) {}
+                copyCsvBtn.setText("Copy to Clipboard");
+            });
+        });
+        VBox csvBox = new VBox(10, csvArea, copyCsvBtn);
+        csvBox.setPadding(new javafx.geometry.Insets(10));
+        csvTab.setContent(csvBox);
+        
+        tabPane.getTabs().addAll(markdownTab, plainTab, csvTab);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        
+        dialog.getDialogPane().setContent(tabPane);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+    
+    private String generateMarkdownTable(List<SObjectItem> items) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("| Object Name | Status | Records | Size | Duration |\n");
+        sb.append("|-------------|--------|---------|------|----------|\n");
+        
+        for (SObjectItem item : items) {
+            sb.append(String.format("| %s | %s | %s | %s | %s |\n",
+                item.getName(),
+                item.getStatus().replace("|", "\\|"),
+                item.getRecordCount().isEmpty() ? "N/A" : item.getRecordCount(),
+                item.getFileSize().isEmpty() ? "N/A" : item.getFileSize(),
+                item.getDuration().isEmpty() ? "N/A" : item.getDuration()
+            ));
+        }
+        
+        return sb.toString();
+    }
+    
+    private String generatePlainTextTable(List<SObjectItem> items) {
+        StringBuilder sb = new StringBuilder();
+        
+        // Calculate column widths
+        int nameWidth = Math.max(20, items.stream().mapToInt(i -> i.getName().length()).max().orElse(20));
+        int statusWidth = Math.max(15, items.stream().mapToInt(i -> i.getStatus().length()).max().orElse(15));
+        
+        String format = "%-" + nameWidth + "s  %-" + statusWidth + "s  %-12s  %-10s  %-10s\n";
+        String separator = "-".repeat(nameWidth) + "  " + "-".repeat(statusWidth) + "  " + "-".repeat(12) + "  " + "-".repeat(10) + "  " + "-".repeat(10) + "\n";
+        
+        sb.append(String.format(format, "Object Name", "Status", "Records", "Size", "Duration"));
+        sb.append(separator);
+        
+        for (SObjectItem item : items) {
+            sb.append(String.format(format,
+                item.getName(),
+                item.getStatus(),
+                item.getRecordCount().isEmpty() ? "N/A" : item.getRecordCount(),
+                item.getFileSize().isEmpty() ? "N/A" : item.getFileSize(),
+                item.getDuration().isEmpty() ? "N/A" : item.getDuration()
+            ));
+        }
+        
+        return sb.toString();
+    }
+    
+    private String generateCSVTable(List<SObjectItem> items) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Object Name,Status,Records,Size,Duration\n");
+        
+        for (SObjectItem item : items) {
+            sb.append(String.format("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+                item.getName(),
+                item.getStatus().replace("\"", "\"\""),
+                item.getRecordCount().isEmpty() ? "N/A" : item.getRecordCount(),
+                item.getFileSize().isEmpty() ? "N/A" : item.getFileSize(),
+                item.getDuration().isEmpty() ? "N/A" : item.getDuration()
+            ));
+        }
+        
+        return sb.toString();
     }
 
     private void logMessage(String message) {
@@ -640,12 +936,16 @@ public class BackupController {
     private class BackupTask extends Task<Void> {
         private final List<SObjectItem> objects;
         private final String outputFolder;
+        private final String displayFolder;
+        private final DataSink dataSink;
         private volatile boolean cancelled = false;
         private ExecutorService executor;
 
-        public BackupTask(List<SObjectItem> objects, String outputFolder) {
+        public BackupTask(List<SObjectItem> objects, String outputFolder, String displayFolder, DataSink dataSink) {
             this.objects = objects;
             this.outputFolder = outputFolder;
+            this.displayFolder = displayFolder;
+            this.dataSink = dataSink;
         }
 
         @Override
@@ -659,6 +959,19 @@ public class BackupController {
             );
             
             logMessage("Connected to Salesforce: " + connectionInfo.getInstanceUrl());
+            
+            // Connect to data sink
+            if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                try {
+                    logMessage("Connecting to " + dataSink.getDisplayName() + "...");
+                    dataSink.connect();
+                    logMessage("Successfully connected to " + dataSink.getDisplayName());
+                } catch (Exception e) {
+                    logMessage("ERROR: Failed to connect to " + dataSink.getDisplayName() + ": " + e.getMessage());
+                    throw new RuntimeException("Failed to connect to backup destination", e);
+                }
+            }
+            
             logMessage("Starting parallel backup with 10 threads...");
             logMessage("");
             
@@ -693,10 +1006,38 @@ public class BackupController {
                         Platform.runLater(() -> item.setStatus("Processing..."));
                         
                         long objectStart = System.currentTimeMillis();
+                        
+                        // Step 1: Query object using Bulk API (writes CSV file)
                         bulkClient.queryObject(objectName, outputFolder, (status) -> {
                             // Update status in real-time
                             Platform.runLater(() -> item.setStatus(status));
                         });
+                        
+                        // Step 2: If using database sink, write to database
+                        if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                            Platform.runLater(() -> item.setStatus("Writing to database..."));
+                            
+                            File csvFile = new File(outputFolder, objectName + ".csv");
+                            if (csvFile.exists()) {
+                                try (java.io.FileReader reader = new java.io.FileReader(csvFile)) {
+                                    // For now, we skip prepareSink since we don't have field metadata
+                                    // The JdbcDatabaseSink will auto-create tables from CSV headers
+                                    String backupId = String.valueOf(System.currentTimeMillis());
+                                    
+                                    int recordsWritten = dataSink.writeData(objectName, reader, backupId, (status) -> {
+                                        Platform.runLater(() -> item.setStatus(status));
+                                    });
+                                    
+                                    logMessage(String.format("[%s] Wrote %d records to %s", 
+                                        objectName, recordsWritten, dataSink.getDisplayName()));
+                                } catch (Exception dbEx) {
+                                    logMessage(String.format("[%s] WARNING: Failed to write to database: %s", 
+                                        objectName, dbEx.getMessage()));
+                                    logger.warn("Failed to write {} to database", objectName, dbEx);
+                                }
+                            }
+                        }
+                        
                         long objectTime = System.currentTimeMillis() - objectStart;
                         
                         successful.incrementAndGet();
@@ -813,6 +1154,16 @@ public class BackupController {
             
             bulkClient.close();
             
+            // Disconnect from data sink
+            if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                try {
+                    logMessage("Disconnecting from " + dataSink.getDisplayName() + "...");
+                    dataSink.disconnect();
+                } catch (Exception e) {
+                    logger.warn("Error disconnecting from data sink", e);
+                }
+            }
+            
             long totalTime = System.currentTimeMillis() - startTime;
             
             Platform.runLater(() -> {
@@ -822,7 +1173,7 @@ public class BackupController {
                 logMessage("Successful: " + successful.get());
                 logMessage("Failed: " + failed.get());
                 logMessage("Total time: " + totalTime / 1000 + " seconds");
-                logMessage("Output folder: " + outputFolder);
+                logMessage("Output: " + displayFolder);
                 logMessage("=".repeat(60));
                 
                 if (!cancelled) {
@@ -831,7 +1182,7 @@ public class BackupController {
                     alert.setHeaderText("Backup Finished Successfully");
                     alert.setContentText(String.format(
                         "Backed up %d objects in %d seconds\n\nOutput: %s",
-                        successful.get(), totalTime / 1000, outputFolder
+                        successful.get(), totalTime / 1000, displayFolder
                     ));
                     alert.showAndWait();
                 }

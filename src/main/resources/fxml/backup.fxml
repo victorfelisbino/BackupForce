@@ -143,8 +143,43 @@
             
             <Separator/>
             
+            <!-- Backup Target Selection -->
+            <VBox spacing="10" styleClass="config-section">
+                <Label text="Backup Destination" styleClass="section-header">
+                    <font>
+                        <Font size="13" name="System Bold"/>
+                    </font>
+                </Label>
+                
+                <HBox spacing="20" alignment="CENTER_LEFT" style="-fx-padding: 5 0 0 10;">
+                    <RadioButton fx:id="csvRadioButton" text="CSV Files" selected="true" 
+                                styleClass="radio-option">
+                        <toggleGroup>
+                            <ToggleGroup fx:id="backupTargetGroup"/>
+                        </toggleGroup>
+                        <font>
+                            <Font size="12"/>
+                        </font>
+                    </RadioButton>
+                    <RadioButton fx:id="databaseRadioButton" text="Database" 
+                                toggleGroup="$backupTargetGroup" styleClass="radio-option">
+                        <font>
+                            <Font size="12"/>
+                        </font>
+                    </RadioButton>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="databaseSettingsButton" text="⚙ Database Settings..." 
+                           onAction="#handleDatabaseSettings" 
+                           styleClass="secondary-button" disable="true">
+                        <font>
+                            <Font size="11"/>
+                        </font>
+                    </Button>
+                </HBox>
+            </VBox>
+            
             <!-- Output Folder Selection -->
-            <HBox spacing="10" alignment="CENTER_LEFT">
+            <HBox spacing="10" alignment="CENTER_LEFT" fx:id="outputFolderBox">
                 <Label text="Output Folder:" styleClass="form-label">
                     <font>
                         <Font size="12"/>
@@ -177,6 +212,12 @@
                 </Button>
                 <Button fx:id="stopBackupButton" text="Stop Backup" onAction="#handleStopBackup" 
                        prefWidth="150" styleClass="danger-button">
+                    <font>
+                        <Font size="14"/>
+                    </font>
+                </Button>
+                <Button fx:id="exportResultsButton" text="Export Results" onAction="#handleExportResults" 
+                       prefWidth="150" styleClass="secondary-button" disable="true">
                     <font>
                         <Font size="14"/>
                     </font>
