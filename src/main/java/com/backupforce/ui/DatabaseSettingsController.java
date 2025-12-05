@@ -255,6 +255,7 @@ public class DatabaseSettingsController {
             Preferences prefs = Preferences.userRoot().node(PREFS_NODE);
             
             if (prefs.getBoolean("remember", false) && dbType.equals(prefs.get("databaseType", ""))) {
+                // Load text field values
                 for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
                     String key = entry.getKey().toLowerCase();
                     String value = prefs.get(key, "");
@@ -264,11 +265,16 @@ public class DatabaseSettingsController {
                     }
                     
                     entry.getValue().setText(value);
-                    
-                    // Also update ComboBox if it exists
-                    ComboBox<String> combo = comboMap.get(entry.getKey());
-                    if (combo != null && !value.isEmpty()) {
-                        combo.setValue(value);
+                }
+                
+                // Load combo box values for Snowflake
+                if (dbType.equals("Snowflake")) {
+                    for (Map.Entry<String, ComboBox<String>> entry : comboMap.entrySet()) {
+                        String key = entry.getKey().toLowerCase();
+                        String value = prefs.get(key, "");
+                        if (!value.isEmpty()) {
+                            entry.getValue().setValue(value);
+                        }
                     }
                 }
             }
@@ -358,7 +364,7 @@ public class DatabaseSettingsController {
     }
     
     private void loadWarehouses() {
-        loadSnowflakeResource("Warehouse", "SHOW WAREHOUSES", comboMap.get("Warehouse"));
+        loadSnowflakeResource("Warehouse", "SHOW WAREHOUSES", comboMap.get("Warehouse"), false);
     }
     
     private void loadDatabases() {
@@ -379,7 +385,7 @@ public class DatabaseSettingsController {
         };
         
         setWarehouseTask.setOnSucceeded(e -> {
-            loadSnowflakeResource("Database", "SHOW DATABASES", comboMap.get("Database"));
+            loadSnowflakeResource("Database", "SHOW DATABASES", comboMap.get("Database"), false);
         });
         
         setWarehouseTask.setOnFailed(e -> {
@@ -395,10 +401,10 @@ public class DatabaseSettingsController {
             return;
         }
         
-        loadSnowflakeResource("Schema", "SHOW SCHEMAS IN DATABASE " + database, comboMap.get("Schema"));
+        loadSnowflakeResource("Schema", "SHOW SCHEMAS IN DATABASE " + database, comboMap.get("Schema"), true);
     }
     
-    private void loadSnowflakeResource(String resourceType, String query, ComboBox<String> comboBox) {
+    private void loadSnowflakeResource(String resourceType, String query, ComboBox<String> comboBox, boolean allowCreate) {
         if (activeConnection == null) {
             statusLabel.setText("Please connect to Snowflake first");
             statusLabel.setStyle("-fx-text-fill: #c62828;");
@@ -425,11 +431,31 @@ public class DatabaseSettingsController {
         loadTask.setOnSucceeded(e -> {
             List<String> items = loadTask.getValue();
             Platform.runLater(() -> {
+                // Add "Create New..." option for schemas
+                if (allowCreate && resourceType.equals("Schema")) {
+                    items.add(0, "➕ Create New Schema...");
+                }
+                
                 comboBox.setItems(FXCollections.observableArrayList(items));
                 if (!items.isEmpty()) {
-                    comboBox.getSelectionModel().selectFirst();
+                    // Select first non-create option
+                    if (allowCreate && items.size() > 1) {
+                        comboBox.getSelectionModel().select(1);
+                    } else {
+                        comboBox.getSelectionModel().selectFirst();
+                    }
                 }
-                statusLabel.setText(String.format("✓ Loaded %d %s(s)", items.size(), resourceType.toLowerCase()));
+                
+                // Add listener for "Create New Schema" selection
+                if (allowCreate && resourceType.equals("Schema")) {
+                    comboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+                        if ("➕ Create New Schema...".equals(newVal)) {
+                            createNewSchema();
+                        }
+                    });
+                }
+                
+                statusLabel.setText(String.format("✓ Loaded %d %s(s)", allowCreate ? items.size() - 1 : items.size(), resourceType.toLowerCase()));
                 statusLabel.setStyle("-fx-text-fill: #2e7d32;");
             });
         });
@@ -444,6 +470,81 @@ public class DatabaseSettingsController {
         });
         
         new Thread(loadTask).start();
+    }
+    
+    private void createNewSchema() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Create New Schema");
+        dialog.setHeaderText("Create a new Snowflake schema");
+        dialog.setContentText("Schema name:");
+        dialog.getEditor().setPromptText("e.g., SALESFORCE_QA or SALESFORCE_STAGING");
+        
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(schemaName -> {
+            if (schemaName.trim().isEmpty()) {
+                statusLabel.setText("Schema name cannot be empty");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                comboMap.get("Schema").getSelectionModel().selectFirst();
+                return;
+            }
+            
+            // Convert to uppercase and replace hyphens with underscores
+            String normalizedName = schemaName.trim().toUpperCase().replace("-", "_");
+            String database = comboMap.get("Database").getValue();
+            
+            if (database == null || database.trim().isEmpty()) {
+                statusLabel.setText("Please select a database first");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                comboMap.get("Schema").getSelectionModel().selectFirst();
+                return;
+            }
+            
+            statusLabel.setText("Creating schema " + normalizedName + "...");
+            statusLabel.setStyle("-fx-text-fill: #1976d2;");
+            
+            Task<String> createTask = new Task<String>() {
+                @Override
+                protected String call() throws Exception {
+                    try (Statement stmt = activeConnection.createStatement()) {
+                        // Use quoted identifiers to handle database and schema names safely
+                        stmt.execute(String.format("USE DATABASE \"%s\"", database));
+                        stmt.execute(String.format("CREATE SCHEMA IF NOT EXISTS \"%s\"", normalizedName));
+                        return normalizedName;
+                    }
+                }
+            };
+            
+            createTask.setOnSucceeded(e -> {
+                String createdSchema = createTask.getValue();
+                statusLabel.setText("✓ Schema '" + createdSchema + "' created successfully");
+                statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+                
+                // Reload schemas and select the newly created one
+                loadSchemas();
+                Platform.runLater(() -> {
+                    comboMap.get("Schema").setValue(createdSchema);
+                });
+            });
+            
+            createTask.setOnFailed(e -> {
+                Throwable ex = createTask.getException();
+                logger.error("Failed to create schema", ex);
+                statusLabel.setText("✗ Failed to create schema: " + ex.getMessage());
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                comboMap.get("Schema").getSelectionModel().selectFirst();
+            });
+            
+            new Thread(createTask).start();
+        });
+        
+        // If user cancels, revert selection
+        if (!result.isPresent()) {
+            Platform.runLater(() -> {
+                if (comboMap.get("Schema").getItems().size() > 1) {
+                    comboMap.get("Schema").getSelectionModel().select(1);
+                }
+            });
+        }
     }
     
     @FXML
@@ -489,13 +590,139 @@ public class DatabaseSettingsController {
             return;
         }
         
+        // For Snowflake, test schema permissions before saving
+        DatabaseType dbType = databaseTypeCombo.getValue();
+        if (dbType.name.equals("Snowflake")) {
+            if (activeConnection == null) {
+                statusLabel.setText("Please connect to Snowflake first");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+            
+            String schema = comboMap.get("Schema").getValue();
+            if (schema == null || schema.trim().isEmpty()) {
+                statusLabel.setText("Please select a schema");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+            
+            // Test schema permissions
+            testSchemaPermissions(schema);
+            return; // Will save after permission test succeeds
+        }
+        
+        // For non-Snowflake databases, save directly
+        saveConnection();
+    }
+    
+    private void testSchemaPermissions(String schema) {
+        statusLabel.setText("Testing schema permissions...");
+        statusLabel.setStyle("-fx-text-fill: #1976d2;");
+        
+        Task<String> permissionTask = new Task<String>() {
+            @Override
+            protected String call() throws Exception {
+                // Get database from combo
+                String database = comboMap.get("Database").getValue();
+                if (database == null || database.trim().isEmpty()) {
+                    throw new Exception("Database not selected");
+                }
+                
+                // Try to create a test table
+                String testTable = "BACKUPFORCE_TEST_" + System.currentTimeMillis();
+                try (Statement stmt = activeConnection.createStatement()) {
+                    // Set database and schema context
+                    stmt.execute(String.format("USE DATABASE %s", database));
+                    stmt.execute(String.format("USE SCHEMA %s", schema));
+                    
+                    // Create test table with fully qualified name
+                    String fullyQualifiedTable = String.format("%s.%s.%s", database, schema, testTable);
+                    stmt.execute(String.format("CREATE TABLE %s (id INT)", fullyQualifiedTable));
+                    
+                    // Drop test table
+                    stmt.execute(String.format("DROP TABLE %s", fullyQualifiedTable));
+                    
+                    return "CREATE_OK";
+                } catch (SQLException e) {
+                    // Check if we can at least read from the schema
+                    try (Statement stmt = activeConnection.createStatement();
+                         ResultSet rs = stmt.executeQuery(String.format("SHOW TABLES IN SCHEMA %s.%s LIMIT 1", database, schema))) {
+                        return "READ_ONLY";
+                    } catch (SQLException e2) {
+                        throw new Exception("No access to schema: " + e.getMessage());
+                    }
+                }
+            }
+        };
+        
+        permissionTask.setOnSucceeded(e -> {
+            String result = permissionTask.getValue();
+            if ("CREATE_OK".equals(result)) {
+                statusLabel.setText("✓ Schema permissions verified - can create tables");
+                statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+                saveConnection();
+            } else if ("READ_ONLY".equals(result)) {
+                statusLabel.setText("⚠ Warning: Read-only access - cannot create tables. Backups will fail!");
+                statusLabel.setStyle("-fx-text-fill: #f57c00; -fx-font-weight: bold;");
+                // Still save, but warn user
+                saveConnection();
+            }
+        });
+        
+        permissionTask.setOnFailed(e -> {
+            Throwable ex = permissionTask.getException();
+            logger.error("Schema permission test failed", ex);
+            statusLabel.setText("✗ " + ex.getMessage());
+            statusLabel.setStyle("-fx-text-fill: #c62828;");
+        });
+        
+        new Thread(permissionTask).start();
+    }
+    
+    private void saveConnection() {
         DatabaseType dbType = databaseTypeCombo.getValue();
         Map<String, String> fields = new HashMap<>();
         
+        // Add text field values
         for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
-            fields.put(entry.getKey(), entry.getValue().getText().trim());
+            String value = entry.getValue().getText().trim();
+            if (!value.isEmpty()) {
+                fields.put(entry.getKey(), value);
+            }
         }
         
+        // Add combo box values for Snowflake (overwrite any from hidden TextFields)
+        if (dbType.name.equals("Snowflake")) {
+            for (Map.Entry<String, ComboBox<String>> entry : comboMap.entrySet()) {
+                String value = entry.getValue().getValue();
+                // Filter out the "Create New Schema..." option and null values
+                if (value != null && !value.trim().isEmpty() && !value.startsWith("➕")) {
+                    fields.put(entry.getKey(), value.trim());
+                    logger.info("Saving {} = {}", entry.getKey(), value.trim());
+                }
+            }
+        }
+        
+        // Validate required Snowflake fields
+        if (dbType.name.equals("Snowflake")) {
+            if (!fields.containsKey("Warehouse") || fields.get("Warehouse").isEmpty()) {
+                statusLabel.setText("Please select a warehouse");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+            if (!fields.containsKey("Database") || fields.get("Database").isEmpty()) {
+                statusLabel.setText("Please select a database");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+            if (!fields.containsKey("Schema") || fields.get("Schema").isEmpty()) {
+                statusLabel.setText("Please select a schema");
+                statusLabel.setStyle("-fx-text-fill: #c62828;");
+                return;
+            }
+        }
+        
+        logger.info("Creating DatabaseConnectionInfo with fields: {}", fields.keySet());
         connectionInfo = new DatabaseConnectionInfo(dbType.name, fields);
         
         if (rememberCheckBox.isSelected()) {
@@ -530,6 +757,7 @@ public class DatabaseSettingsController {
             
             prefs.put("databaseType", dbType.name);
             
+            // Save text field values
             for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
                 String key = entry.getKey().toLowerCase();
                 String value = entry.getValue().getText().trim();
@@ -539,6 +767,16 @@ public class DatabaseSettingsController {
                 }
                 
                 prefs.put(key, value);
+            }
+            
+            // Save combo box values for Snowflake
+            if (dbType.name.equals("Snowflake")) {
+                for (Map.Entry<String, ComboBox<String>> entry : comboMap.entrySet()) {
+                    String value = entry.getValue().getValue();
+                    if (value != null && !value.trim().isEmpty()) {
+                        prefs.put(entry.getKey().toLowerCase(), value.trim());
+                    }
+                }
             }
             
             prefs.putBoolean("remember", true);

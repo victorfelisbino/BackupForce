@@ -8,7 +8,8 @@
       fx:controller="com.backupforce.ui.DatabaseSettingsController"
       prefWidth="550" prefHeight="500" 
       styleClass="root" 
-      spacing="20">
+      spacing="20"
+      stylesheets="@../css/vscode-dark.css">
     
     <padding>
         <Insets top="20" right="20" bottom="20" left="20"/>

@@ -21,6 +21,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Region;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -82,7 +83,7 @@ public class BackupController {
     @FXML private RadioButton databaseRadioButton;
     @FXML private ToggleGroup backupTargetGroup;
     @FXML private Button databaseSettingsButton;
-    @FXML private HBox outputFolderBox;
+    @FXML private VBox outputFolderBox;
     
     @FXML private TextField outputFolderField;
     @FXML private Button browseButton;
@@ -94,11 +95,13 @@ public class BackupController {
     
     @FXML private ProgressBar progressBar;
     @FXML private Label progressLabel;
+    @FXML private Label progressPercentLabel;
     @FXML private TextArea logArea;
     
     @FXML private Label connectionLabel;
     @FXML private TextField searchField;
     @FXML private Label selectionCountLabel;
+    @FXML private Button logoutButton;
 
     
     private LoginController.ConnectionInfo connectionInfo;
@@ -186,26 +189,35 @@ public class BackupController {
         
         // Color coding for status
         allStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            private final Label label = new Label();
+            {
+                label.setWrapText(true);
+                label.setMaxWidth(Double.MAX_VALUE);
+                label.setPrefHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
+                setGraphic(label);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+            
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
+                    label.setText(null);
+                    label.setStyle("");
                 } else {
-                    setText(item);
+                    label.setText(item);
                     if (item.startsWith("✓")) {
-                        setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #4caf50; -fx-font-weight: bold;");
                     } else if (item.startsWith("✗")) {
-                        setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #f44336; -fx-font-weight: bold;");
                     } else if (item.startsWith("⊘")) {
-                        setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #ffa726; -fx-font-weight: bold;");
                     } else if (item.startsWith("\u2298")) {
-                        setStyle("-fx-text-fill: gray; -fx-font-style: italic;");
+                        label.setStyle("-fx-text-fill: #8892a6; -fx-font-style: italic;");
                     } else if (item.contains("Processing") || item.contains("Creating") || item.contains("Downloading")) {
-                        setStyle("-fx-text-fill: blue;");
+                        label.setStyle("-fx-text-fill: #4a9eff;");
                     } else {
-                        setStyle("");
+                        label.setStyle("");
                     }
                 }
             }
@@ -236,26 +248,35 @@ public class BackupController {
         
         // Color coding for status
         statusAllStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            private final Label label = new Label();
+            {
+                label.setWrapText(true);
+                label.setMaxWidth(Double.MAX_VALUE);
+                label.setPrefHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
+                setGraphic(label);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+            
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
+                    label.setText(null);
+                    label.setStyle("");
                 } else {
-                    setText(item);
+                    label.setText(item);
                     if (item.startsWith("✓")) {
-                        setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #4caf50; -fx-font-weight: bold;");
                     } else if (item.startsWith("✗")) {
-                        setStyle("-fx-text-fill: #c62828; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #f44336; -fx-font-weight: bold;");
                     } else if (item.startsWith("⊘")) {
-                        setStyle("-fx-text-fill: #f57c00; -fx-font-weight: bold;");
+                        label.setStyle("-fx-text-fill: #ffa726; -fx-font-weight: bold;");
                     } else if (item.startsWith("\u2298")) {
-                        setStyle("-fx-text-fill: #9e9e9e; -fx-font-style: italic;");
+                        label.setStyle("-fx-text-fill: #8892a6; -fx-font-style: italic;");
                     } else if (item.contains("Processing") || item.contains("Creating") || item.contains("Downloading")) {
-                        setStyle("-fx-text-fill: #1976d2; -fx-font-weight: 500;");
+                        label.setStyle("-fx-text-fill: #4a9eff; -fx-font-weight: 500;");
                     } else {
-                        setStyle("");
+                        label.setStyle("");
                     }
                 }
             }
@@ -267,15 +288,24 @@ public class BackupController {
         progressStatusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
         
         progressStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            private final Label label = new Label();
+            {
+                label.setWrapText(true);
+                label.setMaxWidth(Double.MAX_VALUE);
+                label.setPrefHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
+                setGraphic(label);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+            
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
+                    label.setText(null);
+                    label.setStyle("");
                 } else {
-                    setText(item);
-                    setStyle("-fx-text-fill: blue;");
+                    label.setText(item);
+                    label.setStyle("-fx-text-fill: #4a9eff;");
                 }
             }
         });
@@ -295,7 +325,7 @@ public class BackupController {
                 if (empty || item == null) {
                     setStyle("");
                 } else {
-                    setStyle("-fx-background-color: #e8f5e9;");
+                    setStyle("");
                 }
             }
         });
@@ -305,6 +335,28 @@ public class BackupController {
         errorNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
         errorMessageColumn.setCellValueFactory(cellData -> cellData.getValue().errorMessageProperty());
         
+        // Enable text wrapping for error messages
+        errorMessageColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
+            private final Label label = new Label();
+            {
+                label.setWrapText(true);
+                label.setMaxWidth(Double.MAX_VALUE);
+                label.setPrefHeight(Region.USE_COMPUTED_SIZE);
+                setGraphic(label);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+            
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    label.setText(null);
+                } else {
+                    label.setText(item);
+                }
+            }
+        });
+        
         // Red styling for error items
         errorsTable.setRowFactory(tv -> new TableRow<SObjectItem>() {
             @Override
@@ -313,7 +365,7 @@ public class BackupController {
                 if (empty || item == null) {
                     setStyle("");
                 } else {
-                    setStyle("-fx-background-color: #ffebee;");
+                    setStyle("");
                 }
             }
         });
@@ -321,8 +373,45 @@ public class BackupController {
 
     public void setConnectionInfo(LoginController.ConnectionInfo connInfo) {
         this.connectionInfo = connInfo;
-        connectionLabel.setText("Connected to: " + connInfo.getInstanceUrl() + " as " + connInfo.getUsername());
+        updateConnectionLabel();
         loadObjects();
+    }
+    
+    private void updateConnectionLabel() {
+        StringBuilder labelText = new StringBuilder();
+        labelText.append("Salesforce: ").append(connectionInfo.getUsername());
+        labelText.append(" @ ").append(connectionInfo.getInstanceUrl());
+        
+        // Add database info if configured
+        if (databaseConnectionInfo != null) {
+            Map<String, String> fields = databaseConnectionInfo.getFields();
+            labelText.append(" → Database: ");
+            
+            if ("Snowflake".equals(databaseConnectionInfo.getDatabaseType())) {
+                String account = fields.get("Account");
+                String database = fields.get("Database");
+                String schema = fields.get("Schema");
+                labelText.append(account != null ? account : "?");
+                labelText.append(".");
+                labelText.append(database != null ? database : "?");
+                labelText.append(".");
+                labelText.append(schema != null ? schema : "?");
+            } else {
+                // For other database types, show database and schema
+                String database = fields.get("Database");
+                String schema = fields.get("Schema");
+                if (database != null) {
+                    labelText.append(database);
+                    if (schema != null) {
+                        labelText.append(".").append(schema);
+                    }
+                } else {
+                    labelText.append(databaseConnectionInfo.getDatabaseType());
+                }
+            }
+        }
+        
+        connectionLabel.setText(labelText.toString());
     }
 
     // Known objects that are not supported by Bulk API
@@ -513,6 +602,9 @@ public class BackupController {
             if (controller.isSaved()) {
                 databaseConnectionInfo = controller.getConnectionInfo();
                 logger.info("Database settings saved: {}", databaseConnectionInfo.getDatabaseType());
+                
+                // Update connection label to show database info
+                updateConnectionLabel();
             }
         } catch (IOException e) {
             logger.error("Error opening database settings", e);
@@ -522,16 +614,27 @@ public class BackupController {
 
     private DataSink createDataSinkFromConfig(DatabaseConnectionInfo config) {
         Map<String, String> fields = config.getFields();
+        logger.info("Creating DataSink from config. Database type: {}, Fields: {}", config.getDatabaseType(), fields.keySet());
+        
         switch (config.getDatabaseType()) {
             case "Snowflake":
-                return DataSinkFactory.createSnowflakeSink(
-                    fields.get("Account"), 
-                    fields.get("Warehouse"), 
-                    fields.get("Database"), 
-                    fields.get("Schema"),
-                    fields.get("Username"), 
-                    fields.get("Password")
-                );
+                String account = fields.get("Account");
+                String warehouse = fields.get("Warehouse");
+                String database = fields.get("Database");
+                String schema = fields.get("Schema");
+                String username = fields.get("Username");
+                String password = fields.get("Password");
+                
+                logger.info("Snowflake config - Account: {}, Warehouse: {}, Database: {}, Schema: {}, Username: {}, Password: {}", 
+                    account, warehouse, database, schema, username, password != null ? "***" : "NULL");
+                
+                if (account == null || warehouse == null || database == null || schema == null) {
+                    throw new IllegalArgumentException("Missing required Snowflake parameters. Account=" + account + 
+                        ", Warehouse=" + warehouse + ", Database=" + database + ", Schema=" + schema);
+                }
+                
+                // For SSO, password can be null
+                return DataSinkFactory.createSnowflakeSink(account, warehouse, database, schema, username, password);
             case "SQL Server":
                 return DataSinkFactory.createSqlServerSink(
                     fields.get("Server"), 
@@ -1007,11 +1110,58 @@ public class BackupController {
                         
                         long objectStart = System.currentTimeMillis();
                         
+                        // Check if doing incremental backup
+                        String whereClause = null;
+                        if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                            // Check if table exists and get last backup timestamp
+                            try {
+                                com.backupforce.sink.JdbcDatabaseSink jdbcSink = (com.backupforce.sink.JdbcDatabaseSink) dataSink;
+                                com.backupforce.sink.dialect.SnowflakeDialect dialect = new com.backupforce.sink.dialect.SnowflakeDialect();
+                                String tableName = dialect.sanitizeTableName(objectName);
+                                java.sql.Timestamp lastBackup = jdbcSink.getLastBackupTimestamp(tableName);
+                                
+                                if (lastBackup != null) {
+                                    // Format timestamp for SOQL (ISO 8601)
+                                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+                                    sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                                    String formattedDate = sdf.format(lastBackup);
+                                    whereClause = "LastModifiedDate > " + formattedDate;
+                                    
+                                    Platform.runLater(() -> item.setStatus("Delta backup since " + formattedDate.substring(0, 10)));
+                                    logMessage(String.format("[%s] Incremental backup - querying records modified after %s", objectName, formattedDate));
+                                } else {
+                                    Platform.runLater(() -> item.setStatus("Full backup - first time"));
+                                    logMessage(String.format("[%s] Full backup - table exists but empty", objectName));
+                                }
+                            } catch (Exception e) {
+                                // Table doesn't exist or error checking - do full backup
+                                Platform.runLater(() -> item.setStatus("Full backup - new table"));
+                                logMessage(String.format("[%s] Full backup - creating new table", objectName));
+                            }
+                        }
+                        
                         // Step 1: Query object using Bulk API (writes CSV file)
-                        bulkClient.queryObject(objectName, outputFolder, (status) -> {
+                        bulkClient.queryObject(objectName, outputFolder, whereClause, (status) -> {
                             // Update status in real-time
                             Platform.runLater(() -> item.setStatus(status));
                         });
+                        
+                        // Step 1.5: Download blobs for objects with blob fields (CSV backup only)
+                        if (dataSink == null || dataSink.getType().equals("CSV")) {
+                            String blobField = getBlobFieldName(objectName);
+                            if (blobField != null) {
+                                try {
+                                    Platform.runLater(() -> item.setStatus("Downloading blob files..."));
+                                    bulkClient.downloadBlobs(objectName, outputFolder, blobField, (status) -> {
+                                        Platform.runLater(() -> item.setStatus(status));
+                                    });
+                                } catch (Exception blobEx) {
+                                    logMessage(String.format("[%s] WARNING: Failed to download blobs: %s", 
+                                        objectName, blobEx.getMessage()));
+                                    logger.warn("Failed to download blobs for {}", objectName, blobEx);
+                                }
+                            }
+                        }
                         
                         // Step 2: If using database sink, write to database
                         if (dataSink != null && !dataSink.getType().equals("CSV")) {
@@ -1176,6 +1326,9 @@ public class BackupController {
                 logMessage("Output: " + displayFolder);
                 logMessage("=".repeat(60));
                 
+                // Reset UI for next backup
+                resetUIForNewBackup();
+                
                 if (!cancelled) {
                     Alert alert = new Alert(Alert.AlertType.INFORMATION);
                     alert.setTitle("Backup Complete");
@@ -1203,12 +1356,7 @@ public class BackupController {
             
             // Re-enable controls immediately
             Platform.runLater(() -> {
-                startBackupButton.setDisable(false);
-                stopBackupButton.setDisable(true);
-                allObjectsTable.setDisable(false);
-                browseButton.setDisable(false);
-                selectAllButton.setDisable(false);
-                deselectAllButton.setDisable(false);
+                resetUIForNewBackup();
                 progressLabel.setText("Backup cancelled");
                 logMessage("Backup cancelled by user");
             });
@@ -1217,7 +1365,42 @@ public class BackupController {
         }
     }
     
+    private void resetUIForNewBackup() {
+        startBackupButton.setDisable(false);
+        stopBackupButton.setDisable(true);
+        allObjectsTable.setDisable(false);
+        browseButton.setDisable(false);
+        selectAllButton.setDisable(false);
+        deselectAllButton.setDisable(false);
+        csvRadioButton.setDisable(false);
+        databaseRadioButton.setDisable(false);
+        databaseSettingsButton.setDisable(csvRadioButton.isSelected());
+        outputFolderBox.setDisable(databaseRadioButton.isSelected());
+        progressBar.setProgress(0);
+        progressLabel.setText("Ready to start backup");
+        
+        // Switch back to "All Objects" tab
+        statusTabPane.getSelectionModel().select(0);
+    }
+    
     // Utility methods
+    private static String getBlobFieldName(String objectName) {
+        // Map of objects that have blob fields and their blob field names
+        switch (objectName) {
+            case "Document":
+            case "Attachment":
+                return "Body";
+            case "ContentVersion":
+                return "VersionData";
+            case "StaticResource":
+                return "Body";
+            case "EmailMessage":
+                return null; // Has TextBody and HtmlBody but not blobs
+            default:
+                return null;
+        }
+    }
+    
     private static String formatFileSize(long bytes) {
         if (bytes < 1024) return bytes + " B";
         int exp = (int) (Math.log(bytes) / Math.log(1024));
@@ -1306,5 +1489,38 @@ public class BackupController {
         
         public boolean isDisabled() { return disabled; }
         public void setDisabled(boolean value) { this.disabled = value; }
+    }
+    
+    @FXML
+    private void handleLogout() {
+        logger.info("User initiated logout");
+        
+        // Stop any running backup
+        if (currentBackupTask != null && !currentBackupTask.isDone()) {
+            handleStopBackup();
+        }
+        
+        // Close current window
+        Stage stage = (Stage) logoutButton.getScene().getWindow();
+        stage.close();
+        
+        // Open login window
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            Parent root = loader.load();
+            
+            Stage loginStage = new Stage();
+            loginStage.setTitle("BackupForce - Salesforce Backup Tool");
+            loginStage.setScene(new Scene(root, 600, 750));
+            loginStage.setResizable(true);
+            loginStage.setMinWidth(500);
+            loginStage.setMinHeight(650);
+            loginStage.show();
+            
+            logger.info("Returned to login screen");
+        } catch (IOException e) {
+            logger.error("Failed to load login screen", e);
+            showError("Failed to return to login: " + e.getMessage());
+        }
     }
 }

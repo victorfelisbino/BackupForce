@@ -17,12 +17,14 @@ public class BackupForceApp extends Application {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
             Parent root = loader.load();
             
-            Scene scene = new Scene(root, 500, 400);
-            scene.getStylesheets().add(getClass().getResource("/css/modern-styles.css").toExternalForm());
+            Scene scene = new Scene(root, 600, 700);
+            // CSS is already loaded from FXML, no need to add it again
             
             primaryStage.setTitle("BackupForce - Salesforce Backup Tool");
             primaryStage.setScene(scene);
-            primaryStage.setResizable(false);
+            primaryStage.setResizable(true);
+            primaryStage.setMinWidth(500);
+            primaryStage.setMinHeight(600);
             primaryStage.show();
             
             logger.info("BackupForce application started");

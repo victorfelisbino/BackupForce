@@ -1,5 +1,6 @@
 package com.backupforce.ui;
 
+import com.backupforce.auth.SalesforceOAuthServer;
 import com.sforce.soap.partner.PartnerConnection;
 import com.sforce.ws.ConnectorConfig;
 import javafx.application.Platform;
@@ -9,6 +10,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,8 +28,12 @@ public class LoginController {
     @FXML private ComboBox<String> environmentCombo;
     @FXML private CheckBox rememberCredentialsCheckBox;
     @FXML private Button loginButton;
+    @FXML private Button oauthButton;
     @FXML private Label statusLabel;
     @FXML private ProgressIndicator progressIndicator;
+    @FXML private ListView<String> savedCredentialsList;
+    @FXML private VBox savedCredentialsSection;
+    @FXML private Label environmentUrlLabel;
     
     private boolean isLoggingIn = false;
 
@@ -40,8 +46,86 @@ public class LoginController {
         environmentCombo.getSelectionModel().selectFirst();
         progressIndicator.setVisible(false);
         
-        // Load saved credentials
+        // Update URL label when environment changes
+        environmentCombo.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            updateEnvironmentLabel();
+        });
+        
+        // Load saved credentials list
+        loadSavedCredentialsList();
+        
+        // Load most recent credentials
         loadSavedCredentials();
+        
+        // Set initial URL label
+        updateEnvironmentLabel();
+    }
+    
+    private void updateEnvironmentLabel() {
+        String env = environmentCombo.getSelectionModel().getSelectedItem();
+        if (env != null) {
+            String url = env.contains("Sandbox") ? "https://test.salesforce.com" : "https://login.salesforce.com";
+            environmentUrlLabel.setText("OAuth will use: " + url);
+        }
+    }
+    
+    private void loadSavedCredentialsList() {
+        try {
+            // Get all saved credential keys
+            String[] keys = prefs.keys();
+            java.util.Set<String> usernames = new java.util.HashSet<>();
+            
+            for (String key : keys) {
+                if (key.startsWith("cred_")) {
+                    String username = key.substring(5); // Remove "cred_" prefix
+                    usernames.add(username);
+                }
+            }
+            
+            if (usernames.isEmpty()) {
+                savedCredentialsSection.setVisible(false);
+                savedCredentialsSection.setManaged(false);
+            } else {
+                savedCredentialsList.getItems().clear();
+                savedCredentialsList.getItems().addAll(usernames.stream().sorted().collect(java.util.stream.Collectors.toList()));
+                
+                // Handle selection
+                savedCredentialsList.setOnMouseClicked(event -> {
+                    if (event.getClickCount() == 2) {
+                        String selected = savedCredentialsList.getSelectionModel().getSelectedItem();
+                        if (selected != null) {
+                            loadCredentialsForUser(selected);
+                        }
+                    }
+                });
+                
+                savedCredentialsSection.setVisible(true);
+                savedCredentialsSection.setManaged(true);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load saved credentials list", e);
+            savedCredentialsSection.setVisible(false);
+            savedCredentialsSection.setManaged(false);
+        }
+    }
+    
+    private void loadCredentialsForUser(String username) {
+        try {
+            String credData = prefs.get("cred_" + username, "");
+            if (!credData.isEmpty()) {
+                String[] parts = credData.split("\\|");
+                if (parts.length >= 3) {
+                    usernameField.setText(username);
+                    passwordField.setText(new String(Base64.getDecoder().decode(parts[0])));
+                    tokenField.setText(new String(Base64.getDecoder().decode(parts[1])));
+                    environmentCombo.getSelectionModel().select(Integer.parseInt(parts[2]));
+                    rememberCredentialsCheckBox.setSelected(true);
+                    logger.info("Loaded credentials for user: {}", username);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load credentials for user: {}", username, e);
+        }
     }
     
     private void loadSavedCredentials() {
@@ -72,8 +156,14 @@ public class LoginController {
     private void saveCredentials(String username, String password, String token, int environment) {
         try {
             if (rememberCredentialsCheckBox.isSelected()) {
+                // Save in new format with username as key
+                String credData = Base64.getEncoder().encodeToString(password.getBytes()) + "|" +
+                                 Base64.getEncoder().encodeToString(token.getBytes()) + "|" +
+                                 environment;
+                prefs.put("cred_" + username, credData);
+                
+                // Also save as "most recent"
                 prefs.put("username", username);
-                // Base64 encode for basic obfuscation (not encryption, just to avoid plain text)
                 prefs.put("password", Base64.getEncoder().encodeToString(password.getBytes()));
                 prefs.put("token", Base64.getEncoder().encodeToString(token.getBytes()));
                 prefs.putInt("environment", environment);
@@ -159,12 +249,14 @@ public class LoginController {
                     BackupController controller = loader.getController();
                     controller.setConnectionInfo(connInfo);
                     
-                    Scene scene = new Scene(root, 900, 700);
+                    Scene scene = new Scene(root, 1200, 800);
                     // scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
                     
                     Stage stage = (Stage) loginButton.getScene().getWindow();
                     stage.setScene(scene);
                     stage.setResizable(true);
+                    stage.setMinWidth(1000);
+                    stage.setMinHeight(700);
                     stage.centerOnScreen();
                 } catch (Exception ex) {
                     logger.error("Failed to load backup window", ex);
@@ -240,6 +332,122 @@ public class LoginController {
             return "Authentication error:\n\n" + message + "\n\n" +
                    "If this problem persists, verify your credentials and network connection.";
         }
+    }
+    
+    @FXML
+    private void handleOAuthLogin() {
+        if (isLoggingIn) {
+            return;
+        }
+        
+        Task<Void> oauthTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                try {
+                    updateMessage("Opening browser for authentication...");
+                    
+                    // Get selected environment
+                    String environment = environmentCombo.getSelectionModel().getSelectedItem();
+                    String loginUrl = environment.contains("Sandbox") ? 
+                        "https://test.salesforce.com" : "https://login.salesforce.com";
+                    
+                    // Start OAuth flow
+                    SalesforceOAuthServer oauthServer = new SalesforceOAuthServer();
+                    SalesforceOAuthServer.OAuthResult result = oauthServer.authenticate(loginUrl);
+                    
+                    if (!result.isSuccess()) {
+                        Platform.runLater(() -> showError(result.error));
+                        return null;
+                    }
+                    
+                    updateMessage("Creating session...");
+                    
+                    // Create Partner connection with OAuth token
+                    ConnectorConfig config = new ConnectorConfig();
+                    config.setSessionId(result.accessToken);
+                    config.setServiceEndpoint(result.instanceUrl + "/services/Soap/u/62.0");
+                    
+                    PartnerConnection connection = new PartnerConnection(config);
+                    
+                    // Test connection
+                    String username = connection.getUserInfo().getUserName();
+                    logger.info("OAuth login successful for user: {}", username);
+                    
+                    updateMessage("Success! Loading main window...");
+                    
+                    // Create ConnectionInfo object for OAuth session
+                    final ConnectionInfo connInfo = new ConnectionInfo(
+                        connection,
+                        result.accessToken,
+                        result.instanceUrl,
+                        username,
+                        null, // no password with OAuth
+                        loginUrl
+                    );
+                    
+                    // Load backup window
+                    Platform.runLater(() -> {
+                        try {
+                            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/backup.fxml"));
+                            Parent root = loader.load();
+                            
+                            BackupController controller = loader.getController();
+                            controller.setConnectionInfo(connInfo);
+                            
+                            Scene scene = new Scene(root, 1200, 800);
+                            
+                            Stage stage = (Stage) oauthButton.getScene().getWindow();
+                            stage.setScene(scene);
+                            stage.setResizable(true);
+                            stage.setMinWidth(1000);
+                            stage.setMinHeight(700);
+                            stage.centerOnScreen();
+                        } catch (Exception ex) {
+                            logger.error("Failed to load backup window", ex);
+                            showError("Failed to open backup window: " + ex.getMessage());
+                        }
+                    });
+                    
+                } catch (Exception e) {
+                    logger.error("OAuth login failed", e);
+                    Platform.runLater(() -> showError(
+                        "OAuth authentication failed:\n\n" + e.getMessage() + "\n\n" +
+                        "Make sure you have configured a Connected App in Salesforce.\n" +
+                        "See SalesforceOAuthServer.java for setup instructions."
+                    ));
+                }
+                return null;
+            }
+        };
+        
+        oauthTask.messageProperty().addListener((obs, oldMsg, newMsg) -> {
+            Platform.runLater(() -> statusLabel.setText(newMsg));
+        });
+        
+        oauthTask.setOnRunning(e -> {
+            isLoggingIn = true;
+            progressIndicator.setVisible(true);
+            loginButton.setDisable(true);
+            oauthButton.setDisable(true);
+        });
+        
+        oauthTask.setOnSucceeded(e -> {
+            isLoggingIn = false;
+            progressIndicator.setVisible(false);
+            loginButton.setDisable(false);
+            oauthButton.setDisable(false);
+            statusLabel.setText("");
+        });
+        
+        oauthTask.setOnFailed(e -> {
+            isLoggingIn = false;
+            progressIndicator.setVisible(false);
+            loginButton.setDisable(false);
+            oauthButton.setDisable(false);
+            statusLabel.setText("Login failed");
+        });
+        
+        new Thread(oauthTask).start();
     }
 
     private void showError(String message) {

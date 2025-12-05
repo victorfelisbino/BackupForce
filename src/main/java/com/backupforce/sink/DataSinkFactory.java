@@ -45,8 +45,19 @@ public class DataSinkFactory {
         String jdbcUrl = String.format("jdbc:snowflake://%s.snowflakecomputing.com", account);
         
         Properties props = new Properties();
-        props.put("user", username);
-        props.put("password", password);
+        
+        // If password is null or empty, use SSO authentication
+        if (password == null || password.trim().isEmpty()) {
+            props.put("authenticator", "externalbrowser");
+            if (username != null && !username.trim().isEmpty()) {
+                props.put("user", username);
+            }
+        } else {
+            // Standard username/password authentication
+            if (username != null) props.put("user", username);
+            props.put("password", password);
+        }
+        
         props.put("warehouse", warehouse);
         props.put("db", database);
         props.put("schema", schema);
