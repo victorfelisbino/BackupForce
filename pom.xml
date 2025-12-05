@@ -164,6 +164,30 @@
                     <mainClass>com.backupforce.ui.BackupForceApp</mainClass>
                 </configuration>
             </plugin>
+
+            <!-- jpackage Plugin - Creates Native Windows Executable -->
+            <plugin>
+                <groupId>org.panteleyev</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <name>BackupForce</name>
+                    <appVersion>2.0.0</appVersion>
+                    <vendor>Victor Felisbino</vendor>
+                    <destination>target/installer</destination>
+                    <module>com.backupforce/com.backupforce.Launcher</module>
+                    <runtimeImage>target/java-runtime</runtimeImage>
+                    <javaOptions>
+                        <option>-Dfile.encoding=UTF-8</option>
+                    </javaOptions>
+                    <winMenu>true</winMenu>
+                    <winDirChooser>true</winDirChooser>
+                    <winShortcut>true</winShortcut>
+                    <winMenuGroup>BackupForce</winMenuGroup>
+                    <icon>src/main/resources/icon.ico</icon>
+                    <type>EXE</type>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

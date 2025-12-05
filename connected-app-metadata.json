@@ -1,0 +1,10 @@
+{
+  "label": "BackupForce OAuth",
+  "contactEmail": "victor.felisbino@loves.com",
+  "oauthConfig": {
+    "callbackUrl": "http://localhost:8888/oauth/callback",
+    "scopes": ["Api", "RefreshToken", "Id"],
+    "isAdminApproved": false
+  },
+  "ipRelaxation": "ENFORCE"
+}
