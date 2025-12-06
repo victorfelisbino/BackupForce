@@ -24,6 +24,7 @@ public class JdbcDatabaseSink implements DataSink {
     private final DatabaseDialect dialect;
     private final String displayName;
     private Connection connection;
+    private boolean recreateTables = false;  // Default: incremental mode
     
     public JdbcDatabaseSink(String jdbcUrl, Properties connectionProperties, 
                            DatabaseDialect dialect, String displayName) {
@@ -31,6 +32,32 @@ public class JdbcDatabaseSink implements DataSink {
         this.connectionProperties = connectionProperties;
         this.dialect = dialect;
         this.displayName = displayName;
+    }
+    
+    @Override
+    public void setRecreateTables(boolean recreate) {
+        this.recreateTables = recreate;
+        logger.info("Recreate tables mode: {}", recreate ? "ENABLED (full reload)" : "DISABLED (incremental)");
+    }
+    
+    @Override
+    public void dropTable(String objectName) throws Exception {
+        if (connection == null || connection.isClosed()) {
+            connect();
+        }
+        
+        String tableName = dialect.sanitizeTableName(objectName);
+        
+        if (tableExists(tableName)) {
+            String dropSQL = "DROP TABLE " + tableName;
+            logger.info("Dropping table: {}", tableName);
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute(dropSQL);
+                logger.info("Table {} dropped successfully", tableName);
+            }
+        } else {
+            logger.info("Table {} does not exist, nothing to drop", tableName);
+        }
     }
     
     @Override
@@ -72,9 +99,15 @@ public class JdbcDatabaseSink implements DataSink {
         
         String tableName = dialect.sanitizeTableName(objectName);
         
-        // Check if table exists
+        // Drop table first if recreate mode is enabled
+        if (recreateTables && tableExists(tableName)) {
+            logger.info("Recreate mode enabled - dropping existing table: {}", tableName);
+            dropTable(objectName);
+        }
+        
+        // Check if table exists (after potential drop)
         if (tableExists(tableName)) {
-            logger.info("Table {} already exists", tableName);
+            logger.info("Table {} already exists (incremental mode)", tableName);
             return;
         }
         
@@ -141,6 +174,18 @@ public class JdbcDatabaseSink implements DataSink {
                     blobPathColumnIndex = i;
                     logger.info("{}: Found BLOB_FILE_PATH column - will load blob data", objectName);
                     break;
+                }
+            }
+            
+            // Drop table first if recreate mode is enabled
+            if (recreateTables && tableExists(tableName)) {
+                logger.info("{}: Recreate mode - dropping existing table", objectName);
+                if (progressCallback != null) {
+                    progressCallback.update("Dropping existing table...");
+                }
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("DROP TABLE " + tableName);
+                    logger.info("{}: Table dropped successfully", objectName);
                 }
             }
             

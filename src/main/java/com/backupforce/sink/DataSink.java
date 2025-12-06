@@ -54,6 +54,25 @@ public interface DataSink {
      */
     String getType();
     
+    /**
+     * Set whether to recreate tables (drop and create fresh)
+     * Default is false (incremental/append mode)
+     * 
+     * @param recreate true to drop tables before creating, false for incremental
+     */
+    default void setRecreateTables(boolean recreate) {
+        // Default: no-op for sinks that don't support this
+    }
+    
+    /**
+     * Drop existing table if it exists
+     * 
+     * @param objectName Salesforce object name
+     */
+    default void dropTable(String objectName) throws Exception {
+        // Default: no-op for sinks that don't support this
+    }
+    
     @FunctionalInterface
     interface ProgressCallback {
         void update(String status);

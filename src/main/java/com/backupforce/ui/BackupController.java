@@ -615,7 +615,9 @@ public class BackupController {
     private DataSink createDataSinkFromConfig(DatabaseConnectionInfo config) {
         Map<String, String> fields = config.getFields();
         logger.info("Creating DataSink from config. Database type: {}, Fields: {}", config.getDatabaseType(), fields.keySet());
+        logger.info("Recreate tables option: {}", config.isRecreateTables());
         
+        DataSink sink;
         switch (config.getDatabaseType()) {
             case "Snowflake":
                 String account = fields.get("Account");
@@ -634,16 +636,18 @@ public class BackupController {
                 }
                 
                 // For SSO, password can be null
-                return DataSinkFactory.createSnowflakeSink(account, warehouse, database, schema, username, password);
+                sink = DataSinkFactory.createSnowflakeSink(account, warehouse, database, schema, username, password);
+                break;
             case "SQL Server":
-                return DataSinkFactory.createSqlServerSink(
+                sink = DataSinkFactory.createSqlServerSink(
                     fields.get("Server"), 
                     fields.get("Database"),
                     fields.get("Username"), 
                     fields.get("Password")
                 );
+                break;
             case "PostgreSQL":
-                return DataSinkFactory.createPostgresSink(
+                sink = DataSinkFactory.createPostgresSink(
                     fields.get("Host"), 
                     Integer.parseInt(fields.getOrDefault("Port", "5432")),
                     fields.get("Database"), 
@@ -651,9 +655,14 @@ public class BackupController {
                     fields.get("Username"), 
                     fields.get("Password")
                 );
+                break;
             default:
                 throw new IllegalArgumentException("Unsupported database type: " + config.getDatabaseType());
         }
+        
+        // Set recreate tables option
+        sink.setRecreateTables(config.isRecreateTables());
+        return sink;
     }
 
     @FXML
