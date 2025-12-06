@@ -25,6 +25,7 @@ public class DatabaseSettingsController {
     @FXML private ComboBox<DatabaseType> databaseTypeCombo;
     @FXML private GridPane settingsGrid;
     @FXML private CheckBox rememberCheckBox;
+    @FXML private CheckBox recreateTablesCheckBox;
     @FXML private Label statusLabel;
     
     private Map<String, TextField> fieldMap = new HashMap<>();
@@ -723,7 +724,9 @@ public class DatabaseSettingsController {
         }
         
         logger.info("Creating DatabaseConnectionInfo with fields: {}", fields.keySet());
-        connectionInfo = new DatabaseConnectionInfo(dbType.name, fields);
+        boolean recreateTables = recreateTablesCheckBox != null && recreateTablesCheckBox.isSelected();
+        logger.info("Recreate tables option: {}", recreateTables);
+        connectionInfo = new DatabaseConnectionInfo(dbType.name, fields, recreateTables);
         
         if (rememberCheckBox.isSelected()) {
             saveCredentials();
@@ -892,14 +895,17 @@ public class DatabaseSettingsController {
     public static class DatabaseConnectionInfo {
         private final String databaseType;
         private final Map<String, String> fields;
+        private final boolean recreateTables;
         
-        public DatabaseConnectionInfo(String databaseType, Map<String, String> fields) {
+        public DatabaseConnectionInfo(String databaseType, Map<String, String> fields, boolean recreateTables) {
             this.databaseType = databaseType;
             this.fields = fields;
+            this.recreateTables = recreateTables;
         }
         
         public String getDatabaseType() { return databaseType; }
         public Map<String, String> getFields() { return fields; }
         public String getField(String name) { return fields.get(name); }
+        public boolean isRecreateTables() { return recreateTables; }
     }
 }

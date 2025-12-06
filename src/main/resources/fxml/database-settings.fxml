@@ -36,6 +36,15 @@
         
     </GridPane>
     
+    <!-- Backup Options -->
+    <Separator/>
+    <VBox spacing="8">
+        <Label text="Backup Options" styleClass="section-label"/>
+        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)"/>
+        <Label text="⚠ Warning: This will delete existing data in the target tables" 
+               style="-fx-text-fill: #ff9800; -fx-font-size: 11px; -fx-padding: 0 0 0 24;"/>
+    </VBox>
+    
     <!-- Remember credentials -->
     <CheckBox fx:id="rememberCheckBox" text="Remember credentials"/>
     
