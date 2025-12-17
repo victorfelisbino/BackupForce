@@ -50,7 +50,7 @@ jpackage --input target `
          --type app-image `
          --dest target `
          --runtime-image target/java-runtime `
-         --app-version 2.0.0 `
+         --app-version 2.1.0 `
          --vendor "Victor Felisbino" `
          --description "Salesforce Backup Tool"
 if ($LASTEXITCODE -ne 0) {
