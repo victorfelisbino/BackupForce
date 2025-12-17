@@ -739,6 +739,88 @@ public class BulkV2Client {
             return false;
         }
     }
+    
+    /**
+     * Get Salesforce API limits information
+     * @return ApiLimits object with current usage and max values
+     */
+    public ApiLimits getApiLimits() throws IOException, ParseException {
+        String url = instanceUrl + "/services/data/v" + apiVersion + "/limits";
+        HttpGet get = new HttpGet(url);
+        get.setHeader("Authorization", "Bearer " + accessToken);
+        get.setHeader("Accept", "application/json");
+        
+        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
+            int statusCode = response.getCode();
+            if (statusCode != 200) {
+                logger.warn("Failed to get API limits, status: {}", statusCode);
+                return null;
+            }
+            
+            String responseBody = EntityUtils.toString(response.getEntity());
+            JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
+            
+            ApiLimits limits = new ApiLimits();
+            
+            // Daily API Requests
+            if (json.has("DailyApiRequests")) {
+                JsonObject dailyApi = json.getAsJsonObject("DailyApiRequests");
+                limits.dailyApiRequestsUsed = dailyApi.get("Remaining").getAsLong();
+                limits.dailyApiRequestsMax = dailyApi.get("Max").getAsLong();
+                // Salesforce returns "Remaining", so calculate used
+                limits.dailyApiRequestsUsed = limits.dailyApiRequestsMax - limits.dailyApiRequestsUsed;
+            }
+            
+            // Daily Bulk API 2.0 Requests
+            if (json.has("DailyBulkV2QueryFileStorageMB")) {
+                JsonObject bulkStorage = json.getAsJsonObject("DailyBulkV2QueryFileStorageMB");
+                limits.bulkApiStorageUsedMB = bulkStorage.get("Max").getAsLong() - bulkStorage.get("Remaining").getAsLong();
+                limits.bulkApiStorageMaxMB = bulkStorage.get("Max").getAsLong();
+            }
+            
+            // Daily Bulk API Jobs
+            if (json.has("DailyBulkV2QueryJobs")) {
+                JsonObject bulkJobs = json.getAsJsonObject("DailyBulkV2QueryJobs");
+                limits.bulkApiJobsUsed = bulkJobs.get("Max").getAsLong() - bulkJobs.get("Remaining").getAsLong();
+                limits.bulkApiJobsMax = bulkJobs.get("Max").getAsLong();
+            }
+            
+            logger.debug("API Limits - Daily: {}/{}, Bulk Jobs: {}/{}", 
+                limits.dailyApiRequestsUsed, limits.dailyApiRequestsMax,
+                limits.bulkApiJobsUsed, limits.bulkApiJobsMax);
+            
+            return limits;
+        }
+    }
+    
+    /**
+     * Container for API limit information
+     */
+    public static class ApiLimits {
+        public long dailyApiRequestsUsed;
+        public long dailyApiRequestsMax;
+        public long bulkApiJobsUsed;
+        public long bulkApiJobsMax;
+        public long bulkApiStorageUsedMB;
+        public long bulkApiStorageMaxMB;
+        
+        public double getDailyApiPercentUsed() {
+            return dailyApiRequestsMax > 0 ? (dailyApiRequestsUsed * 100.0 / dailyApiRequestsMax) : 0;
+        }
+        
+        public double getBulkApiPercentUsed() {
+            return bulkApiJobsMax > 0 ? (bulkApiJobsUsed * 100.0 / bulkApiJobsMax) : 0;
+        }
+        
+        public String getFormattedDailyApi() {
+            return String.format("%,d / %,d (%.1f%%)", 
+                dailyApiRequestsUsed, dailyApiRequestsMax, getDailyApiPercentUsed());
+        }
+        
+        public String getFormattedBulkApi() {
+            return String.format("%,d / %,d jobs", bulkApiJobsUsed, bulkApiJobsMax);
+        }
+    }
 
     public void close() throws IOException {
         httpClient.close();

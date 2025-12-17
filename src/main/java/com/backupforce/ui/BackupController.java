@@ -1,6 +1,10 @@
 package com.backupforce.ui;
 
 import com.backupforce.bulkv2.BulkV2Client;
+import com.backupforce.bulkv2.BulkV2Client.ApiLimits;
+import com.backupforce.config.BackupHistory;
+import com.backupforce.config.BackupHistory.BackupRun;
+import com.backupforce.config.BackupHistory.ObjectBackupResult;
 import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
 import com.backupforce.sink.DataSink;
@@ -105,6 +109,9 @@ public class BackupController {
     
     @FXML private TextField outputFolderField;
     @FXML private TextField recordLimitField;
+    @FXML private CheckBox incrementalBackupCheckbox;
+    @FXML private CheckBox compressBackupCheckbox;
+    @FXML private Label lastBackupLabel;
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
     @FXML private Button deselectAllButton;
@@ -118,6 +125,7 @@ public class BackupController {
     @FXML private TextArea logArea;
     
     @FXML private Label connectionLabel;
+    @FXML private Label apiLimitsLabel;
     @FXML private TextField searchField;
     @FXML private Label selectionCountLabel;
     @FXML private Button logoutButton;
@@ -133,6 +141,7 @@ public class BackupController {
     private FilteredList<SObjectItem> errorObjects;
     private BackupTask currentBackupTask;
     private Thread backupThread;
+    private BackupRun currentBackupRun;
 
     @FXML
     public void initialize() {
@@ -171,6 +180,13 @@ public class BackupController {
         
         stopBackupButton.setDisable(true);
         progressBar.setProgress(0);
+        
+        // Setup incremental backup checkbox listener
+        if (incrementalBackupCheckbox != null) {
+            incrementalBackupCheckbox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                updateLastBackupLabel();
+            });
+        }
         
         // Initialize selection counter
         updateSelectionCount();
@@ -628,6 +644,8 @@ public class BackupController {
         this.connectionInfo = connInfo;
         updateConnectionLabel();
         loadObjects();
+        fetchApiLimits();
+        updateLastBackupLabel();
     }
     
     public void setBackupType(String backupType) {
@@ -822,6 +840,91 @@ public class BackupController {
         if (selectionCountLabel != null) {
             selectionCountLabel.setText(count + " selected");
         }
+    }
+    
+    /**
+     * Update the last backup label to show when incremental backup will start from
+     */
+    private void updateLastBackupLabel() {
+        if (lastBackupLabel == null || connectionInfo == null) {
+            return;
+        }
+        
+        if (incrementalBackupCheckbox != null && incrementalBackupCheckbox.isSelected()) {
+            // Check backup history for last successful backup
+            Optional<BackupRun> lastBackup = BackupHistory.getInstance()
+                    .getHistoryForUser(connectionInfo.getUsername())
+                    .stream()
+                    .filter(r -> "COMPLETED".equals(r.getStatus()))
+                    .findFirst();
+            
+            if (lastBackup.isPresent()) {
+                String startTime = lastBackup.get().getStartTime();
+                try {
+                    // Parse and format nicely
+                    LocalDateTime dt = LocalDateTime.parse(startTime);
+                    String formatted = dt.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"));
+                    lastBackupLabel.setText("(since " + formatted + ")");
+                    lastBackupLabel.setStyle("-fx-text-fill: #4CAF50;"); // Green
+                } catch (Exception e) {
+                    lastBackupLabel.setText("(since " + startTime.substring(0, 10) + ")");
+                }
+            } else {
+                lastBackupLabel.setText("(no previous backup - will do full backup)");
+                lastBackupLabel.setStyle("-fx-text-fill: #FF9800;"); // Orange warning
+            }
+        } else {
+            lastBackupLabel.setText("");
+        }
+    }
+    
+    /**
+     * Fetch Salesforce API limits and display in the header
+     */
+    private void fetchApiLimits() {
+        if (apiLimitsLabel == null || connectionInfo == null) {
+            return;
+        }
+        
+        // Fetch limits in background to avoid blocking UI
+        Task<ApiLimits> task = new Task<ApiLimits>() {
+            @Override
+            protected ApiLimits call() throws Exception {
+                try (BulkV2Client client = new BulkV2Client(
+                        connectionInfo.getInstanceUrl(),
+                        connectionInfo.getSessionId(),
+                        "62.0")) {
+                    return client.getApiLimits();
+                }
+            }
+        };
+        
+        task.setOnSucceeded(e -> {
+            ApiLimits limits = task.getValue();
+            if (limits != null) {
+                String text = String.format("API: %,d/%,d (%.0f%%) | Bulk: %,d/%,d",
+                    limits.dailyApiRequestsUsed, limits.dailyApiRequestsMax,
+                    limits.getDailyApiPercentUsed(),
+                    limits.bulkApiJobsUsed, limits.bulkApiJobsMax);
+                apiLimitsLabel.setText(text);
+                
+                // Color code based on usage
+                if (limits.getDailyApiPercentUsed() > 80) {
+                    apiLimitsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #f44336; -fx-padding: 0 10;"); // Red
+                } else if (limits.getDailyApiPercentUsed() > 50) {
+                    apiLimitsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #FF9800; -fx-padding: 0 10;"); // Orange
+                } else {
+                    apiLimitsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #4CAF50; -fx-padding: 0 10;"); // Green
+                }
+            }
+        });
+        
+        task.setOnFailed(e -> {
+            logger.warn("Failed to fetch API limits", task.getException());
+            apiLimitsLabel.setText("");
+        });
+        
+        new Thread(task).start();
     }
 
     @FXML
@@ -1036,6 +1139,18 @@ public class BackupController {
         logMessage("Objects to backup: " + selectedObjects.size());
         logMessage("Output: " + displayFolder);
         logMessage("=".repeat(60));
+        
+        // Start tracking backup history
+        String backupTypeLabel = csvRadioButton.isSelected() ? "CSV" : 
+            (databaseConnectionInfo != null ? databaseConnectionInfo.getDatabaseType() : "Database");
+        boolean isIncremental = incrementalBackupCheckbox != null && incrementalBackupCheckbox.isSelected();
+        currentBackupRun = BackupHistory.getInstance().startBackup(
+            connectionInfo.getUsername(),
+            isIncremental ? "INCREMENTAL" : "FULL",
+            backupTypeLabel,
+            displayFolder,
+            selectedObjects.size()
+        );
         
         // Reset all statuses and extra fields
         allObjects.forEach(item -> {
@@ -1396,7 +1511,31 @@ public class BackupController {
                         
                         // Check if doing incremental backup
                         String whereClause = null;
-                        if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                        
+                        // For CSV backups, check if incremental mode is enabled
+                        if (dataSink == null || dataSink.getType().equals("CSV")) {
+                            if (incrementalBackupCheckbox != null && incrementalBackupCheckbox.isSelected()) {
+                                if (!supportsLastModifiedDate(objectName)) {
+                                    Platform.runLater(() -> item.setStatus("Full backup - no LastModifiedDate"));
+                                    logMessage(String.format("[%s] Full backup - object does not support incremental", objectName));
+                                } else {
+                                    // Get last successful backup from history
+                                    Optional<ObjectBackupResult> lastBackup = BackupHistory.getInstance()
+                                            .getLastSuccessfulBackup(connectionInfo.getUsername(), objectName);
+                                    
+                                    if (lastBackup.isPresent() && lastBackup.get().getLastModifiedDate() != null) {
+                                        String lastModified = lastBackup.get().getLastModifiedDate();
+                                        whereClause = "LastModifiedDate > " + lastModified;
+                                        String displayDate = lastModified.length() > 10 ? lastModified.substring(0, 10) : lastModified;
+                                        Platform.runLater(() -> item.setStatus("Incremental since " + displayDate));
+                                        logMessage(String.format("[%s] Incremental backup - records modified after %s", objectName, displayDate));
+                                    } else {
+                                        Platform.runLater(() -> item.setStatus("Full backup - first time"));
+                                        logMessage(String.format("[%s] Full backup - no previous backup found", objectName));
+                                    }
+                                }
+                            }
+                        } else if (dataSink != null && !dataSink.getType().equals("CSV")) {
                             // Check if recreate tables is enabled - if so, always do full backup
                             com.backupforce.sink.JdbcDatabaseSink jdbcSink = (com.backupforce.sink.JdbcDatabaseSink) dataSink;
                             
@@ -1524,6 +1663,17 @@ public class BackupController {
                         final String formattedSize = formatFileSize(fileSize);
                         final String formattedDuration = formatDuration(objectTime);
                         
+                        // Record in backup history
+                        if (currentBackupRun != null) {
+                            ObjectBackupResult objResult = new ObjectBackupResult(objectName);
+                            objResult.setStatus("COMPLETED");
+                            objResult.setRecordCount(finalRecordCount);
+                            objResult.setByteCount(fileSize);
+                            objResult.setDurationMs(objectTime);
+                            objResult.setLastModifiedDate(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                            currentBackupRun.getObjectResults().add(objResult);
+                        }
+                        
                         Platform.runLater(() -> {
                             item.setStatus("✓ Completed");
                             item.setRecordCount(String.format("%,d", finalRecordCount));
@@ -1584,6 +1734,14 @@ public class BackupController {
                                 cleanError = errorMsg.substring(errorMsg.indexOf(":") + 1).trim();
                             }
                             
+                            // Record failed object in backup history
+                            if (currentBackupRun != null) {
+                                ObjectBackupResult objResult = new ObjectBackupResult(objectName);
+                                objResult.setStatus("FAILED");
+                                objResult.setErrorMessage(cleanError);
+                                currentBackupRun.getObjectResults().add(objResult);
+                            }
+                            
                             final String finalError = cleanError;
                             Platform.runLater(() -> {
                                 item.setStatus("✗ Failed");
@@ -1628,6 +1786,24 @@ public class BackupController {
                 }
             }
             
+            // Compress CSV files to ZIP if enabled (only for CSV backups)
+            String finalOutputInfo = displayFolder;
+            if (compressBackupCheckbox != null && compressBackupCheckbox.isSelected() && 
+                (dataSink == null || dataSink.getType().equals("CSV"))) {
+                try {
+                    Platform.runLater(() -> logMessage("Compressing backup to ZIP..."));
+                    String zipPath = compressCsvFilesToZip(outputFolder);
+                    if (zipPath != null) {
+                        finalOutputInfo = zipPath;
+                        Platform.runLater(() -> logMessage("✓ Compressed to: " + zipPath));
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to compress backup", e);
+                    Platform.runLater(() -> logMessage("WARNING: Compression failed: " + e.getMessage()));
+                }
+            }
+            final String displayOutput = finalOutputInfo;
+            
             long totalTime = System.currentTimeMillis() - startTime;
             
             final long finalTotalRecords = totalRecords.get();
@@ -1640,12 +1816,25 @@ public class BackupController {
                 logMessage("Failed: " + failed.get());
                 logMessage("Total records: " + String.format("%,d", finalTotalRecords));
                 logMessage("Total time: " + totalTime / 1000 + " seconds");
-                logMessage("Output: " + displayFolder);
+                logMessage("Output: " + displayOutput);
                 logMessage("=".repeat(60));
                 
                 // Save backup stats for home page display
                 if (!cancelled) {
-                    saveBackupStats(successful.get(), finalTotalRecords, displayFolder);
+                    saveBackupStats(successful.get(), finalTotalRecords, displayOutput);
+                    
+                    // Complete backup history record
+                    if (currentBackupRun != null) {
+                        boolean success = failed.get() == 0;
+                        BackupHistory.getInstance().completeBackup(currentBackupRun, success);
+                        currentBackupRun = null;
+                    }
+                } else {
+                    // Cancel backup history record
+                    if (currentBackupRun != null) {
+                        BackupHistory.getInstance().cancelBackup(currentBackupRun);
+                        currentBackupRun = null;
+                    }
                 }
                 
                 // Reset UI for next backup
@@ -1657,7 +1846,7 @@ public class BackupController {
                     alert.setHeaderText("Backup Finished Successfully");
                     alert.setContentText(String.format(
                         "Backed up %d objects (%,d records) in %d seconds\n\nOutput: %s",
-                        successful.get(), finalTotalRecords, totalTime / 1000, displayFolder
+                        successful.get(), finalTotalRecords, totalTime / 1000, displayOutput
                     ));
                     alert.showAndWait();
                 }
@@ -1727,6 +1916,75 @@ public class BackupController {
         } catch (Exception e) {
             logger.warn("Failed to save backup stats", e);
         }
+    }
+    
+    /**
+     * Compress all CSV files in the output folder to a single ZIP file
+     * @param outputFolder The folder containing CSV files
+     * @return Path to the created ZIP file, or null if no files were compressed
+     */
+    private String compressCsvFilesToZip(String outputFolder) throws IOException {
+        File folder = new File(outputFolder);
+        if (!folder.exists() || !folder.isDirectory()) {
+            return null;
+        }
+        
+        File[] csvFiles = folder.listFiles((dir, name) -> name.endsWith(".csv"));
+        if (csvFiles == null || csvFiles.length == 0) {
+            return null;
+        }
+        
+        // Create ZIP file name with timestamp
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String zipFileName = "backup_" + timestamp + ".zip";
+        File zipFile = new File(folder, zipFileName);
+        
+        long totalUncompressed = 0;
+        long totalCompressed = 0;
+        
+        try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+                new java.io.BufferedOutputStream(new java.io.FileOutputStream(zipFile)))) {
+            
+            // Set compression level
+            zos.setLevel(java.util.zip.Deflater.DEFAULT_COMPRESSION);
+            
+            byte[] buffer = new byte[8192];
+            
+            for (File csvFile : csvFiles) {
+                totalUncompressed += csvFile.length();
+                
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(csvFile.getName());
+                zos.putNextEntry(entry);
+                
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(csvFile)) {
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        zos.write(buffer, 0, bytesRead);
+                    }
+                }
+                
+                zos.closeEntry();
+            }
+        }
+        
+        totalCompressed = zipFile.length();
+        
+        // Delete original CSV files after successful compression
+        for (File csvFile : csvFiles) {
+            if (!csvFile.delete()) {
+                logger.warn("Failed to delete CSV file after compression: {}", csvFile.getName());
+            }
+        }
+        
+        // Log compression ratio
+        double ratio = totalUncompressed > 0 ? (1.0 - (double) totalCompressed / totalUncompressed) * 100 : 0;
+        logger.info("Compressed {} files: {} MB -> {} MB (saved {:.1f}%)", 
+            csvFiles.length, 
+            totalUncompressed / (1024 * 1024),
+            totalCompressed / (1024 * 1024),
+            ratio);
+        
+        return zipFile.getAbsolutePath();
     }
 
     // Utility methods
