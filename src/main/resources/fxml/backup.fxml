@@ -17,6 +17,8 @@
                styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
         <Region styleClass="connection-status-dot"/>
         <Label fx:id="connectionLabel" text="Connected to Salesforce" styleClass="connection-label" HBox.hgrow="ALWAYS"/>
+        <Label fx:id="apiLimitsLabel" text="" 
+              style="-fx-font-size: 11px; -fx-text-fill: #888; -fx-padding: 0 10;"/>
         <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" 
                styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
     </HBox>
@@ -207,6 +209,24 @@
                           text="0"/>
                 <Label text="(0 = unlimited)" style="-fx-font-size: 11px; -fx-text-fill: #666;"/>
             </HBox>
+            
+            <!-- Backup Mode Options -->
+            <VBox spacing="8" styleClass="config-card">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="incrementalBackupCheckbox" text="Incremental Backup" 
+                             style="-fx-font-size: 13px;"/>
+                    <Label fx:id="lastBackupLabel" text="" 
+                          style="-fx-font-size: 11px; -fx-text-fill: #888;"/>
+                </HBox>
+                <Label text="Only backup records modified since last successful backup" 
+                      style="-fx-font-size: 11px; -fx-text-fill: #666; -fx-padding: 0 0 0 24;"/>
+                
+                <HBox spacing="12" alignment="CENTER_LEFT" style="-fx-padding: 4 0 0 0;">
+                    <CheckBox fx:id="compressBackupCheckbox" text="Compress to ZIP" 
+                             style="-fx-font-size: 13px;"/>
+                    <Label text="(saves disk space)" style="-fx-font-size: 11px; -fx-text-fill: #888;"/>
+                </HBox>
+            </VBox>
             
             <!-- Progress Section -->
             <VBox spacing="10" styleClass="progress-card">
