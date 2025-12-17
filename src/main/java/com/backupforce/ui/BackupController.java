@@ -115,6 +115,7 @@ public class BackupController {
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
     @FXML private Button deselectAllButton;
+    @FXML private Button configureFieldsButton;
     @FXML private Button startBackupButton;
     @FXML private Button stopBackupButton;
     @FXML private Button exportResultsButton;
@@ -1037,6 +1038,79 @@ public class BackupController {
             updateSelectionCount();
         }
     }
+    
+    @FXML
+    private void handleConfigureFields() {
+        List<SObjectItem> selectedItems = allObjects.stream()
+            .filter(SObjectItem::isSelected)
+            .collect(Collectors.toList());
+        
+        if (selectedItems.isEmpty()) {
+            showError("Please select at least one object to configure fields for");
+            return;
+        }
+        
+        if (selectedItems.size() == 1) {
+            // Single object - show field selection dialog
+            SObjectItem item = selectedItems.get(0);
+            openFieldSelectionDialog(item);
+        } else {
+            // Multiple objects - ask what to do
+            Alert choice = new Alert(Alert.AlertType.CONFIRMATION);
+            choice.setTitle("Configure Fields");
+            choice.setHeaderText("Multiple objects selected (" + selectedItems.size() + ")");
+            choice.setContentText("Would you like to configure fields for each object individually, " +
+                "or reset all to backup all fields?");
+            
+            ButtonType configureEach = new ButtonType("Configure Each");
+            ButtonType resetAll = new ButtonType("Reset to All Fields");
+            ButtonType cancel = ButtonType.CANCEL;
+            
+            choice.getButtonTypes().setAll(configureEach, resetAll, cancel);
+            
+            Optional<ButtonType> result = choice.showAndWait();
+            if (result.isPresent()) {
+                if (result.get() == configureEach) {
+                    // Configure each object one by one
+                    for (SObjectItem item : selectedItems) {
+                        openFieldSelectionDialog(item);
+                    }
+                } else if (result.get() == resetAll) {
+                    // Reset all selected objects to backup all fields
+                    selectedItems.forEach(item -> item.setSelectedFields(null));
+                    allObjectsTable.refresh();
+                    logMessage("Reset field selection to 'All Fields' for " + selectedItems.size() + " objects");
+                }
+            }
+        }
+    }
+    
+    private void openFieldSelectionDialog(SObjectItem item) {
+        if (connectionInfo == null) {
+            showError("Not connected to Salesforce");
+            return;
+        }
+        
+        FieldSelectionDialog dialog = new FieldSelectionDialog(
+            item.getName(),
+            connectionInfo.getInstanceUrl(),
+            connectionInfo.getSessionId(),
+            "62.0",
+            item.getSelectedFields()
+        );
+        
+        Optional<Set<String>> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            Set<String> selectedFields = result.get();
+            item.setSelectedFields(selectedFields);
+            item.setTotalFieldCount(selectedFields.size()); // Will be updated with actual total
+            
+            logMessage(String.format("[%s] Field selection configured: %d fields selected", 
+                item.getName(), selectedFields.size()));
+            
+            allObjectsTable.refresh();
+        }
+    }
 
     @FXML
     private void handleStartBackup() {
@@ -1576,7 +1650,14 @@ public class BackupController {
                         }
                         
                         // Step 1: Query object using Bulk API (writes CSV file)
-                        bulkClient.queryObject(objectName, outputFolder, whereClause, recordLimit, (status) -> {
+                        // Pass selected fields if configured (null = all fields)
+                        Set<String> selectedFields = item.getSelectedFields();
+                        if (selectedFields != null) {
+                            logMessage(String.format("[%s] Using custom field selection: %d fields", 
+                                objectName, selectedFields.size()));
+                        }
+                        
+                        bulkClient.queryObject(objectName, outputFolder, whereClause, recordLimit, selectedFields, (status) -> {
                             // Update status in real-time
                             Platform.runLater(() -> item.setStatus(status));
                         });
@@ -2105,6 +2186,8 @@ public class BackupController {
         private final SimpleStringProperty errorMessage;
         private boolean selected;
         private boolean disabled;
+        private Set<String> selectedFields; // null = all fields
+        private int totalFieldCount = 0;
 
         public SObjectItem(String name, String label) {
             this.name = new SimpleStringProperty(name);
@@ -2116,6 +2199,7 @@ public class BackupController {
             this.errorMessage = new SimpleStringProperty("");
             this.selected = false;
             this.disabled = false;
+            this.selectedFields = null; // null means all fields
         }
 
         public String getName() { return name.get(); }
@@ -2164,6 +2248,36 @@ public class BackupController {
         
         public boolean isDisabled() { return disabled; }
         public void setDisabled(boolean value) { this.disabled = value; }
+        
+        /**
+         * Get selected fields for this object. 
+         * @return Set of field names, or null if all fields should be backed up
+         */
+        public Set<String> getSelectedFields() { return selectedFields; }
+        
+        /**
+         * Set which fields to backup for this object.
+         * @param fields Set of field names, or null to backup all fields
+         */
+        public void setSelectedFields(Set<String> fields) { this.selectedFields = fields; }
+        
+        /**
+         * Check if custom field selection has been configured
+         */
+        public boolean hasCustomFieldSelection() { return selectedFields != null; }
+        
+        public int getTotalFieldCount() { return totalFieldCount; }
+        public void setTotalFieldCount(int count) { this.totalFieldCount = count; }
+        
+        /**
+         * Get a display string showing field selection status
+         */
+        public String getFieldSelectionInfo() {
+            if (selectedFields == null) {
+                return "All fields";
+            }
+            return selectedFields.size() + " of " + totalFieldCount + " fields";
+        }
     }
     
     @FXML
