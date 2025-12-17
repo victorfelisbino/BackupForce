@@ -35,4 +35,7 @@ backup/
 *.log
 
 # User credentials (don't commit sensitive data)
-myconfig.properties
+myconfig.propertiesoauth.properties
+
+# Salesforce CLI
+.sfdx/

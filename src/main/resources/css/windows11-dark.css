@@ -20,6 +20,26 @@
 }
 
 /* ============================================ */
+/* Split Pane - Dark Background */
+/* ============================================ */
+.split-pane {
+    -fx-background-color: #1a1a1a;
+}
+
+.split-pane .split-pane-divider {
+    -fx-background-color: #404040;
+    -fx-padding: 0 1 0 1;
+}
+
+.split-pane:horizontal .split-pane-divider {
+    -fx-cursor: h_resize;
+}
+
+.split-pane:vertical .split-pane-divider {
+    -fx-cursor: v_resize;
+}
+
+/* ============================================ */
 /* Header Section - Elevated Card */
 /* ============================================ */
 .header-section {
@@ -565,9 +585,11 @@
     -fx-border-radius: 12px;
     -fx-background-radius: 12px;
     -fx-border-width: 2px;
-    -fx-padding: 4px;
+    -fx-padding: 3px;
     -fx-min-width: 20px;
     -fx-min-height: 20px;
+    -fx-max-width: 20px;
+    -fx-max-height: 20px;
 }
 
 .radio-button:hover .radio {
@@ -577,12 +599,29 @@
 
 .radio-button:selected .radio {
     -fx-border-color: #2a8bd8;
+    -fx-background-color: #2a2a2a;
 }
 
+/* Hide the dot when not selected */
 .radio-button .dot {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-padding: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+}
+
+/* Show dot only when selected */
+.radio-button:selected .dot {
     -fx-background-color: #2a8bd8;
-    -fx-background-radius: 8px;
-    -fx-padding: 5px;
+    -fx-background-radius: 6px;
+    -fx-padding: 4px;
+    -fx-min-width: 8px;
+    -fx-min-height: 8px;
+    -fx-max-width: 8px;
+    -fx-max-height: 8px;
 }
 
 .radio-button .text {
@@ -676,20 +715,20 @@
 .config-section,
 .config-card {
     -fx-background-color: #242424;
-    -fx-background-radius: 8px;
-    -fx-border-color: #404040;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 10px;
+    -fx-border-color: #3a3a3a;
+    -fx-border-radius: 10px;
     -fx-border-width: 1px;
-    -fx-padding: 18px 20px;
+    -fx-padding: 16px 18px;
 }
 
 .progress-card {
     -fx-background-color: #242424;
-    -fx-background-radius: 8px;
-    -fx-border-color: #404040;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 10px;
+    -fx-border-color: #3a3a3a;
+    -fx-border-radius: 10px;
     -fx-border-width: 1px;
-    -fx-padding: 16px 20px;
+    -fx-padding: 14px 18px;
 }
 
 /* ============================================ */
