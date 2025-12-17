@@ -35,7 +35,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.prefs.Preferences;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +87,7 @@ public class BackupController {
     @FXML private TableColumn<SObjectItem, String> errorMessageColumn;
     
     @FXML private TabPane statusTabPane;
+    @FXML private Button backButton;
     
     @FXML private RadioButton csvRadioButton;
     @FXML private RadioButton databaseRadioButton;
@@ -118,6 +125,7 @@ public class BackupController {
     
     private LoginController.ConnectionInfo connectionInfo;
     private DatabaseSettingsController.DatabaseConnectionInfo databaseConnectionInfo;
+    private String backupType = "data"; // "data", "config", or "metadata"
     private ObservableList<SObjectItem> allObjects;
     private FilteredList<SObjectItem> filteredObjects;
     private FilteredList<SObjectItem> inProgressObjects;
@@ -447,6 +455,118 @@ public class BackupController {
     }
     
     private void applyConnection(SavedConnection connection) {
+        logger.info("Validating connection: {}", connection.getName());
+        
+        // Show testing indicator
+        connectionInfoBox.setVisible(true);
+        connectionInfoBox.setManaged(true);
+        connectionTypeLabel.setText(connection.getType());
+        connectionDetailsLabel.setText("Testing connection...");
+        connectionStatusIcon.setText("○");
+        connectionStatusIcon.setStyle("-fx-font-size: 18px; -fx-text-fill: #888;");
+        
+        // Validate the connection in background
+        Task<Boolean> validateTask = new Task<>() {
+            @Override
+            protected Boolean call() throws Exception {
+                String jdbcUrl = buildJdbcUrl(connection);
+                logger.info("Testing JDBC URL: {}", jdbcUrl.replaceAll("password=[^&]*", "password=***"));
+                String username = connection.isUseSso() ? "" : connection.getUsername();
+                String password = connection.isUseSso() ? "" : ConnectionManager.getInstance().getDecryptedPassword(connection);
+                
+                try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+                    boolean valid = conn.isValid(10);
+                    logger.info("Connection validation result: {}", valid);
+                    return valid;
+                }
+            }
+        };
+        
+        validateTask.setOnSucceeded(e -> {
+            if (validateTask.getValue()) {
+                logger.info("Connection validated successfully: {}", connection.getName());
+                // Connection is valid - apply it
+                applyValidatedConnection(connection);
+            } else {
+                logger.warn("Connection validation failed: {}", connection.getName());
+                // Connection failed validation
+                showConnectionError(connection, "Connection validation failed");
+            }
+        });
+        
+        validateTask.setOnFailed(e -> {
+            String error = validateTask.getException() != null 
+                ? validateTask.getException().getMessage() 
+                : "Unknown error";
+            logger.error("Connection error for {}: {}", connection.getName(), error);
+            showConnectionError(connection, error);
+        });
+        
+        Thread thread = new Thread(validateTask);
+        thread.setDaemon(true);
+        thread.start();
+    }
+    
+    private String buildJdbcUrl(SavedConnection connection) {
+        switch (connection.getType()) {
+            case "Snowflake":
+                String account = connection.getAccount();
+                String warehouse = connection.getWarehouse();
+                String database = connection.getDatabase();
+                String schema = connection.getSchema();
+                if (connection.isUseSso()) {
+                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s&authenticator=externalbrowser",
+                        account, warehouse, database, schema);
+                } else {
+                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s",
+                        account, warehouse, database, schema);
+                }
+                    
+            case "SQL Server":
+                String server = connection.getHost();
+                String db = connection.getDatabase();
+                return String.format("jdbc:sqlserver://%s;databaseName=%s;encrypt=true;trustServerCertificate=true",
+                    server, db);
+                    
+            case "PostgreSQL":
+                String host = connection.getHost();
+                String port = connection.getPort() != null ? connection.getPort() : "5432";
+                String pgDb = connection.getDatabase();
+                return String.format("jdbc:postgresql://%s:%s/%s", host, port, pgDb);
+                
+            default:
+                return "";
+        }
+    }
+    
+    private void showConnectionError(SavedConnection connection, String error) {
+        Platform.runLater(() -> {
+            connectionStatusIcon.setText("✗");
+            connectionStatusIcon.setStyle("-fx-font-size: 18px; -fx-text-fill: #e74c3c;");
+            connectionDetailsLabel.setText("Connection failed - click to configure");
+            
+            // Clear the database connection info since it's invalid
+            databaseConnectionInfo = null;
+            
+            // Show alert with option to configure
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Connection Failed");
+            alert.setHeaderText("Cannot connect to " + connection.getName());
+            alert.setContentText(error + "\n\nWould you like to configure this connection?");
+            
+            ButtonType configureBtn = new ButtonType("Configure");
+            ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+            alert.getButtonTypes().setAll(configureBtn, cancelBtn);
+            
+            alert.showAndWait().ifPresent(response -> {
+                if (response == configureBtn) {
+                    handleDatabaseSettings();
+                }
+            });
+        });
+    }
+    
+    private void applyValidatedConnection(SavedConnection connection) {
         try {
             // Convert SavedConnection to DatabaseConnectionInfo
             Map<String, String> fields = new HashMap<>();
@@ -508,6 +628,16 @@ public class BackupController {
         this.connectionInfo = connInfo;
         updateConnectionLabel();
         loadObjects();
+    }
+    
+    public void setBackupType(String backupType) {
+        this.backupType = backupType;
+        logger.info("Backup type set to: {}", backupType);
+        // TODO: Update UI based on backup type (data, config, metadata)
+    }
+    
+    public String getBackupType() {
+        return backupType;
     }
     
     private void updateConnectionLabel() {
@@ -715,36 +845,22 @@ public class BackupController {
     @FXML
     private void handleDatabaseSettings() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/database-settings.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/connections.fxml"));
             Parent root = loader.load();
             
-            DatabaseSettingsController controller = loader.getController();
+            ConnectionsController controller = loader.getController();
+            controller.setConnectionInfo(connectionInfo);
+            controller.setReturnToBackup(true); // Flag to return to backup screen
             
-            Stage dialog = new Stage();
-            dialog.setTitle("Database Settings");
-            dialog.initModality(Modality.APPLICATION_MODAL);
-            dialog.initOwner(databaseSettingsButton.getScene().getWindow());
+            Scene scene = new Scene(root, 820, 560);
+            Stage stage = (Stage) databaseSettingsButton.getScene().getWindow();
+            stage.setScene(scene);
+            stage.setResizable(false);
+            stage.centerOnScreen();
             
-            Scene scene = new Scene(root);
-            scene.getStylesheets().add(getClass().getResource("/css/modern-styles.css").toExternalForm());
-            dialog.setScene(scene);
-            dialog.setResizable(false);
-            
-            dialog.showAndWait();
-            
-            if (controller.isSaved()) {
-                databaseConnectionInfo = controller.getConnectionInfo();
-                logger.info("Database settings saved: {}", databaseConnectionInfo.getDatabaseType());
-                
-                // Refresh the connection list in the dropdown
-                loadSavedConnections();
-                
-                // Update connection label to show database info
-                updateConnectionLabel();
-            }
         } catch (IOException e) {
-            logger.error("Error opening database settings", e);
-            showError("Failed to open database settings: " + e.getMessage());
+            logger.error("Error opening connections page", e);
+            showError("Failed to open connections: " + e.getMessage());
         }
     }
 
@@ -1248,6 +1364,7 @@ public class BackupController {
             AtomicInteger completed = new AtomicInteger(0);
             AtomicInteger successful = new AtomicInteger(0);
             AtomicInteger failed = new AtomicInteger(0);
+            AtomicLong totalRecords = new AtomicLong(0);
             int totalObjects = objects.size();
             long startTime = System.currentTimeMillis();
             
@@ -1403,6 +1520,7 @@ public class BackupController {
                         }
                         
                         final long finalRecordCount = recordCount;
+                        totalRecords.addAndGet(recordCount);
                         final String formattedSize = formatFileSize(fileSize);
                         final String formattedDuration = formatDuration(objectTime);
                         
@@ -1512,15 +1630,23 @@ public class BackupController {
             
             long totalTime = System.currentTimeMillis() - startTime;
             
+            final long finalTotalRecords = totalRecords.get();
+            
             Platform.runLater(() -> {
                 logMessage("=".repeat(60));
                 logMessage("Backup completed!");
                 logMessage("Total objects: " + totalObjects);
                 logMessage("Successful: " + successful.get());
                 logMessage("Failed: " + failed.get());
+                logMessage("Total records: " + String.format("%,d", finalTotalRecords));
                 logMessage("Total time: " + totalTime / 1000 + " seconds");
                 logMessage("Output: " + displayFolder);
                 logMessage("=".repeat(60));
+                
+                // Save backup stats for home page display
+                if (!cancelled) {
+                    saveBackupStats(successful.get(), finalTotalRecords, displayFolder);
+                }
                 
                 // Reset UI for next backup
                 resetUIForNewBackup();
@@ -1530,8 +1656,8 @@ public class BackupController {
                     alert.setTitle("Backup Complete");
                     alert.setHeaderText("Backup Finished Successfully");
                     alert.setContentText(String.format(
-                        "Backed up %d objects in %d seconds\n\nOutput: %s",
-                        successful.get(), totalTime / 1000, displayFolder
+                        "Backed up %d objects (%,d records) in %d seconds\n\nOutput: %s",
+                        successful.get(), finalTotalRecords, totalTime / 1000, displayFolder
                     ));
                     alert.showAndWait();
                 }
@@ -1579,6 +1705,30 @@ public class BackupController {
         statusTabPane.getSelectionModel().select(0);
     }
     
+    private void saveBackupStats(int objectCount, long rowCount, String destination) {
+        try {
+            Preferences prefs = Preferences.userNodeForPackage(HomeController.class);
+            
+            // Format the timestamp
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, h:mm a"));
+            
+            // Save current backup as last backup
+            prefs.put("lastDataBackupDate", timestamp);
+            prefs.putInt("lastBackupObjectCount", objectCount);
+            prefs.putLong("lastBackupRowCount", rowCount);
+            prefs.put("lastBackupDestination", destination);
+            
+            // Update totals
+            int totalBackups = prefs.getInt("totalBackups", 0);
+            prefs.putInt("totalBackups", totalBackups + 1);
+            prefs.put("lastBackupDate", timestamp);
+            
+            logger.info("Saved backup stats: {} objects, {} rows to {}", objectCount, rowCount, destination);
+        } catch (Exception e) {
+            logger.warn("Failed to save backup stats", e);
+        }
+    }
+
     // Utility methods
     private static String getBlobFieldName(String objectName) {
         // Map of objects that have blob fields and their blob field names
@@ -1756,6 +1906,36 @@ public class BackupController {
         
         public boolean isDisabled() { return disabled; }
         public void setDisabled(boolean value) { this.disabled = value; }
+    }
+    
+    @FXML
+    private void handleBack() {
+        logger.info("User navigating back to home");
+        
+        // Stop any running backup
+        if (currentBackupTask != null && !currentBackupTask.isDone()) {
+            handleStopBackup();
+        }
+        
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
+            Parent root = loader.load();
+            
+            HomeController controller = loader.getController();
+            controller.setConnectionInfo(connectionInfo);
+            
+            Scene scene = new Scene(root, 820, 560);
+            
+            Stage stage = (Stage) backButton.getScene().getWindow();
+            stage.setScene(scene);
+            stage.setResizable(false);
+            stage.centerOnScreen();
+            
+            logger.info("Returned to home screen");
+        } catch (IOException e) {
+            logger.error("Failed to load home screen", e);
+            showError("Failed to return to home: " + e.getMessage());
+        }
     }
     
     @FXML

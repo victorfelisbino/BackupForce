@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="com.backupforce.ui.HomeController"
+            stylesheets="@../css/windows11-dark.css"
+            prefWidth="820" prefHeight="560"
+            style="-fx-background-color: #1a1a1a;">
+    
+    <!-- Top Header Bar -->
+    <top>
+        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="header-bar-compact">
+            <Label text="BackupForce" styleClass="app-logo-compact"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <VBox alignment="CENTER_RIGHT" spacing="1">
+                <Label fx:id="usernameLabel" text="user@example.com" styleClass="user-info-name-compact"/>
+                <Label fx:id="instanceLabel" text="https://yourorg.salesforce.com" styleClass="user-info-org-compact"/>
+            </VBox>
+            <MenuButton fx:id="settingsMenuButton" text="Settings" styleClass="menu-button-compact">
+                <items>
+                    <MenuItem text="Database Connections" onAction="#handleDatabaseConnections"/>
+                    <MenuItem text="Preferences" onAction="#handlePreferences"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="About BackupForce" onAction="#handleAbout"/>
+                </items>
+            </MenuButton>
+            <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" styleClass="secondary-button-compact"/>
+        </HBox>
+    </top>
+    
+    <!-- Main Content -->
+    <center>
+        <VBox spacing="16" alignment="TOP_CENTER" style="-fx-padding: 20 32;">
+        
+            <!-- Welcome Section -->
+            <VBox spacing="4" alignment="CENTER">
+                <Label text="What would you like to backup?" styleClass="page-title-compact"/>
+                <Label text="Choose a backup type to get started" styleClass="page-subtitle-compact"/>
+            </VBox>
+        
+            <!-- Backup Options Grid -->
+            <HBox spacing="12" alignment="CENTER">
+            
+                <!-- Data Backup Card -->
+                <VBox fx:id="dataBackupCard" spacing="6" alignment="CENTER" 
+                      styleClass="backup-card-compact" onMouseClicked="#handleDataBackup"
+                      style="-fx-cursor: hand;">
+                    <StackPane styleClass="card-icon-container-compact">
+                        <Label text="&#x2630;" styleClass="card-icon-symbol-compact"/>
+                    </StackPane>
+                    <Label text="Data Backup" styleClass="card-title-compact"/>
+                    <Label text="Export Salesforce records to CSV or database"
+                           wrapText="true" textAlignment="CENTER" styleClass="card-description-compact"/>
+                    <Region VBox.vgrow="ALWAYS"/>
+                    
+                    <!-- Stats Row -->
+                    <HBox spacing="12" alignment="CENTER" styleClass="card-stats-compact">
+                        <VBox spacing="0" alignment="CENTER">
+                            <Label fx:id="objectsAvailableLabel" text="--" styleClass="metric-value-compact"/>
+                            <Label text="Objects" styleClass="metric-label-compact"/>
+                        </VBox>
+                        <Separator orientation="VERTICAL" prefHeight="20"/>
+                        <VBox spacing="0" alignment="CENTER">
+                            <Label fx:id="lastBackupRowsLabel" text="--" styleClass="metric-value-compact"/>
+                            <Label text="Rows" styleClass="metric-label-compact"/>
+                        </VBox>
+                    </HBox>
+                    <Label fx:id="lastDataBackupLabel" text="No backups yet" styleClass="last-backup-label-compact"/>
+                </VBox>
+            
+                <!-- Configuration Backup Card (Coming Soon) -->
+                <VBox fx:id="configBackupCard" spacing="6" alignment="CENTER" 
+                      styleClass="backup-card-disabled-compact">
+                    <StackPane styleClass="card-icon-container-disabled-compact">
+                        <Label text="&#x2699;" styleClass="card-icon-symbol-disabled-compact"/>
+                    </StackPane>
+                    <Label text="Config Backup" styleClass="card-title-compact"/>
+                    <Label text="Picklists, record types, and settings"
+                           wrapText="true" textAlignment="CENTER" styleClass="card-description-compact"/>
+                    <Region VBox.vgrow="ALWAYS"/>
+                    <Label text="Coming Soon" styleClass="coming-soon-badge-compact"/>
+                </VBox>
+            
+                <!-- Metadata Backup Card (Coming Soon) -->
+                <VBox fx:id="metadataBackupCard" spacing="6" alignment="CENTER" 
+                      styleClass="backup-card-disabled-compact">
+                    <StackPane styleClass="card-icon-container-disabled-compact">
+                        <Label text="&#x2702;" styleClass="card-icon-symbol-disabled-compact"/>
+                    </StackPane>
+                    <Label text="Metadata Backup" styleClass="card-title-compact"/>
+                    <Label text="Apex, triggers, profiles, and metadata"
+                           wrapText="true" textAlignment="CENTER" styleClass="card-description-compact"/>
+                    <Region VBox.vgrow="ALWAYS"/>
+                    <Label text="Coming Soon" styleClass="coming-soon-badge-compact"/>
+                </VBox>
+            
+            </HBox>
+        
+            <!-- Database Connections Section -->
+            <VBox spacing="8" alignment="CENTER" styleClass="section-panel-compact">
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Label text="Database Connections" styleClass="section-panel-title-compact"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="+ Add" onAction="#handleAddConnection" styleClass="primary-button-compact"/>
+                </HBox>
+                <HBox fx:id="connectionsContainer" spacing="8" alignment="CENTER_LEFT">
+                    <Label fx:id="noConnectionsLabel" text="No connections configured. Add one to export directly to Snowflake, SQL Server, or PostgreSQL." 
+                           wrapText="true" styleClass="empty-state-text-compact"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Recent Activity Section -->
+            <HBox spacing="32" alignment="CENTER" styleClass="activity-bar">
+                <HBox spacing="6" alignment="CENTER">
+                    <Label text="Last Backup:" styleClass="activity-label"/>
+                    <Label fx:id="lastBackupLabel" text="No backups yet" styleClass="activity-value"/>
+                </HBox>
+                <Separator orientation="VERTICAL" prefHeight="16"/>
+                <HBox spacing="6" alignment="CENTER">
+                    <Label text="Total:" styleClass="activity-label"/>
+                    <Label fx:id="totalBackupsLabel" text="0" styleClass="activity-value"/>
+                </HBox>
+            </HBox>
+        
+        </VBox>
+    </center>
+    
+    <!-- Bottom Status Bar -->
+    <bottom>
+        <HBox spacing="12" alignment="CENTER" styleClass="status-bar-compact">
+            <Label fx:id="statusLabel" text="Ready" styleClass="status-bar-text"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="v2.0" styleClass="version-text"/>
+        </HBox>
+    </bottom>
+    
+</BorderPane>

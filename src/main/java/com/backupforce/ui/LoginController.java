@@ -241,26 +241,24 @@ public class LoginController {
                 // Save credentials if remember is checked
                 saveCredentials(username, password, token, environmentCombo.getSelectionModel().getSelectedIndex());
             
-                // Open main backup window
+                // Open home page
                 try {
-                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/backup.fxml"));
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
                     Parent root = loader.load();
                     
-                    BackupController controller = loader.getController();
+                    HomeController controller = loader.getController();
                     controller.setConnectionInfo(connInfo);
                     
-                    Scene scene = new Scene(root, 1200, 800);
+                    Scene scene = new Scene(root, 820, 560);
                     // scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
                     
                     Stage stage = (Stage) loginButton.getScene().getWindow();
                     stage.setScene(scene);
-                    stage.setResizable(true);
-                    stage.setMinWidth(1000);
-                    stage.setMinHeight(700);
+                    stage.setResizable(false);
                     stage.centerOnScreen();
                 } catch (Exception ex) {
-                    logger.error("Failed to load backup window", ex);
-                    statusLabel.setText("Failed to open backup window: " + ex.getMessage());
+                    logger.error("Failed to load home window", ex);
+                    statusLabel.setText("Failed to open home window: " + ex.getMessage());
                 }
             });
         });
@@ -385,26 +383,24 @@ public class LoginController {
                         loginUrl
                     );
                     
-                    // Load backup window
+                    // Load home page
                     Platform.runLater(() -> {
                         try {
-                            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/backup.fxml"));
+                            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
                             Parent root = loader.load();
                             
-                            BackupController controller = loader.getController();
+                            HomeController controller = loader.getController();
                             controller.setConnectionInfo(connInfo);
                             
-                            Scene scene = new Scene(root, 1200, 800);
+                            Scene scene = new Scene(root, 820, 560);
                             
                             Stage stage = (Stage) oauthButton.getScene().getWindow();
                             stage.setScene(scene);
-                            stage.setResizable(true);
-                            stage.setMinWidth(1000);
-                            stage.setMinHeight(700);
+                            stage.setResizable(false);
                             stage.centerOnScreen();
                         } catch (Exception ex) {
-                            logger.error("Failed to load backup window", ex);
-                            showError("Failed to open backup window: " + ex.getMessage());
+                            logger.error("Failed to load home window", ex);
+                            showError("Failed to open home window: " + ex.getMessage());
                         }
                     });
                     

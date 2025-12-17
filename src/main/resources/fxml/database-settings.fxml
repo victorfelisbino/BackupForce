@@ -6,27 +6,28 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml" 
       fx:controller="com.backupforce.ui.DatabaseSettingsController"
-      prefWidth="550" prefHeight="500" 
+      prefWidth="550" prefHeight="520" 
       styleClass="root" 
       spacing="20"
-      stylesheets="@../css/vscode-dark.css">
+      stylesheets="@../css/windows11-dark.css"
+      style="-fx-background-color: #1a1a1a;">
     
     <padding>
-        <Insets top="20" right="20" bottom="20" left="20"/>
+        <Insets top="24" right="24" bottom="24" left="24"/>
     </padding>
     
-    <Label text="Database Connection Settings" styleClass="header-label"/>
+    <Label text="Database Connection Settings" styleClass="dialog-header"/>
     
     <!-- Database Type Selection -->
     <HBox spacing="10" alignment="CENTER_LEFT">
-        <Label text="Database Type:" minWidth="120"/>
-        <ComboBox fx:id="databaseTypeCombo" prefWidth="300" 
+        <Label text="Database Type:" styleClass="field-label"/>
+        <ComboBox fx:id="databaseTypeCombo" prefWidth="300" styleClass="modern-combo"
                   promptText="Select database type"/>
     </HBox>
     
-    <Separator/>
+    <Separator style="-fx-background-color: #333333;"/>
     
-    <GridPane fx:id="settingsGrid" hgap="10" vgap="15">
+    <GridPane fx:id="settingsGrid" hgap="12" vgap="14">
         <columnConstraints>
             <ColumnConstraints minWidth="120" prefWidth="120"/>
             <ColumnConstraints hgrow="ALWAYS"/>
@@ -37,40 +38,40 @@
     </GridPane>
     
     <!-- Backup Options -->
-    <Separator/>
-    <VBox spacing="8">
+    <Separator style="-fx-background-color: #333333;"/>
+    <VBox spacing="10">
         <Label text="Backup Options" styleClass="section-label"/>
-        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)"/>
+        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)" styleClass="modern-checkbox"/>
         <Label text="⚠ Warning: This will delete existing data in the target tables" 
-               style="-fx-text-fill: #ff9800; -fx-font-size: 11px; -fx-padding: 0 0 0 24;"/>
+               styleClass="warning-text" style="-fx-font-size: 11px; -fx-font-weight: normal; -fx-padding: 0 0 0 24;"/>
     </VBox>
     
     <!-- Connection Management -->
-    <Separator/>
-    <VBox spacing="8">
+    <Separator style="-fx-background-color: #333333;"/>
+    <VBox spacing="10">
         <Label text="Connection Management" styleClass="section-label"/>
         <HBox spacing="10" alignment="CENTER_LEFT">
-            <Label text="Connection Name:" minWidth="120"/>
+            <Label text="Connection Name:" styleClass="field-label"/>
             <TextField fx:id="connectionNameField" promptText="e.g., Production Snowflake" 
-                      HBox.hgrow="ALWAYS" 
-                      style="-fx-font-size: 13px;"/>
+                      HBox.hgrow="ALWAYS" styleClass="modern-text-field"/>
         </HBox>
-        <CheckBox fx:id="rememberCheckBox" text="Save this connection for quick access"/>
+        <CheckBox fx:id="rememberCheckBox" text="Save this connection for quick access" styleClass="modern-checkbox"/>
     </VBox>
     
-    <HBox spacing="10" alignment="CENTER">
+    <Region VBox.vgrow="ALWAYS"/>
+    
+    <HBox spacing="12" alignment="CENTER">
         <Button text="Test Connection" onAction="#handleTestConnection" 
                 styleClass="secondary-button" prefWidth="140"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Save As New" onAction="#handleSaveAs" 
-                styleClass="accent-button" prefWidth="120"
-                style="-fx-background-color: #2196F3;"/>
+                styleClass="secondary-button" prefWidth="120"/>
         <Button text="Save" onAction="#handleSave" 
                 styleClass="primary-button" prefWidth="100"/>
         <Button text="Cancel" onAction="#handleCancel" 
                 styleClass="secondary-button" prefWidth="100"/>
     </HBox>
     
-    <Label fx:id="statusLabel" styleClass="status-label" wrapText="true"/>
+    <Label fx:id="statusLabel" wrapText="true" style="-fx-padding: 8 0 0 0;"/>
     
 </VBox>

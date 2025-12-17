@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="com.backupforce.ui.ConnectionsController"
+            stylesheets="@../css/windows11-dark.css"
+            prefWidth="820" prefHeight="560"
+            style="-fx-background-color: #1a1a1a;">
+    
+    <!-- Top Header Bar -->
+    <top>
+        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="header-bar-compact">
+            <Button fx:id="backButton" text="← Back" onAction="#handleBack" styleClass="back-button-compact"/>
+            <Label text="Database Connections" styleClass="page-header-compact"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="statusLabel" text="" styleClass="status-text-inline"/>
+        </HBox>
+    </top>
+    
+    <!-- Main Content -->
+    <center>
+        <HBox spacing="16" style="-fx-padding: 16;">
+            
+            <!-- Left Panel: Connection Types & Saved Connections -->
+            <VBox spacing="12" style="-fx-min-width: 240; -fx-max-width: 240;">
+                
+                <!-- New Connection Section -->
+                <Label text="Add New Connection" styleClass="section-title-compact"/>
+                
+                <VBox spacing="8" fx:id="connectionTypesContainer">
+                    <!-- Snowflake -->
+                    <HBox fx:id="snowflakeTypeCard" spacing="10" alignment="CENTER_LEFT" 
+                          styleClass="connection-type-card" onMouseClicked="#selectSnowflake">
+                        <VBox spacing="2" alignment="CENTER" style="-fx-min-width: 36;">
+                            <Label text="❄" styleClass="db-icon-snowflake"/>
+                        </VBox>
+                        <VBox spacing="1">
+                            <Label text="Snowflake" styleClass="connection-type-name"/>
+                            <Label text="Cloud data warehouse" styleClass="connection-type-desc"/>
+                        </VBox>
+                    </HBox>
+                    
+                    <!-- SQL Server -->
+                    <HBox fx:id="sqlServerTypeCard" spacing="10" alignment="CENTER_LEFT" 
+                          styleClass="connection-type-card" onMouseClicked="#selectSqlServer">
+                        <VBox spacing="2" alignment="CENTER" style="-fx-min-width: 36;">
+                            <Label text="S" styleClass="db-icon-sqlserver"/>
+                        </VBox>
+                        <VBox spacing="1">
+                            <Label text="SQL Server" styleClass="connection-type-name"/>
+                            <Label text="Microsoft SQL database" styleClass="connection-type-desc"/>
+                        </VBox>
+                    </HBox>
+                    
+                    <!-- PostgreSQL -->
+                    <HBox fx:id="postgresTypeCard" spacing="10" alignment="CENTER_LEFT" 
+                          styleClass="connection-type-card" onMouseClicked="#selectPostgres">
+                        <VBox spacing="2" alignment="CENTER" style="-fx-min-width: 36;">
+                            <Label text="P" styleClass="db-icon-postgres"/>
+                        </VBox>
+                        <VBox spacing="1">
+                            <Label text="PostgreSQL" styleClass="connection-type-name"/>
+                            <Label text="Open source database" styleClass="connection-type-desc"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+                
+                <Separator style="-fx-background-color: #333;"/>
+                
+                <!-- Saved Connections -->
+                <Label text="Saved Connections" styleClass="section-title-compact"/>
+                
+                <ScrollPane fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;" 
+                           VBox.vgrow="ALWAYS">
+                    <VBox fx:id="savedConnectionsList" spacing="6">
+                        <Label fx:id="noSavedLabel" text="No saved connections" styleClass="empty-state-text-compact"/>
+                    </VBox>
+                </ScrollPane>
+                
+            </VBox>
+            
+            <Separator orientation="VERTICAL"/>
+            
+            <!-- Right Panel: Connection Form -->
+            <VBox fx:id="formPanel" spacing="14" HBox.hgrow="ALWAYS" style="-fx-padding: 0 8;">
+                
+                <!-- Form Header -->
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label fx:id="formTitle" text="Select a connection type" styleClass="form-title-compact"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="deleteButton" text="Delete" onAction="#handleDelete" 
+                            styleClass="danger-button-compact" visible="false" managed="false"/>
+                </HBox>
+                
+                <!-- Scrollable Form Content -->
+                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" 
+                           style="-fx-background-color: transparent; -fx-background: transparent;">
+                    <VBox spacing="14" style="-fx-padding: 0 4 0 0;">
+                        
+                        <!-- Connection Name -->
+                        <HBox spacing="10" alignment="CENTER_LEFT" fx:id="nameRow" visible="false" managed="false">
+                            <Label text="Connection Name:" styleClass="field-label-compact" style="-fx-min-width: 120;"/>
+                            <TextField fx:id="connectionNameField" promptText="e.g., Production Snowflake" 
+                                       HBox.hgrow="ALWAYS" styleClass="text-field-compact"/>
+                        </HBox>
+                        
+                        <!-- SSO Checkbox (Snowflake only) - Placed before form fields -->
+                        <CheckBox fx:id="ssoCheckBox" text="Use Single Sign-On (Okta/SAML)" 
+                                  styleClass="checkbox-compact sso-checkbox" visible="false" managed="false"
+                                  onAction="#handleSsoToggle"/>
+                        
+                        <!-- Dynamic Form Fields -->
+                        <GridPane fx:id="formGrid" hgap="10" vgap="12">
+                            <columnConstraints>
+                                <ColumnConstraints minWidth="120" prefWidth="120"/>
+                                <ColumnConstraints hgrow="ALWAYS"/>
+                            </columnConstraints>
+                        </GridPane>
+                        
+                        <!-- Options -->
+                        <Separator style="-fx-background-color: #333;" fx:id="optionsSeparator" visible="false" managed="false"/>
+                        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables on backup" 
+                                  styleClass="checkbox-compact" visible="false" managed="false"/>
+                        
+                    </VBox>
+                </ScrollPane>
+                
+                <!-- Action Buttons (always visible at bottom) -->
+                <HBox spacing="10" alignment="CENTER_RIGHT" fx:id="actionButtons" visible="false" managed="false">
+                    <Label fx:id="testResultLabel" text="" wrapText="true" styleClass="test-result-label" HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="testButton" text="Test Connection" onAction="#handleTestConnection" 
+                            styleClass="secondary-button-compact"/>
+                    <Button fx:id="saveButton" text="Save Connection" onAction="#handleSave" 
+                            styleClass="primary-button-compact"/>
+                </HBox>
+                
+            </VBox>
+            
+        </HBox>
+    </center>
+    
+</BorderPane>

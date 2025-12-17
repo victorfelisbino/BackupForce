@@ -990,6 +990,77 @@ public class DatabaseSettingsController {
         return saved;
     }
     
+    /**
+     * Loads a saved connection by ID into the dialog for editing
+     */
+    public void loadConnection(String connectionId) {
+        if (connectionId == null) return;
+        
+        SavedConnection conn = ConnectionManager.getInstance().getConnection(connectionId);
+        if (conn == null) {
+            logger.warn("Connection not found: {}", connectionId);
+            return;
+        }
+        
+        logger.info("Loading connection: {} ({})", conn.getName(), conn.getType());
+        
+        // Select the database type
+        for (DatabaseType dbType : databaseTypeCombo.getItems()) {
+            if (dbType.name.equalsIgnoreCase(conn.getType())) {
+                databaseTypeCombo.getSelectionModel().select(dbType);
+                break;
+            }
+        }
+        
+        // Wait for UI to update then populate fields
+        Platform.runLater(() -> {
+            connectionNameField.setText(conn.getName());
+            
+            // Populate fields based on database type
+            if (fieldMap.containsKey("Account") && conn.getAccount() != null) {
+                fieldMap.get("Account").setText(conn.getAccount());
+            }
+            if (fieldMap.containsKey("Warehouse") && conn.getWarehouse() != null) {
+                fieldMap.get("Warehouse").setText(conn.getWarehouse());
+            }
+            if (fieldMap.containsKey("Database") && conn.getDatabase() != null) {
+                fieldMap.get("Database").setText(conn.getDatabase());
+            }
+            if (fieldMap.containsKey("Schema") && conn.getSchema() != null) {
+                fieldMap.get("Schema").setText(conn.getSchema());
+            }
+            if (fieldMap.containsKey("Username") && conn.getUsername() != null) {
+                fieldMap.get("Username").setText(conn.getUsername());
+            }
+            if (fieldMap.containsKey("Host") && conn.getHost() != null) {
+                fieldMap.get("Host").setText(conn.getHost());
+            }
+            if (fieldMap.containsKey("Port") && conn.getPort() != null) {
+                fieldMap.get("Port").setText(conn.getPort());
+            }
+            if (fieldMap.containsKey("Server") && conn.getHost() != null) {
+                fieldMap.get("Server").setText(conn.getHost());
+            }
+            
+            // Set password (decrypted)
+            if (fieldMap.containsKey("Password")) {
+                String password = ConnectionManager.getInstance().getDecryptedPassword(conn);
+                if (password != null) {
+                    fieldMap.get("Password").setText(password);
+                }
+            }
+            
+            // Set SSO checkbox for Snowflake
+            if (ssoCheckBox != null && conn.isUseSso()) {
+                ssoCheckBox.setSelected(true);
+            }
+            
+            rememberCheckBox.setSelected(true);
+            statusLabel.setText("Loaded connection: " + conn.getName());
+            statusLabel.setStyle("-fx-text-fill: #4caf50;");
+        });
+    }
+    
     public static class DatabaseType {
         private final String name;
         private final List<String> fields;

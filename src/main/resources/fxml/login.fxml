@@ -8,7 +8,8 @@
 <VBox xmlns:fx="http://javafx.com/fxml" 
       fx:controller="com.backupforce.ui.LoginController"
       spacing="24" alignment="CENTER" styleClass="login-container"
-      stylesheets="@../css/windows11-dark.css">
+      stylesheets="@../css/windows11-dark.css"
+      style="-fx-background-color: #1a1a1a;">
     
     <padding>
         <Insets top="50" right="50" bottom="50" left="50"/>
@@ -16,94 +17,76 @@
     
     <!-- Header -->
     <VBox spacing="8" alignment="CENTER" style="-fx-padding: 0 0 8 0;">
-        <Label text="BackupForce" styleClass="app-title" 
-              style="-fx-font-size: 32px; -fx-font-weight: 600; -fx-text-fill: #e3e3e3;"/>
-        <Label text="Salesforce Backup Tool" styleClass="app-subtitle"
-              style="-fx-font-size: 14px; -fx-text-fill: #8b8b8b;"/>
+        <Label text="BackupForce" styleClass="app-logo" style="-fx-font-size: 32px;"/>
+        <Label text="Salesforce Backup Tool" styleClass="page-subtitle"/>
     </VBox>
     
     <!-- Login Form -->
-    <VBox spacing="16" styleClass="login-card" style="-fx-padding: 28px; -fx-background-radius: 8px; -fx-background-color: #2b2b2b; -fx-border-color: #3f3f3f; -fx-border-width: 1px; -fx-border-radius: 8px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 12, 0, 0, 2);">
+    <VBox spacing="16" styleClass="section-panel" style="-fx-padding: 28px; -fx-max-width: 420px;">
         
         <!-- Saved Credentials Section -->
         <VBox spacing="10" fx:id="savedCredentialsSection">
-            <Label text="Saved Credentials" styleClass="section-label" 
-                  style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e3e3e3;"/>
-            <ListView fx:id="savedCredentialsList" maxHeight="120" 
-                     style="-fx-background-color: #202020; -fx-background-radius: 6px; -fx-border-color: #3f3f3f; -fx-border-width: 1px; -fx-border-radius: 6px;"/>
-            <Separator style="-fx-padding: 8 0; -fx-background-color: #3f3f3f;"/>
+            <Label text="Saved Credentials" styleClass="section-label"/>
+            <ListView fx:id="savedCredentialsList" maxHeight="120" styleClass="modern-list"/>
+            <Separator style="-fx-padding: 8 0; -fx-background-color: #333333;"/>
         </VBox>
         
         <VBox spacing="8">
-            <Label text="Username" styleClass="form-label" 
-                  style="-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #e3e3e3;"/>
+            <Label text="Username" styleClass="field-label"/>
             <TextField fx:id="usernameField" promptText="your.email@company.com" 
-                      styleClass="modern-text-field"
-                      style="-fx-padding: 10px 12px; -fx-font-size: 13px;"/>
+                      styleClass="modern-text-field"/>
         </VBox>
         
         <VBox spacing="8">
-            <Label text="Password" styleClass="form-label" 
-                  style="-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #e3e3e3;"/>
+            <Label text="Password" styleClass="field-label"/>
             <PasswordField fx:id="passwordField" promptText="Your Salesforce password" 
-                          styleClass="modern-text-field"
-                          style="-fx-padding: 10px 12px; -fx-font-size: 13px;"/>
+                          styleClass="modern-text-field"/>
         </VBox>
         
         <VBox spacing="8">
-            <Label text="Security Token" styleClass="form-label" 
-                  style="-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #e3e3e3;"/>
+            <Label text="Security Token" styleClass="field-label"/>
             <PasswordField fx:id="tokenField" promptText="Leave empty if IP is whitelisted" 
-                          styleClass="modern-text-field"
-                          style="-fx-padding: 10px 12px; -fx-font-size: 13px;"/>
+                          styleClass="modern-text-field"/>
         </VBox>
         
         <VBox spacing="8">
-            <Label text="Environment" styleClass="form-label" 
-                  style="-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #e3e3e3;"/>
-            <ComboBox fx:id="environmentCombo" maxWidth="Infinity" styleClass="modern-combo"
-                     style="-fx-padding: 10px 12px; -fx-font-size: 13px;"/>
-            <Label fx:id="environmentUrlLabel" text="" 
-                   style="-fx-text-fill: #8b8b8b; -fx-font-size: 11px; -fx-padding: 2 0 0 4;"/>
+            <Label text="Environment" styleClass="field-label"/>
+            <ComboBox fx:id="environmentCombo" maxWidth="Infinity" styleClass="modern-combo"/>
+            <Label fx:id="environmentUrlLabel" text="" styleClass="caption" 
+                   style="-fx-padding: 2 0 0 4;"/>
         </VBox>
         
         <CheckBox fx:id="rememberCredentialsCheckBox" text="Remember credentials" 
-                  styleClass="modern-checkbox"
-                  style="-fx-font-size: 13px; -fx-padding: 8 0 4 0;"/>
+                  styleClass="modern-checkbox" style="-fx-padding: 8 0 4 0;"/>
         
         <Button fx:id="loginButton" text="Login to Salesforce" onAction="#handleLogin" 
                 maxWidth="Infinity" styleClass="primary-button"
-                style="-fx-padding: 12px; -fx-font-size: 14px; -fx-font-weight: 600;"/>
+                style="-fx-padding: 12px; -fx-font-size: 14px;"/>
         
         <!-- OR Separator -->
         <HBox spacing="12" alignment="CENTER" style="-fx-padding: 8 0;">
-            <Separator HBox.hgrow="ALWAYS" style="-fx-background-color: #3f3f3f;"/>
-            <Label text="OR" style="-fx-text-fill: #8b8b8b; -fx-font-size: 12px; -fx-font-weight: 500;"/>
-            <Separator HBox.hgrow="ALWAYS" style="-fx-background-color: #3f3f3f;"/>
+            <Separator HBox.hgrow="ALWAYS" style="-fx-background-color: #333333;"/>
+            <Label text="OR" styleClass="caption" style="-fx-font-weight: 500;"/>
+            <Separator HBox.hgrow="ALWAYS" style="-fx-background-color: #333333;"/>
         </HBox>
         
         <!-- OAuth Login Button -->
         <Button fx:id="oauthButton" text="🔒 Login with Browser (OAuth)" onAction="#handleOAuthLogin" 
                 maxWidth="Infinity" styleClass="secondary-button"
-                style="-fx-padding: 12px; -fx-font-size: 14px; -fx-font-weight: 600;"/>
+                style="-fx-padding: 12px; -fx-font-size: 14px;"/>
         
         <HBox spacing="12" alignment="CENTER" style="-fx-padding: 8 0 0 0;">
             <ProgressIndicator fx:id="progressIndicator" prefWidth="20" prefHeight="20"/>
-            <Label fx:id="statusLabel" text="" styleClass="status-label" 
-                  style="-fx-font-size: 13px; -fx-text-fill: #e3e3e3;"/>
+            <Label fx:id="statusLabel" text=""/>
         </HBox>
     </VBox>
     
     <!-- Footer -->
     <VBox spacing="12" alignment="CENTER" style="-fx-padding: 8 0 0 0;">
         <Label text="Security token not needed if your IP is whitelisted in Setup → Network Access → Trusted IP Ranges" 
-               wrapText="true" textAlignment="CENTER"
-               style="-fx-font-size: 11px; -fx-text-fill: #8b8b8b; -fx-max-width: 480px;">
-            <font>
-                <Font size="11"/>
-            </font>
-        </Label>
-        <Label text="Developed by Victor Felisbino" 
-              style="-fx-font-size: 11px; -fx-text-fill: #8b8b8b; -fx-padding: 4 0 0 0;"/>
+               wrapText="true" textAlignment="CENTER" styleClass="caption"
+               style="-fx-max-width: 420px;"/>
+        <Label text="Developed by Victor Felisbino" styleClass="version-text"
+              style="-fx-padding: 4 0 0 0;"/>
     </VBox>
 </VBox>
