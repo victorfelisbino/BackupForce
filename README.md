@@ -138,6 +138,7 @@ SELECT Id, Name, BLOB_FILE_PATH, BLOB_SIZE FROM Attachment;
 - OAuth 2.0 authentication (no password storage)
 - Credentials stored securely in Windows Registry
 - All data transmitted over HTTPS
+- [VirusTotal Scan](https://www.virustotal.com/gui/file/72a63cc03f44c80292fd7d2d25106d18e737d5c4fefd386b459bf9eb18228a04) - 1/66 (Microsoft ML false positive, common for unsigned apps)
 
 ---
 
