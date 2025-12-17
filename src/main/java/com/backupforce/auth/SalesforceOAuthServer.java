@@ -8,8 +8,8 @@ import com.sun.net.httpserver.HttpServer;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
@@ -268,7 +268,7 @@ public class SalesforceOAuthServer {
             
             post.setEntity(new UrlEncodedFormEntity(params));
             
-            try (CloseableHttpResponse response = httpClient.execute(post)) {
+            try (ClassicHttpResponse response = httpClient.executeOpen(null, post, null)) {
                 String responseBody = EntityUtils.toString(response.getEntity());
                 
                 if (response.getCode() != 200) {

@@ -1363,7 +1363,7 @@ public class BackupController {
                                     // Get CSV record count for comparison (count records properly using CSVParser)
                                     int csvRecords = 0;
                                     try (java.io.FileReader countReader = new java.io.FileReader(csvFile);
-                                         org.apache.commons.csv.CSVParser countParser = org.apache.commons.csv.CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(countReader)) {
+                                         org.apache.commons.csv.CSVParser countParser = org.apache.commons.csv.CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(countReader)) {
                                         for (org.apache.commons.csv.CSVRecord ignored : countParser) {
                                             csvRecords++;
                                         }

@@ -7,8 +7,8 @@ import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
@@ -116,7 +116,7 @@ public class BulkV2Client {
         post.setHeader("Content-Type", "application/json");
         post.setEntity(new StringEntity(jobRequest.toString(), ContentType.APPLICATION_JSON));
         
-        try (CloseableHttpResponse response = httpClient.execute(post)) {
+        try (ClassicHttpResponse response = httpClient.executeOpen(null, post, null)) {
             String responseBody = EntityUtils.toString(response.getEntity());
             
             if (response.getCode() >= 400) {
@@ -150,7 +150,7 @@ public class BulkV2Client {
         HttpGet get = new HttpGet(url);
         get.setHeader("Authorization", "Bearer " + accessToken);
         
-        try (CloseableHttpResponse response = httpClient.execute(get)) {
+        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
             String responseBody = EntityUtils.toString(response.getEntity());
             JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
             
@@ -227,7 +227,7 @@ public class BulkV2Client {
             HttpGet get = new HttpGet(url);
             get.setHeader("Authorization", "Bearer " + accessToken);
             
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
+            try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
                 String responseBody = EntityUtils.toString(response.getEntity());
                 JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
                 
@@ -271,7 +271,7 @@ public class BulkV2Client {
         Path outputPath = Paths.get(outputFolder, objectName + ".csv");
         Files.createDirectories(outputPath.getParent());
         
-        try (CloseableHttpResponse response = httpClient.execute(get);
+        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null);
              InputStream inputStream = response.getEntity().getContent();
              FileOutputStream outputStream = new FileOutputStream(outputPath.toFile())) {
             
@@ -449,7 +449,7 @@ public class BulkV2Client {
             HttpGet get = new HttpGet(url);
             get.setHeader("Authorization", "Bearer " + accessToken);
             
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
+            try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
                 if (response.getCode() >= 400) {
                     return null;
                 }
@@ -709,7 +709,7 @@ public class BulkV2Client {
         HttpGet get = new HttpGet(url);
         get.setHeader("Authorization", "Bearer " + accessToken);
         
-        try (CloseableHttpResponse response = httpClient.execute(get)) {
+        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
             if (response.getCode() >= 400) {
                 logger.warn("Failed to download blob from {}: HTTP {}", url, response.getCode());
                 return false;

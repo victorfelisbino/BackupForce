@@ -164,7 +164,7 @@ public class JdbcDatabaseSink implements DataSink {
         
         int recordCount = 0;
         
-        try (CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(csvReader)) {
+        try (CSVParser parser = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(csvReader)) {
             List<String> headers = parser.getHeaderNames();
             
             if (headers.isEmpty()) {
