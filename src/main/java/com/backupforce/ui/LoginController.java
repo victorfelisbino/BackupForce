@@ -3,6 +3,8 @@ package com.backupforce.ui;
 import com.backupforce.auth.SalesforceOAuthServer;
 import com.sforce.soap.partner.PartnerConnection;
 import com.sforce.ws.ConnectorConfig;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -12,10 +14,12 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.prefs.Preferences;
 
 public class LoginController {
@@ -29,13 +33,17 @@ public class LoginController {
     @FXML private CheckBox rememberCredentialsCheckBox;
     @FXML private Button loginButton;
     @FXML private Button oauthButton;
+    @FXML private Button cancelButton;
     @FXML private Label statusLabel;
+    @FXML private Label timeoutLabel;
     @FXML private ProgressIndicator progressIndicator;
     @FXML private ListView<String> savedCredentialsList;
     @FXML private VBox savedCredentialsSection;
     @FXML private Label environmentUrlLabel;
     
     private boolean isLoggingIn = false;
+    private SalesforceOAuthServer currentOAuthServer = null;
+    private javafx.animation.Timeline countdownTimeline = null;
 
     @FXML
     public void initialize() {
@@ -338,20 +346,47 @@ public class LoginController {
             return;
         }
         
+        // Show cancel button and countdown
+        final int TIMEOUT_SECONDS = 180; // 3 minutes
+        final AtomicInteger remainingSeconds = new AtomicInteger(TIMEOUT_SECONDS);
+        
+        // Setup countdown timer
+        countdownTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
+            int remaining = remainingSeconds.decrementAndGet();
+            int minutes = remaining / 60;
+            int seconds = remaining % 60;
+            timeoutLabel.setText(String.format("Time remaining: %d:%02d", minutes, seconds));
+            
+            if (remaining <= 30) {
+                timeoutLabel.setStyle("-fx-text-fill: #e74c3c;"); // Red when low
+            }
+        }));
+        countdownTimeline.setCycleCount(TIMEOUT_SECONDS);
+        
         Task<Void> oauthTask = new Task<>() {
             @Override
             protected Void call() throws Exception {
                 try {
-                    updateMessage("Opening browser for authentication...");
+                    updateMessage("Opening browser for authentication...\nComplete login in browser, then return here.");
                     
                     // Get selected environment
                     String environment = environmentCombo.getSelectionModel().getSelectedItem();
                     String loginUrl = environment.contains("Sandbox") ? 
                         "https://test.salesforce.com" : "https://login.salesforce.com";
                     
-                    // Start OAuth flow
-                    SalesforceOAuthServer oauthServer = new SalesforceOAuthServer();
-                    SalesforceOAuthServer.OAuthResult result = oauthServer.authenticate(loginUrl);
+                    // Start OAuth flow with configurable timeout
+                    currentOAuthServer = new SalesforceOAuthServer();
+                    currentOAuthServer.setTimeout(TIMEOUT_SECONDS);
+                    SalesforceOAuthServer.OAuthResult result = currentOAuthServer.authenticate(loginUrl);
+                    
+                    // Check if cancelled
+                    if (result.isCancelled()) {
+                        Platform.runLater(() -> {
+                            statusLabel.setText("Login cancelled");
+                            statusLabel.setStyle("-fx-text-fill: #888;");
+                        });
+                        return null;
+                    }
                     
                     if (!result.isSuccess()) {
                         Platform.runLater(() -> showError(result.error));
@@ -408,9 +443,11 @@ public class LoginController {
                     logger.error("OAuth login failed", e);
                     Platform.runLater(() -> showError(
                         "OAuth authentication failed:\n\n" + e.getMessage() + "\n\n" +
-                        "Make sure you have configured a Connected App in Salesforce.\n" +
-                        "See SalesforceOAuthServer.java for setup instructions."
+                        "This uses browser-based OAuth (no Connected App needed).\n" +
+                        "If the browser didn't open, try again."
                     ));
+                } finally {
+                    currentOAuthServer = null;
                 }
                 return null;
             }
@@ -425,25 +462,68 @@ public class LoginController {
             progressIndicator.setVisible(true);
             loginButton.setDisable(true);
             oauthButton.setDisable(true);
+            cancelButton.setVisible(true);
+            cancelButton.setManaged(true);
+            timeoutLabel.setVisible(true);
+            timeoutLabel.setManaged(true);
+            timeoutLabel.setStyle("-fx-text-fill: #888;");
+            timeoutLabel.setText("Time remaining: 3:00");
+            countdownTimeline.play();
         });
         
-        oauthTask.setOnSucceeded(e -> {
+        Runnable resetUI = () -> {
             isLoggingIn = false;
             progressIndicator.setVisible(false);
             loginButton.setDisable(false);
             oauthButton.setDisable(false);
-            statusLabel.setText("");
-        });
+            cancelButton.setVisible(false);
+            cancelButton.setManaged(false);
+            timeoutLabel.setVisible(false);
+            timeoutLabel.setManaged(false);
+            if (countdownTimeline != null) {
+                countdownTimeline.stop();
+            }
+        };
         
+        oauthTask.setOnSucceeded(e -> resetUI.run());
         oauthTask.setOnFailed(e -> {
-            isLoggingIn = false;
-            progressIndicator.setVisible(false);
-            loginButton.setDisable(false);
-            oauthButton.setDisable(false);
+            resetUI.run();
             statusLabel.setText("Login failed");
+        });
+        oauthTask.setOnCancelled(e -> {
+            resetUI.run();
+            statusLabel.setText("Login cancelled");
         });
         
         new Thread(oauthTask).start();
+    }
+    
+    @FXML
+    private void handleCancelOAuth() {
+        logger.info("User cancelled OAuth flow");
+        
+        // Stop the countdown
+        if (countdownTimeline != null) {
+            countdownTimeline.stop();
+        }
+        
+        // Cancel the OAuth server
+        if (currentOAuthServer != null) {
+            currentOAuthServer.cancel();
+            currentOAuthServer = null;
+        }
+        
+        // Reset UI
+        isLoggingIn = false;
+        progressIndicator.setVisible(false);
+        loginButton.setDisable(false);
+        oauthButton.setDisable(false);
+        cancelButton.setVisible(false);
+        cancelButton.setManaged(false);
+        timeoutLabel.setVisible(false);
+        timeoutLabel.setManaged(false);
+        statusLabel.setText("Login cancelled");
+        statusLabel.setStyle("-fx-text-fill: #888;");
     }
 
     private void showError(String message) {
