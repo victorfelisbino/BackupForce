@@ -5,7 +5,7 @@ Thank you for your interest in contributing to BackupForce! 🎉
 ## How to Contribute
 
 ### Reporting Bugs
-1. Check if the bug has already been reported in [Issues](https://github.com/victorfelisbino/backupforce-javafx/issues)
+1. Check if the bug has already been reported in [Issues](https://github.com/victorfelisbino/BackupForce/issues)
 2. If not, create a new issue with:
    - Clear title describing the problem
    - Steps to reproduce

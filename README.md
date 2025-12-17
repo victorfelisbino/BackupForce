@@ -1,8 +1,8 @@
 # BackupForce
 
-[![Download](https://img.shields.io/github/v/release/victorfelisbino/backupforce-javafx?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/backupforce-javafx/releases/latest)
+[![Download](https://img.shields.io/github/v/release/victorfelisbino/BackupForce?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases/latest)
 [![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge)](https://github.com/victorfelisbino/backupforce-javafx/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
 
 A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a modern Windows 11 dark theme UI.
 
@@ -12,7 +12,7 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ## 🚀 Quick Download
 
-**[⬇️ Download BackupForce v2.0.0](https://github.com/victorfelisbino/backupforce-javafx/releases/latest)**
+**[⬇️ Download BackupForce v2.0.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
 
 1. Download `BackupForce-2.0.0-portable.zip`
 2. Extract to any folder
@@ -63,7 +63,7 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ### Option 1: Portable Executable (Recommended)
 
-1. **Download** the latest release from [Releases](https://github.com/victorfelisbino/backupforce-javafx/releases)
+1. **Download** the latest release from [Releases](https://github.com/victorfelisbino/BackupForce/releases)
 2. **Extract** `BackupForce-2.0.0-portable.zip` to any folder
 3. **Run** `BackupForce.exe`
 
@@ -71,8 +71,8 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ```bash
 # Clone the repository
-git clone https://github.com/victorfelisbino/backupforce-javafx.git
-cd backupforce-javafx
+git clone https://github.com/victorfelisbino/BackupForce.git
+cd BackupForce
 
 # Build and run
 mvn javafx:run
