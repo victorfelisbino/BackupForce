@@ -53,6 +53,7 @@ public class SalesforceOAuthServer {
     private HttpServer server;
     private CompletableFuture<OAuthResult> resultFuture;
     private String codeVerifier;  // PKCE code verifier
+    private String oauthState;    // State parameter to prevent CSRF and stale code reuse
     private String loginUrl;  // Store login URL for token exchange
     private int activePort = -1;  // Port that successfully started
     private String activeRedirectUri = null;  // Redirect URI for the active port
@@ -131,7 +132,9 @@ public class SalesforceOAuthServer {
         // Generate PKCE code verifier and challenge
         codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
-        logger.info("Generated PKCE code verifier and challenge");
+        // Generate unique state to prevent CSRF and stale authorization code reuse
+        oauthState = generateCodeVerifier();  // Reuse the secure random generator
+        logger.info("Generated PKCE code verifier, challenge, and state");
         logger.info("Using Salesforce CLI Connected App (works on all orgs)");
         
         // Store login URL for token exchange
@@ -176,14 +179,16 @@ public class SalesforceOAuthServer {
         }
         
         try {
-            // Build authorization URL with PKCE challenge
+            // Build authorization URL with PKCE challenge and state parameter
             // prompt=login select_account forces account selection screen
+            // state parameter prevents CSRF and ensures callback matches this request
             String authUrl = String.format(
-                "%s/services/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=api%%20refresh_token%%20web&code_challenge=%s&code_challenge_method=S256&prompt=login%%20select_account",
+                "%s/services/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=api%%20refresh_token%%20web&code_challenge=%s&code_challenge_method=S256&state=%s&prompt=login%%20select_account",
                 loginUrl,
                 CLIENT_ID,
                 activeRedirectUri,
-                codeChallenge
+                codeChallenge,
+                oauthState
             );
             
             logger.info("Opening browser for Salesforce login...");
@@ -272,8 +277,22 @@ public class SalesforceOAuthServer {
                     return;
                 }
                 
+                // Validate state parameter to prevent CSRF and stale code reuse
+                String receivedState = params.get("state");
+                if (oauthState != null && !oauthState.equals(receivedState)) {
+                    logger.error("State mismatch - possible stale authorization code from previous attempt");
+                    sendResponse(exchange, 400, 
+                        "<html><body>" +
+                        "<h1>Session Expired</h1>" +
+                        "<p>This authorization link is from a previous login attempt.</p>" +
+                        "<p>Please close this tab and try logging in again from BackupForce.</p>" +
+                        "</body></html>");
+                    resultFuture.complete(new OAuthResult("Authorization session expired. Please try again."));
+                    return;
+                }
+                
                 String authCode = params.get("code");
-                logger.info("Received authorization code");
+                logger.info("Received authorization code with valid state");
                 
                 // Exchange code for access token
                 OAuthResult result = exchangeCodeForToken(authCode);
