@@ -98,7 +98,16 @@ public class SnowflakeDialect implements JdbcDatabaseSink.DatabaseDialect {
     }
     
     @Override
+    public String getBinaryType() {
+        // Snowflake BINARY type supports up to 8MB
+        // For larger files, consider using internal/external stages
+        return "BINARY(8388608)";
+    }
+    
+    @Override
     public int getOptimalBatchSize() {
-        return 10000;
+        // Snowflake works better with smaller batches due to JDBC driver limitations
+        // Larger batches can cause memory issues and silent failures
+        return 1000;
     }
 }

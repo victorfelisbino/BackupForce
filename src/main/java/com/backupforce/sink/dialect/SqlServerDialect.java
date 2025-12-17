@@ -98,6 +98,12 @@ public class SqlServerDialect implements JdbcDatabaseSink.DatabaseDialect {
     }
     
     @Override
+    public String getBinaryType() {
+        // SQL Server VARBINARY(MAX) for binary data up to 2GB
+        return "VARBINARY(MAX)";
+    }
+    
+    @Override
     public int getOptimalBatchSize() {
         return 1000; // SQL Server performs well with smaller batches
     }

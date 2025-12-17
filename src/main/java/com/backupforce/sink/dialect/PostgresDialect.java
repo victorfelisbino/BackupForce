@@ -96,6 +96,12 @@ public class PostgresDialect implements JdbcDatabaseSink.DatabaseDialect {
     }
     
     @Override
+    public String getBinaryType() {
+        // PostgreSQL BYTEA type for binary data
+        return "BYTEA";
+    }
+    
+    @Override
     public int getOptimalBatchSize() {
         return 5000;
     }

@@ -1,5 +1,7 @@
 package com.backupforce.ui;
 
+import com.backupforce.config.ConnectionManager;
+import com.backupforce.config.ConnectionManager.SavedConnection;
 import com.backupforce.sink.DataSink;
 import com.backupforce.sink.DataSinkFactory;
 import javafx.application.Platform;
@@ -26,6 +28,7 @@ public class DatabaseSettingsController {
     @FXML private GridPane settingsGrid;
     @FXML private CheckBox rememberCheckBox;
     @FXML private CheckBox recreateTablesCheckBox;
+    @FXML private TextField connectionNameField;
     @FXML private Label statusLabel;
     
     private Map<String, TextField> fieldMap = new HashMap<>();
@@ -725,10 +728,54 @@ public class DatabaseSettingsController {
         
         logger.info("Creating DatabaseConnectionInfo with fields: {}", fields.keySet());
         boolean recreateTables = recreateTablesCheckBox != null && recreateTablesCheckBox.isSelected();
+        boolean useSso = ssoCheckBox != null && ssoCheckBox.isSelected();
         logger.info("Recreate tables option: {}", recreateTables);
-        connectionInfo = new DatabaseConnectionInfo(dbType.name, fields, recreateTables);
+        connectionInfo = new DatabaseConnectionInfo(dbType.name, fields, useSso, recreateTables);
         
+        // Save to ConnectionManager if "remember" is checked
         if (rememberCheckBox.isSelected()) {
+            try {
+                String connectionName = connectionNameField.getText().trim();
+                if (connectionName.isEmpty()) {
+                    connectionName = generateConnectionName(dbType.name, fields);
+                }
+                
+                SavedConnection savedConn = new SavedConnection();
+                savedConn.setName(connectionName);
+                savedConn.setType(dbType.name);
+                savedConn.setUseSso(useSso);
+                
+                if (dbType.name.equals("Snowflake")) {
+                    savedConn.setAccount(fields.get("Account"));
+                    savedConn.setWarehouse(fields.get("Warehouse"));
+                    savedConn.setDatabase(fields.get("Database"));
+                    savedConn.setSchema(fields.get("Schema"));
+                    savedConn.setUsername(fields.get("Username"));
+                    if (!useSso) {
+                        savedConn.setPassword(fields.get("Password"));
+                    }
+                } else {
+                    savedConn.setHost(fields.get("Host"));
+                    if (fields.containsKey("Port")) {
+                        savedConn.setPort(fields.get("Port"));
+                    }
+                    savedConn.setDatabase(fields.get("Database"));
+                    if (fields.containsKey("Schema")) {
+                        savedConn.setSchema(fields.get("Schema"));
+                    }
+                    savedConn.setUsername(fields.get("Username"));
+                    savedConn.setPassword(fields.get("Password"));
+                }
+                
+                ConnectionManager.getInstance().saveConnection(savedConn);
+                logger.info("Connection saved: {}", connectionName);
+                statusLabel.setText("✓ Connection saved successfully");
+                statusLabel.setStyle("-fx-text-fill: #2e7d32; -fx-font-weight: bold;");
+            } catch (Exception e) {
+                logger.error("Failed to save connection", e);
+                statusLabel.setText("⚠ Connection settings saved, but failed to store for reuse");
+                statusLabel.setStyle("-fx-text-fill: #f57c00;");
+            }
             saveCredentials();
         } else {
             clearSavedCredentials();
@@ -736,6 +783,72 @@ public class DatabaseSettingsController {
         
         saved = true;
         closeDialog();
+    }
+    
+    @FXML
+    private void handleSaveAs() {
+        if (!validateFields()) {
+            return;
+        }
+        
+        // Prompt for connection name if not provided
+        String connectionName = connectionNameField.getText().trim();
+        if (connectionName.isEmpty()) {
+            TextInputDialog dialog = new TextInputDialog();
+            dialog.setTitle("Save Connection");
+            dialog.setHeaderText("Save this connection for quick access");
+            dialog.setContentText("Connection name:");
+            
+            DatabaseType dbType = databaseTypeCombo.getValue();
+            Map<String, String> fields = getCurrentFields();
+            dialog.getEditor().setText(generateConnectionName(dbType.name, fields));
+            
+            Optional<String> result = dialog.showAndWait();
+            if (result.isPresent() && !result.get().trim().isEmpty()) {
+                connectionName = result.get().trim();
+                connectionNameField.setText(connectionName);
+            } else {
+                return;
+            }
+        }
+        
+        // Force remember checkbox to be checked when saving as new
+        rememberCheckBox.setSelected(true);
+        
+        // Call the regular save method
+        handleSave();
+    }
+    
+    private Map<String, String> getCurrentFields() {
+        Map<String, String> fields = new HashMap<>();
+        for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
+            String value = entry.getValue().getText().trim();
+            if (!value.isEmpty()) {
+                fields.put(entry.getKey(), value);
+            }
+        }
+        DatabaseType dbType = databaseTypeCombo.getValue();
+        if (dbType != null && dbType.name.equals("Snowflake")) {
+            for (Map.Entry<String, ComboBox<String>> entry : comboMap.entrySet()) {
+                String value = entry.getValue().getValue();
+                if (value != null && !value.trim().isEmpty() && !value.startsWith("➕")) {
+                    fields.put(entry.getKey(), value.trim());
+                }
+            }
+        }
+        return fields;
+    }
+    
+    private String generateConnectionName(String dbType, Map<String, String> fields) {
+        if (dbType.equals("Snowflake")) {
+            String account = fields.getOrDefault("Account", "Unknown");
+            String database = fields.getOrDefault("Database", "DB");
+            return String.format("%s - %s", account, database);
+        } else {
+            String host = fields.getOrDefault("Host", fields.getOrDefault("Server", "Unknown"));
+            String database = fields.getOrDefault("Database", "DB");
+            return String.format("%s - %s (%s)", host, database, dbType);
+        }
     }
     
     @FXML
@@ -895,17 +1008,20 @@ public class DatabaseSettingsController {
     public static class DatabaseConnectionInfo {
         private final String databaseType;
         private final Map<String, String> fields;
+        private final boolean useSso;
         private final boolean recreateTables;
         
-        public DatabaseConnectionInfo(String databaseType, Map<String, String> fields, boolean recreateTables) {
+        public DatabaseConnectionInfo(String databaseType, Map<String, String> fields, boolean useSso, boolean recreateTables) {
             this.databaseType = databaseType;
             this.fields = fields;
+            this.useSso = useSso;
             this.recreateTables = recreateTables;
         }
         
         public String getDatabaseType() { return databaseType; }
         public Map<String, String> getFields() { return fields; }
         public String getField(String name) { return fields.get(name); }
+        public boolean isUseSso() { return useSso; }
         public boolean isRecreateTables() { return recreateTables; }
     }
 }

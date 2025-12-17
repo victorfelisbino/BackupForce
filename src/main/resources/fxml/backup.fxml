@@ -125,41 +125,86 @@
         </VBox>
         
         <!-- RIGHT PANEL: Configuration and Logs -->
-        <VBox spacing="14" style="-fx-padding: 16px 16px 16px 12px;">
+        <VBox spacing="10" style="-fx-padding: 12px 16px 12px 8px;">
             
             <!-- Backup Target Selection -->
-            <VBox spacing="12" styleClass="config-card">
+            <VBox spacing="8" styleClass="config-card">
                 <Label text="Backup Destination" styleClass="section-label"/>
                 
-                <HBox spacing="24" alignment="CENTER_LEFT" style="-fx-padding: 4 0 0 0;">
-                    <RadioButton fx:id="csvRadioButton" text="CSV Files" selected="true" 
-                                styleClass="modern-radio">
+                <HBox spacing="20" alignment="CENTER_LEFT" style="-fx-padding: 6 0 4 0;">
+                    <RadioButton fx:id="csvRadioButton" text="CSV Files" selected="true">
                         <toggleGroup>
                             <ToggleGroup fx:id="backupTargetGroup"/>
                         </toggleGroup>
                     </RadioButton>
                     <RadioButton fx:id="databaseRadioButton" text="Database" 
-                                toggleGroup="$backupTargetGroup" styleClass="modern-radio"/>
+                                toggleGroup="$backupTargetGroup"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="databaseSettingsButton" text="⚙ Database Settings" 
+                    <Button fx:id="databaseSettingsButton" text="⚙ Manage" 
                            onAction="#handleDatabaseSettings" 
                            styleClass="secondary-button" disable="true"
+                           style="-fx-padding: 5px 12px; -fx-font-size: 12px;"/>
+                </HBox>
+                
+                <!-- Database Connection Selector (shown when Database is selected) -->
+                <VBox fx:id="connectionSelectorBox" spacing="10" visible="false" managed="false" 
+                      style="-fx-padding: 8 0 0 0;">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Active Connection:" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                        <ComboBox fx:id="connectionCombo" promptText="Select a connection..." 
+                                 HBox.hgrow="ALWAYS" styleClass="modern-combo"
+                                 style="-fx-min-width: 250px; -fx-font-size: 13px;"/>
+                        <Button text="↻" onAction="#handleRefreshConnections" 
+                               styleClass="icon-button" 
+                               style="-fx-padding: 6px 12px; -fx-font-size: 16px; -fx-font-weight: bold;">
+                            <tooltip>
+                                <Tooltip text="Refresh connection list"/>
+                            </tooltip>
+                        </Button>
+                    </HBox>
+                    
+                    <!-- Connection Info Display -->
+                    <HBox fx:id="connectionInfoBox" spacing="12" visible="false" managed="false" 
+                          style="-fx-padding: 8; -fx-background-color: rgba(33, 150, 243, 0.1); -fx-background-radius: 6;">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label fx:id="connectionTypeLabel" text="Snowflake" 
+                                  style="-fx-font-size: 11px; -fx-text-fill: #2196F3; -fx-font-weight: 600;"/>
+                            <Label fx:id="connectionDetailsLabel" text="Database.Schema" 
+                                  style="-fx-font-size: 12px; -fx-text-fill: #e0e0e0;"/>
+                        </VBox>
+                        <Label fx:id="connectionStatusIcon" text="●" 
+                              style="-fx-font-size: 18px; -fx-text-fill: #4CAF50;">
+                            <tooltip>
+                                <Tooltip text="Connection ready"/>
+                            </tooltip>
+                        </Label>
+                    </HBox>
+                </VBox>
+            </VBox>
+            
+            <!-- Output Folder Selection -->
+            <VBox spacing="6" styleClass="config-card" fx:id="outputFolderBox">
+                <Label text="Output Folder" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
+                              styleClass="modern-text-field"
+                              style="-fx-padding: 8px 10px; -fx-font-size: 12px;"
+                              promptText="Select backup folder..."/>
+                    <Button fx:id="browseButton" text="..." onAction="#handleBrowse" 
+                           styleClass="secondary-button"
                            style="-fx-padding: 6px 14px; -fx-font-size: 13px;"/>
                 </HBox>
             </VBox>
             
-            <!-- Output Folder Selection -->
-            <VBox spacing="10" styleClass="config-card" fx:id="outputFolderBox">
-                <Label text="Output Folder" styleClass="section-label"/>
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
-                              styleClass="modern-text-field"
-                              promptText="Select backup destination folder..."/>
-                    <Button fx:id="browseButton" text="Browse" onAction="#handleBrowse" 
-                           styleClass="secondary-button"
-                           style="-fx-padding: 8px 16px; -fx-font-size: 13px;"/>
-                </HBox>
-            </VBox>
+            <!-- Record Limit (for testing) -->
+            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="config-card">
+                <Label text="Record Limit (Testing)" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <TextField fx:id="recordLimitField" prefWidth="80" 
+                          styleClass="modern-text-field"
+                          style="-fx-padding: 6px 10px;"
+                          text="0"/>
+                <Label text="(0 = unlimited)" style="-fx-font-size: 11px; -fx-text-fill: #666;"/>
+            </HBox>
             
             <!-- Progress Section -->
             <VBox spacing="10" styleClass="progress-card">
@@ -173,24 +218,24 @@
             </VBox>
             
             <!-- Action Buttons -->
-            <HBox spacing="12" alignment="CENTER_RIGHT" style="-fx-padding: 8 0 0 0;">
+            <HBox spacing="10" alignment="CENTER" style="-fx-padding: 6 0 0 0;">
                 <Button fx:id="startBackupButton" text="Start Backup" onAction="#handleStartBackup" 
-                       prefWidth="160" prefHeight="38" styleClass="primary-button"
-                       style="-fx-font-size: 14px; -fx-font-weight: 600;"/>
-                <Button fx:id="stopBackupButton" text="Stop Backup" onAction="#handleStopBackup" 
-                       prefWidth="160" prefHeight="38" styleClass="danger-button"
-                       style="-fx-font-size: 14px; -fx-font-weight: 600;"/>
-                <Button fx:id="exportResultsButton" text="Export Results" onAction="#handleExportResults" 
-                       prefWidth="160" prefHeight="38" styleClass="success-button" disable="true"
-                       style="-fx-font-size: 14px; -fx-font-weight: 600;"/>
+                       prefWidth="140" prefHeight="36" styleClass="primary-button"
+                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <Button fx:id="stopBackupButton" text="Stop" onAction="#handleStopBackup" 
+                       prefWidth="90" prefHeight="36" styleClass="danger-button"
+                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <Button fx:id="exportResultsButton" text="Export" onAction="#handleExportResults" 
+                       prefWidth="90" prefHeight="36" styleClass="success-button" disable="true"
+                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
             </HBox>
             
             <!-- Activity Log (TALL - grows to fill remaining space) -->
-            <VBox spacing="10" styleClass="config-card" VBox.vgrow="ALWAYS">
-                <Label text="Activity Log" styleClass="section-label"/>
+            <VBox spacing="6" styleClass="config-card" VBox.vgrow="ALWAYS">
+                <Label text="Activity Log" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
                 <TextArea fx:id="logArea" editable="false" wrapText="true" 
                          styleClass="log-area" VBox.vgrow="ALWAYS"
-                         style="-fx-min-height: 300px;">
+                         style="-fx-min-height: 150px;">
                     <font>
                         <Font name="Consolas" size="11"/>
                     </font>

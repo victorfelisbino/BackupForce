@@ -45,12 +45,26 @@
                style="-fx-text-fill: #ff9800; -fx-font-size: 11px; -fx-padding: 0 0 0 24;"/>
     </VBox>
     
-    <!-- Remember credentials -->
-    <CheckBox fx:id="rememberCheckBox" text="Remember credentials"/>
+    <!-- Connection Management -->
+    <Separator/>
+    <VBox spacing="8">
+        <Label text="Connection Management" styleClass="section-label"/>
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label text="Connection Name:" minWidth="120"/>
+            <TextField fx:id="connectionNameField" promptText="e.g., Production Snowflake" 
+                      HBox.hgrow="ALWAYS" 
+                      style="-fx-font-size: 13px;"/>
+        </HBox>
+        <CheckBox fx:id="rememberCheckBox" text="Save this connection for quick access"/>
+    </VBox>
     
     <HBox spacing="10" alignment="CENTER">
         <Button text="Test Connection" onAction="#handleTestConnection" 
                 styleClass="secondary-button" prefWidth="140"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Save As New" onAction="#handleSaveAs" 
+                styleClass="accent-button" prefWidth="120"
+                style="-fx-background-color: #2196F3;"/>
         <Button text="Save" onAction="#handleSave" 
                 styleClass="primary-button" prefWidth="100"/>
         <Button text="Cancel" onAction="#handleCancel" 

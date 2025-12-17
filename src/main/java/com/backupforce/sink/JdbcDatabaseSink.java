@@ -40,6 +40,13 @@ public class JdbcDatabaseSink implements DataSink {
         logger.info("Recreate tables mode: {}", recreate ? "ENABLED (full reload)" : "DISABLED (incremental)");
     }
     
+    /**
+     * Returns whether recreate tables mode is enabled
+     */
+    public boolean isRecreateTables() {
+        return this.recreateTables;
+    }
+    
     @Override
     public void dropTable(String objectName) throws Exception {
         if (connection == null || connection.isClosed()) {
@@ -190,14 +197,25 @@ public class JdbcDatabaseSink implements DataSink {
             }
             
             // Auto-create table if it doesn't exist (based on CSV headers)
+            boolean hasBlobData = blobPathColumnIndex >= 0;
             if (!tableExists(tableName)) {
                 if (progressCallback != null) {
                     progressCallback.update("Creating table...");
                 }
-                createTableFromHeaders(tableName, headers, blobPathColumnIndex >= 0);
+                createTableFromHeaders(tableName, headers, hasBlobData);
+            } else if (hasBlobData) {
+                // Table exists - check if BLOB_DATA column exists, if not add it
+                if (!columnExists(tableName, "BLOB_DATA")) {
+                    logger.info("{}: Adding BLOB_DATA column to existing table", objectName);
+                    addBlobDataColumn(tableName);
+                }
             }
             
+            // Check if BLOB_DATA column actually exists in the table (for INSERT statement building)
+            boolean tableBlobDataColumn = hasBlobData && columnExists(tableName, "BLOB_DATA");
+            
             // Prepare INSERT statement
+            // If we have blob data AND the table has the BLOB_DATA column, include it in INSERT
             String sanitizedHeaders = headers.stream()
                 .map(dialect::sanitizeColumnName)
                 .collect(Collectors.joining(", "));
@@ -206,13 +224,27 @@ public class JdbcDatabaseSink implements DataSink {
                 .map(h -> "?")
                 .collect(Collectors.joining(", "));
             
-            String insertSQL = String.format(
-                "INSERT INTO %s (%s, %s, %s) VALUES (%s, ?, ?)",
-                tableName, sanitizedHeaders, 
-                dialect.sanitizeColumnName("BACKUP_ID"),
-                dialect.sanitizeColumnName("BACKUP_TIMESTAMP"),
-                placeholders
-            );
+            String insertSQL;
+            if (tableBlobDataColumn) {
+                // Add BLOB_DATA column to the insert
+                insertSQL = String.format(
+                    "INSERT INTO %s (%s, %s, %s, %s) VALUES (%s, ?, ?, ?)",
+                    tableName, sanitizedHeaders,
+                    dialect.sanitizeColumnName("BLOB_DATA"),
+                    dialect.sanitizeColumnName("BACKUP_ID"),
+                    dialect.sanitizeColumnName("BACKUP_TIMESTAMP"),
+                    placeholders
+                );
+                logger.info("{}: INSERT will include BLOB_DATA column", objectName);
+            } else {
+                insertSQL = String.format(
+                    "INSERT INTO %s (%s, %s, %s) VALUES (%s, ?, ?)",
+                    tableName, sanitizedHeaders, 
+                    dialect.sanitizeColumnName("BACKUP_ID"),
+                    dialect.sanitizeColumnName("BACKUP_TIMESTAMP"),
+                    placeholders
+                );
+            }
             
             int batchSize = dialect.getOptimalBatchSize();
             
@@ -222,30 +254,55 @@ public class JdbcDatabaseSink implements DataSink {
             
             logger.info("{}: Starting batch insert with batch size {}", objectName, batchSize);
             
+            // Use final variable for lambda capture
+            final boolean insertBlobData = tableBlobDataColumn;
+            
             try (PreparedStatement pstmt = connection.prepareStatement(insertSQL)) {
                 java.sql.Timestamp currentTimestamp = new java.sql.Timestamp(System.currentTimeMillis());
                 
                 for (CSVRecord record : parser) {
+                    byte[] blobBytes = null;
+                    
                     for (int i = 0; i < headers.size(); i++) {
                         String value = record.get(i);
                         
-                        // Special handling for BLOB_FILE_PATH - load actual blob data
+                        // For BLOB_FILE_PATH column, keep the path as-is but also load the blob for BLOB_DATA
                         if (i == blobPathColumnIndex && value != null && !value.trim().isEmpty()) {
-                            String blobData = loadBlobAsBase64(value);
-                            pstmt.setString(i + 1, blobData != null ? blobData : value);
+                            // Store the file path in BLOB_FILE_PATH column
+                            pstmt.setString(i + 1, value);
+                            // Load blob bytes for BLOB_DATA column (only if we're inserting blob data)
+                            if (insertBlobData) {
+                                blobBytes = loadBlobAsBytes(value);
+                            }
                         } else if (value == null || value.trim().isEmpty()) {
                             pstmt.setNull(i + 1, Types.VARCHAR);
                         } else {
                             pstmt.setString(i + 1, value);
                         }
                     }
-                    pstmt.setString(headers.size() + 1, backupId);
-                    pstmt.setTimestamp(headers.size() + 2, currentTimestamp);
+                    
+                    // Set BLOB_DATA, BACKUP_ID, and BACKUP_TIMESTAMP
+                    int paramIndex = headers.size() + 1;
+                    if (insertBlobData) {
+                        if (blobBytes != null) {
+                            pstmt.setBytes(paramIndex, blobBytes);
+                        } else {
+                            pstmt.setNull(paramIndex, Types.BINARY);
+                        }
+                        paramIndex++;
+                    }
+                    pstmt.setString(paramIndex, backupId);
+                    pstmt.setTimestamp(paramIndex + 1, currentTimestamp);
+                    
                     pstmt.addBatch();
                     recordCount++;
                     
                     if (recordCount % batchSize == 0) {
-                        pstmt.executeBatch();
+                        int[] results = pstmt.executeBatch();
+                        int batchSuccess = countSuccessfulInserts(results);
+                        if (batchSuccess < batchSize) {
+                            logger.warn("{}: Batch had {} failures out of {} records", objectName, batchSize - batchSuccess, batchSize);
+                        }
                         if (progressCallback != null) {
                             progressCallback.update("Inserted " + recordCount + " records...");
                         }
@@ -254,8 +311,13 @@ public class JdbcDatabaseSink implements DataSink {
                 }
                 
                 // Execute remaining batch
-                if (recordCount % batchSize != 0) {
-                    pstmt.executeBatch();
+                int remaining = recordCount % batchSize;
+                if (remaining != 0) {
+                    int[] results = pstmt.executeBatch();
+                    int batchSuccess = countSuccessfulInserts(results);
+                    if (batchSuccess < remaining) {
+                        logger.warn("{}: Final batch had {} failures out of {} records", objectName, remaining - batchSuccess, remaining);
+                    }
                     logger.info("{}: Executed final batch, total records: {}", objectName, recordCount);
                 }
                 
@@ -295,16 +357,20 @@ public class JdbcDatabaseSink implements DataSink {
             String columnName = dialect.sanitizeColumnName(header);
             String columnType;
             
-            // Special handling for BLOB_FILE_PATH - store as large VARCHAR for base64 data
+            // Special handling for BLOB_FILE_PATH - use BINARY type for actual blob storage
             if (header.equals("BLOB_FILE_PATH") && hasBlobData) {
-                columnType = dialect.getVarcharType(16777216); // 16MB max for base64 blob data
-                logger.info("{}: BLOB_FILE_PATH column will store base64-encoded blob data", tableName);
+                // Store actual binary data in a separate column
+                columnType = dialect.getVarcharType(4096); // Keep file path for reference
+                columnDefs.add("  " + columnName + " " + columnType);
+                // Add BLOB_DATA column for actual binary content
+                String blobDataType = dialect.getBinaryType();
+                columnDefs.add("  " + dialect.sanitizeColumnName("BLOB_DATA") + " " + blobDataType);
+                logger.info("{}: Added BLOB_DATA column ({}) for binary blob storage", tableName, blobDataType);
             } else {
                 // Use large VARCHAR for all other fields since we don't have Salesforce metadata
                 columnType = dialect.getVarcharType(16777216); // 16MB max
+                columnDefs.add("  " + columnName + " " + columnType);
             }
-            
-            columnDefs.add("  " + columnName + " " + columnType);
         }
         
         // Add metadata columns
@@ -330,6 +396,37 @@ public class JdbcDatabaseSink implements DataSink {
         
         try (ResultSet rs = meta.getTables(database, schema, tableName, new String[]{"TABLE"})) {
             return rs.next();
+        }
+    }
+    
+    /**
+     * Check if a specific column exists in a table
+     */
+    private boolean columnExists(String tableName, String columnName) throws SQLException {
+        DatabaseMetaData meta = connection.getMetaData();
+        String schema = connectionProperties.getProperty("schema");
+        String database = connectionProperties.getProperty("db");
+        String sanitizedColumnName = dialect.sanitizeColumnName(columnName);
+        
+        try (ResultSet rs = meta.getColumns(database, schema, tableName, sanitizedColumnName)) {
+            return rs.next();
+        }
+    }
+    
+    /**
+     * Add BLOB_DATA column to an existing table
+     */
+    private void addBlobDataColumn(String tableName) throws SQLException {
+        String blobDataType = dialect.getBinaryType();
+        String columnName = dialect.sanitizeColumnName("BLOB_DATA");
+        String alterSQL = String.format("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, blobDataType);
+        
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(alterSQL);
+            logger.info("Added {} column to table {}", columnName, tableName);
+        } catch (SQLException e) {
+            // Column might already exist with different case or the syntax might differ
+            logger.warn("Could not add BLOB_DATA column to {}: {}", tableName, e.getMessage());
         }
     }
     
@@ -363,66 +460,108 @@ public class JdbcDatabaseSink implements DataSink {
     }
     
     /**
-     * Load blob file and encode as base64 for database storage
+     * Load blob file as raw bytes for database storage
      * Returns null if file cannot be loaded
      */
-    private String loadBlobAsBase64(String blobPath) {
+    private byte[] loadBlobAsBytes(String blobPath) {
+        if (blobPath == null || blobPath.trim().isEmpty()) {
+            return null;
+        }
+        
+        java.nio.file.Path filePath = resolveBlobPath(blobPath);
+        
+        if (filePath != null && java.nio.file.Files.exists(filePath)) {
+            try {
+                byte[] blobBytes = java.nio.file.Files.readAllBytes(filePath);
+                
+                // Log only for larger files to avoid spam
+                if (blobBytes.length > 100000) {
+                    logger.debug("Loaded blob from {} ({} KB)", blobPath, blobBytes.length / 1024);
+                }
+                
+                return blobBytes;
+            } catch (Exception e) {
+                logger.error("Failed to read blob file {}: {}", blobPath, e.getMessage());
+                return null;
+            }
+        } else {
+            logger.warn("Blob file not found: {} (tried multiple locations)", blobPath);
+            return null;
+        }
+    }
+    
+    /**
+     * Resolve blob file path using multiple strategies
+     */
+    private java.nio.file.Path resolveBlobPath(String blobPath) {
         if (blobPath == null || blobPath.trim().isEmpty()) {
             return null;
         }
         
         try {
-            // blobPath format: "ObjectName_blobs/RecordId.bin"
-            // We need to find this relative to the backup output folder
-            
-            // Try multiple resolution strategies:
-            java.nio.file.Path filePath = null;
-            
             // Strategy 1: Check if it's already an absolute path
             java.nio.file.Path testPath = java.nio.file.Paths.get(blobPath);
             if (testPath.isAbsolute() && java.nio.file.Files.exists(testPath)) {
-                filePath = testPath;
+                return testPath;
             }
             
             // Strategy 2: Relative to current working directory
-            if (filePath == null) {
-                testPath = java.nio.file.Paths.get(System.getProperty("user.dir"), blobPath);
-                if (java.nio.file.Files.exists(testPath)) {
-                    filePath = testPath;
-                }
+            testPath = java.nio.file.Paths.get(System.getProperty("user.dir"), blobPath);
+            if (java.nio.file.Files.exists(testPath)) {
+                return testPath;
             }
             
             // Strategy 3: Check common backup locations
-            if (filePath == null) {
-                String[] commonDirs = {"E:\\Staging Backup", "C:\\Backups", "."};
-                for (String dir : commonDirs) {
-                    testPath = java.nio.file.Paths.get(dir, blobPath);
-                    if (java.nio.file.Files.exists(testPath)) {
-                        filePath = testPath;
-                        break;
-                    }
+            String[] commonDirs = {"E:\\Staging Backup", "C:\\Backups", "."};
+            for (String dir : commonDirs) {
+                testPath = java.nio.file.Paths.get(dir, blobPath);
+                if (java.nio.file.Files.exists(testPath)) {
+                    return testPath;
                 }
-            }
-            
-            if (filePath != null && java.nio.file.Files.exists(filePath)) {
-                byte[] blobBytes = java.nio.file.Files.readAllBytes(filePath);
-                String base64 = java.util.Base64.getEncoder().encodeToString(blobBytes);
-                
-                // Log only for larger files to avoid spam
-                if (blobBytes.length > 10000) {
-                    logger.debug("Loaded blob from {} ({} KB -> {} KB base64)", 
-                        blobPath, blobBytes.length / 1024, base64.length() / 1024);
-                }
-                
-                return base64;
-            } else {
-                logger.warn("Blob file not found: {} (tried multiple locations)", blobPath);
-                return null;
             }
         } catch (Exception e) {
-            logger.error("Failed to load blob from {}: {}", blobPath, e.getMessage());
+            logger.error("Error resolving blob path {}: {}", blobPath, e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Load blob file and encode as base64 for database storage
+     * Returns null if file cannot be loaded
+     */
+    private String loadBlobAsBase64(String blobPath) {
+        byte[] blobBytes = loadBlobAsBytes(blobPath);
+        if (blobBytes == null) {
             return null;
         }
+        
+        String base64 = java.util.Base64.getEncoder().encodeToString(blobBytes);
+        
+        // Log only for larger files to avoid spam
+        if (blobBytes.length > 100000) {
+            logger.debug("Encoded blob from {} ({} KB -> {} KB base64)", 
+                blobPath, blobBytes.length / 1024, base64.length() / 1024);
+        }
+        
+        return base64;
+    }
+    
+    /**
+     * Count successful inserts from batch execution results
+     * Handles various JDBC driver return codes
+     */
+    private int countSuccessfulInserts(int[] results) {
+        int success = 0;
+        for (int result : results) {
+            // SUCCESS_NO_INFO (-2) means success but row count unknown
+            // Positive numbers mean rows affected
+            // Statement.EXECUTE_FAILED (-3) means failure
+            if (result >= 0 || result == java.sql.Statement.SUCCESS_NO_INFO) {
+                success++;
+            }
+        }
+        return success;
     }
     
     /**
@@ -436,5 +575,13 @@ public class JdbcDatabaseSink implements DataSink {
         String getCurrentTimestamp();
         String getVarcharType(int length);
         int getOptimalBatchSize();
+        
+        /**
+         * Get the binary/blob data type for this database
+         * Used for storing binary file content
+         */
+        default String getBinaryType() {
+            return "BLOB";
+        }
     }
 }
