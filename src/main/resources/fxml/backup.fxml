@@ -13,6 +13,8 @@
     
     <!-- Top: Header Bar -->
     <HBox spacing="12" alignment="CENTER_LEFT" styleClass="header-section" style="-fx-padding: 14px 20px;">
+        <Button fx:id="backButton" text="← Back" onAction="#handleBack" 
+               styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
         <Region styleClass="connection-status-dot"/>
         <Label fx:id="connectionLabel" text="Connected to Salesforce" styleClass="connection-label" HBox.hgrow="ALWAYS"/>
         <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" 

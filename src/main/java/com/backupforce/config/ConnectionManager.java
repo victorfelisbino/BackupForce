@@ -94,6 +94,51 @@ public class ConnectionManager {
         saveConnections();
     }
     
+    /**
+     * Create and save a new connection from name, type, and properties map
+     */
+    public SavedConnection saveConnection(String name, String type, Map<String, String> props) {
+        SavedConnection conn = new SavedConnection(name, type);
+        applyPropertiesToConnection(conn, props);
+        saveConnection(conn);
+        return conn;
+    }
+    
+    /**
+     * Update an existing connection
+     */
+    public void updateConnection(String id, String name, String type, Map<String, String> props) {
+        SavedConnection existing = getConnection(id);
+        if (existing != null) {
+            existing.setName(name);
+            existing.setType(type);
+            existing.setEncrypted(false); // Reset encryption flag so password gets re-encrypted
+            applyPropertiesToConnection(existing, props);
+            saveConnection(existing);
+        }
+    }
+    
+    private void applyPropertiesToConnection(SavedConnection conn, Map<String, String> props) {
+        for (Map.Entry<String, String> entry : props.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            
+            switch (key) {
+                case "Account": conn.setAccount(value); break;
+                case "Warehouse": conn.setWarehouse(value); break;
+                case "Database": conn.setDatabase(value); break;
+                case "Schema": conn.setSchema(value); break;
+                case "Username": conn.setUsername(value); break;
+                case "Password": conn.setPassword(value); break;
+                case "Host": conn.setHost(value); break;
+                case "Port": conn.setPort(value); break;
+                case "Server": conn.setHost(value); break; // SQL Server uses "Server" but stores as host
+                case "useSSO": conn.setUseSso(Boolean.parseBoolean(value)); break;
+                default: conn.getAdditionalProps().put(key, value); break;
+            }
+        }
+    }
+    
     public void deleteConnection(String id) {
         connections.removeIf(c -> c.getId().equals(id));
         saveConnections();
@@ -297,6 +342,29 @@ public class ConnectionManager {
         public Map<String, String> getAdditionalProps() { return additionalProps; }
         public void setAdditionalProps(Map<String, String> additionalProps) { 
             this.additionalProps = additionalProps; 
+        }
+        
+        /**
+         * Get all properties as a map (for form population)
+         */
+        public Map<String, String> getProperties() {
+            Map<String, String> props = new HashMap<>();
+            if (account != null) props.put("Account", account);
+            if (warehouse != null) props.put("Warehouse", warehouse);
+            if (database != null) props.put("Database", database);
+            if (schema != null) props.put("Schema", schema);
+            if (username != null) props.put("Username", username);
+            if (password != null) props.put("Password", password);
+            if (host != null) {
+                if ("SQL Server".equals(type)) {
+                    props.put("Server", host);
+                } else {
+                    props.put("Host", host);
+                }
+            }
+            if (port != null) props.put("Port", port);
+            props.putAll(additionalProps);
+            return props;
         }
         
         @Override
