@@ -47,12 +47,17 @@ public class SalesforceOAuthServer {
     // Try multiple ports in case the default is blocked by firewall/antivirus
     private static final int[] FALLBACK_PORTS = {1717, 8888, 3000, 8080, 9090};
     
+    // Default timeout (can be changed via setTimeout)
+    private static final int DEFAULT_TIMEOUT_SECONDS = 180; // 3 minutes
+    
     private HttpServer server;
     private CompletableFuture<OAuthResult> resultFuture;
     private String codeVerifier;  // PKCE code verifier
     private String loginUrl;  // Store login URL for token exchange
     private int activePort = -1;  // Port that successfully started
     private String activeRedirectUri = null;  // Redirect URI for the active port
+    private volatile boolean cancelled = false;  // Flag to track cancellation
+    private int timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
     
     public static class OAuthResult {
         public final String accessToken;
@@ -77,6 +82,46 @@ public class SalesforceOAuthServer {
         public boolean isSuccess() {
             return error == null && accessToken != null;
         }
+        
+        public boolean isCancelled() {
+            return "CANCELLED".equals(error);
+        }
+    }
+    
+    /**
+     * Cancel the ongoing OAuth flow
+     */
+    public void cancel() {
+        cancelled = true;
+        if (resultFuture != null && !resultFuture.isDone()) {
+            resultFuture.complete(new OAuthResult("CANCELLED"));
+        }
+        stopServer();
+    }
+    
+    /**
+     * Stop the OAuth server
+     */
+    public void stopServer() {
+        if (server != null) {
+            server.stop(0);
+            logger.info("OAuth server stopped");
+            server = null;
+        }
+    }
+    
+    /**
+     * Set timeout in seconds (default: 180 = 3 minutes)
+     */
+    public void setTimeout(int seconds) {
+        this.timeoutSeconds = seconds;
+    }
+    
+    /**
+     * Get the current timeout in seconds
+     */
+    public int getTimeout() {
+        return timeoutSeconds;
     }
     
     /**
@@ -162,31 +207,41 @@ public class SalesforceOAuthServer {
                 return new OAuthResult(errorMsg);
             }
             
-            // Wait for callback (with 5 minute timeout)
-            logger.info("Waiting for OAuth callback on port {}...", activePort);
-            OAuthResult result = resultFuture.get(5, TimeUnit.MINUTES);
+            // Wait for callback (with configurable timeout)
+            logger.info("Waiting for OAuth callback on port {} (timeout: {}s)...", activePort, timeoutSeconds);
+            OAuthResult result = resultFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+            
+            if (cancelled) {
+                logger.info("OAuth flow was cancelled by user");
+                return new OAuthResult("CANCELLED");
+            }
             
             if (result.isSuccess()) {
                 logger.info("✅ OAuth flow completed successfully");
+            } else if (result.isCancelled()) {
+                logger.info("OAuth flow cancelled");
             } else {
                 logger.error("❌ OAuth flow failed: {}", result.error);
             }
             return result;
             
         } catch (java.util.concurrent.TimeoutException e) {
-            logger.error("❌ OAuth timeout - no response received within 5 minutes");
+            logger.error("❌ OAuth timeout - no response received within {} seconds", timeoutSeconds);
             return new OAuthResult("Authentication timeout.\n\n" +
-                                  "The OAuth callback was not received within 5 minutes.\n" +
-                                  "Please try again and complete the login faster.");
+                                  "No response received within " + (timeoutSeconds / 60) + " minutes.\n" +
+                                  "Please try again and complete the login in the browser.");
+        } catch (java.util.concurrent.CancellationException e) {
+            logger.info("OAuth flow was cancelled");
+            return new OAuthResult("CANCELLED");
         } catch (Exception e) {
+            if (cancelled) {
+                return new OAuthResult("CANCELLED");
+            }
             logger.error("❌ OAuth authentication failed", e);
             return new OAuthResult("Authentication failed: " + e.getMessage());
         } finally {
             // Stop server
-            if (server != null) {
-                server.stop(0);
-                logger.info("OAuth server stopped (port {})", activePort);
-            }
+            stopServer();
         }
     }
     

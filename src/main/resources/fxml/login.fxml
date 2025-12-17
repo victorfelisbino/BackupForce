@@ -75,10 +75,20 @@
                 maxWidth="Infinity" styleClass="secondary-button"
                 style="-fx-padding: 12px; -fx-font-size: 14px;"/>
         
+        <!-- Cancel Button (shown during OAuth) -->
+        <Button fx:id="cancelButton" text="Cancel" onAction="#handleCancelOAuth" 
+                maxWidth="Infinity" styleClass="secondary-button" visible="false" managed="false"
+                style="-fx-padding: 10px; -fx-font-size: 13px;"/>
+        
         <HBox spacing="12" alignment="CENTER" style="-fx-padding: 8 0 0 0;">
             <ProgressIndicator fx:id="progressIndicator" prefWidth="20" prefHeight="20"/>
-            <Label fx:id="statusLabel" text=""/>
+            <Label fx:id="statusLabel" text="" wrapText="true" textAlignment="CENTER"
+                   style="-fx-max-width: 350px;"/>
         </HBox>
+        
+        <!-- OAuth timeout countdown -->
+        <Label fx:id="timeoutLabel" text="" styleClass="caption" visible="false" managed="false"
+               style="-fx-text-fill: #888;"/>
     </VBox>
     
     <!-- Footer -->
