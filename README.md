@@ -1,132 +1,176 @@
 # BackupForce
 
-A JavaFX desktop application for backing up Salesforce data using Bulk API v2.
+[![Download](https://img.shields.io/github/v/release/victorfelisbino/backupforce-javafx?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/backupforce-javafx/releases/latest)
+[![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge)](https://github.com/victorfelisbino/backupforce-javafx/releases)
 
-## Features
+A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a modern Windows 11 dark theme UI.
 
-- **User-friendly GUI** - Simple login and backup interface
-- **Bulk API v2** - Fast, efficient data extraction for large datasets
-- **Object Selection** - Choose which Salesforce objects to backup
+![BackupForce Screenshot](docs/screenshot.png)
+
+---
+
+## 🚀 Quick Download
+
+**[⬇️ Download BackupForce v2.0.0](https://github.com/victorfelisbino/backupforce-javafx/releases/latest)**
+
+1. Download `BackupForce-2.0.0-portable.zip`
+2. Extract to any folder
+3. Run `BackupForce.exe`
+
+**No Java installation required** - runtime is bundled!
+
+---
+
+## ✨ Features
+
+### Data Export
+- **Bulk API v2** - Fast, efficient data extraction for millions of records
+- **Blob Downloads** - Automatically downloads Attachment.Body, ContentVersion.VersionData, Document.Body
+- **Record Limits** - Test exports with a limited number of records
 - **Multi-threaded** - Parallel processing for faster backups
-- **Memory Monitoring** - Automatic monitoring for large objects (Attachments, ContentVersion, etc.)
-- **Progress Tracking** - Real-time progress indicators and detailed logging
-- **Credential Storage** - Optional "Remember Me" feature for convenience
 
-## Requirements
+### Database Support
+| Database | Blob Storage | Status |
+|----------|-------------|--------|
+| **Snowflake** | BINARY(8MB) | ✅ Recommended |
+| **PostgreSQL** | BYTEA | ✅ Supported |
+| **SQL Server** | VARBINARY(MAX) | ✅ Supported |
+| **CSV Files** | File + Path column | ✅ Supported |
 
-- **Java 11 or higher** - [Download Java](https://www.oracle.com/java/technologies/downloads/)
-- **Salesforce Account** - With API access enabled
+### User Experience
+- **Windows 11 Dark Theme** - Modern Fluent Design UI
+- **OAuth Authentication** - Secure Salesforce login
+- **Object Selection** - Search and filter 2500+ objects
+- **Progress Tracking** - Real-time progress and logging
+- **Memory Monitoring** - Automatic warnings for large objects
 
-## Building from Source
+---
 
-### Prerequisites
-- Maven 3.6+
+## 📋 Requirements
+
+### For Running (Portable .exe)
+- Windows 10/11
+- No additional software needed!
+
+### For Building from Source
 - Java 11+
+- Maven 3.6+
 
-### Build Steps
+---
 
-1. Clone the repository:
+## 🔧 Installation
+
+### Option 1: Portable Executable (Recommended)
+
+1. **Download** the latest release from [Releases](https://github.com/victorfelisbino/backupforce-javafx/releases)
+2. **Extract** `BackupForce-2.0.0-portable.zip` to any folder
+3. **Run** `BackupForce.exe`
+
+### Option 2: Build from Source
+
 ```bash
+# Clone the repository
 git clone https://github.com/victorfelisbino/backupforce-javafx.git
 cd backupforce-javafx
-```
 
-2. Build the executable JAR:
-```bash
-mvn clean package
-```
-
-This creates `BackupForce.jar` in the `target/` directory.
-
-## Running the Application
-
-### Option 1: Using Maven (for development)
-```bash
+# Build and run
 mvn javafx:run
+
+# Or build portable executable
+.\build-portable.ps1
 ```
 
-### Option 2: Using the JAR file
-After building, the executable JAR is located at `target/BackupForce.jar`
+---
 
-**Windows:**
-```cmd
-java -jar target\BackupForce.jar
+## 📖 Usage
+
+### 1. Login to Salesforce
+- Click "Login with OAuth" for secure authentication
+- Browser will open for Salesforce authorization
+- Supports Production and Sandbox environments
+
+### 2. Select Objects
+- Browse or search 2500+ Salesforce objects
+- Check objects to backup (Account, Contact, Opportunity, etc.)
+- Use "Select All" or "Deselect All" for bulk selection
+
+### 3. Configure Export
+- **Output Folder**: Where CSV/blob files are saved
+- **Record Limit**: Optional limit for testing (leave blank for all records)
+- **Database Export**: Configure Snowflake/PostgreSQL/SQL Server connection
+
+### 4. Start Backup
+- Click "Start Backup"
+- Monitor progress in the log panel
+- Blobs are downloaded and stored alongside data
+
+---
+
+## 🗄️ Database Export
+
+### Snowflake Configuration
+```
+Host: your-account.snowflakecomputing.com
+Database: SALESFORCE_BACKUP
+Schema: PUBLIC
+Username: your_user
+Password: your_password
 ```
 
-**Mac/Linux:**
+Blob fields are stored as `BINARY(8388608)` with additional columns:
+- `BLOB_FILE_PATH` - Original file name
+- `BLOB_SIZE` - File size in bytes
+
+### Viewing Blobs in Snowflake
+```sql
+-- View as hex
+SELECT Id, Name, TO_VARCHAR(Body, 'HEX') as BodyHex FROM Attachment;
+
+-- Get file info
+SELECT Id, Name, BLOB_FILE_PATH, BLOB_SIZE FROM Attachment;
+```
+
+---
+
+## 🔒 Security
+
+- OAuth 2.0 authentication (no password storage)
+- Credentials stored securely in Windows Registry
+- All data transmitted over HTTPS
+
+---
+
+## 🐛 Troubleshooting
+
+### "Failed to launch JVM"
+- Use the latest release with bundled runtime
+- Or install Java 11+ and run with Maven
+
+### OutOfMemoryError
 ```bash
-java -jar target/BackupForce.jar
+java -Xmx4g -jar BackupForce.jar
 ```
 
-### Option 3: Using the launcher script (Windows)
-Copy `BackupForce.bat` to the same directory as `BackupForce.jar` and double-click it.
+### Connection Errors
+- Verify Salesforce credentials
+- Check if your IP is whitelisted
+- Ensure API access is enabled for your user
 
-## Usage
+---
 
-1. **Login**
-   - Enter your Salesforce username
-   - Enter your password
-   - Enter your security token (if required by your org)
-   - Select environment (Production or Sandbox)
-   - Click "Login"
+## 📄 License
 
-2. **Select Objects**
-   - Use the search box to filter objects
-   - Check/uncheck objects you want to backup
-   - Use "Select All" or "Deselect All" for bulk selection
-   - View selection count at the bottom
+Free to use. Created by Victor Felisbino.
 
-3. **Start Backup**
-   - Choose output folder
-   - Click "Start Backup"
-   - Monitor progress in the log panel
-   - Large objects (Attachments, ContentVersion) will show memory warnings
+---
 
-## Distribution
+## 🤝 Contributing
 
-To distribute the application:
+Issues and pull requests are welcome!
 
-1. Build the JAR: `mvn clean package`
-2. Copy `target/BackupForce.jar` to your distribution folder
-3. Include `BackupForce.bat` (for Windows users)
-4. Package or upload to your website
+---
 
-### Creating a Windows Installer (Optional)
-
-For a more professional distribution, you can use tools like:
-- **jpackage** (Java 14+) - Creates native Windows installers
-- **Launch4j** - Wraps JAR in a Windows .exe
-- **Install4j** - Professional installer creation tool
-
-## Security Notes
-
-- Credentials are stored in Windows Registry using Java Preferences API
-- Credentials are Base64 encoded (NOT encrypted)
-- For production use, consider implementing proper encryption
-- Never commit `myconfig.properties` if it contains credentials
-
-## Troubleshooting
-
-### OutOfMemoryError with large objects
-- The app monitors memory for Attachment, ContentVersion, Document, and StaticResource
-- If you see memory warnings, try:
-  - Increasing Java heap: `java -Xmx4g -jar BackupForce.jar`
-  - Backing up large objects separately
-  - Reducing thread count (modify `BackupController.java`)
-
-### Module errors
-- Ensure you're using Java 11+
-- JavaFX modules are bundled in the fat JAR
-
-### Connection errors
-- Verify your Salesforce credentials
-- Check if security token is required
-- Ensure your IP is not restricted
-
-## License
-
-Private - All Rights Reserved
-
-## Author
-
-Victor Felisbino
+<p align="center">
+  <b>Made with ❤️ for the Salesforce community</b>
+</p>
