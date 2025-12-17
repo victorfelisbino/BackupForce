@@ -38,6 +38,13 @@
             </HBox>
             
             <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 0 4px;">
+                <Button fx:id="configureFieldsButton" text="⚙ Fields" onAction="#handleConfigureFields" 
+                       styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;">
+                    <tooltip>
+                        <Tooltip text="Configure which fields to backup for selected objects"/>
+                    </tooltip>
+                </Button>
+                <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="selectAllButton" text="Select All" onAction="#handleSelectAll" 
                        styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;"/>
                 <Button fx:id="deselectAllButton" text="Clear" onAction="#handleDeselectAll" 

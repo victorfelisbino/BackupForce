@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
-public class BulkV2Client {
+public class BulkV2Client implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(BulkV2Client.class);
     
     private final String instanceUrl;
@@ -61,15 +61,29 @@ public class BulkV2Client {
      * @param recordLimit Maximum number of records to retrieve (0 = no limit)
      */
     public void queryObject(String objectName, String outputFolder, String whereClause, int recordLimit, ProgressCallback progressCallback) throws IOException, InterruptedException, ParseException {
+        queryObject(objectName, outputFolder, whereClause, recordLimit, null, progressCallback);
+    }
+    
+    /**
+     * Query object with optional delta support, record limit, and specific field selection
+     * @param whereClause Optional WHERE clause for delta queries (e.g., "LastModifiedDate > 2024-01-01T00:00:00Z")
+     * @param recordLimit Maximum number of records to retrieve (0 = no limit)
+     * @param selectedFields Specific fields to query (null = all fields)
+     */
+    public void queryObject(String objectName, String outputFolder, String whereClause, int recordLimit, 
+                           java.util.Set<String> selectedFields, ProgressCallback progressCallback) throws IOException, InterruptedException, ParseException {
         logger.info("Starting Bulk API v2 query for: {}", objectName);
         if (recordLimit > 0) {
             logger.info("{}: Record limit set to {}", objectName, recordLimit);
+        }
+        if (selectedFields != null) {
+            logger.info("{}: Querying {} selected fields", objectName, selectedFields.size());
         }
         
         if (progressCallback != null) progressCallback.update("Creating job...");
         
         // Step 1: Create query job
-        String jobId = createQueryJob(objectName, whereClause, recordLimit);
+        String jobId = createQueryJob(objectName, whereClause, recordLimit, selectedFields);
         logger.info("{}: Job created with ID: {}", objectName, jobId);
         
         if (progressCallback != null) progressCallback.update("Processing...");
@@ -86,16 +100,30 @@ public class BulkV2Client {
     }
 
     private String createQueryJob(String objectName) throws IOException, ParseException {
-        return createQueryJob(objectName, null, 0);
+        return createQueryJob(objectName, null, 0, null);
     }
     
     private String createQueryJob(String objectName, String whereClause) throws IOException, ParseException {
-        return createQueryJob(objectName, whereClause, 0);
+        return createQueryJob(objectName, whereClause, 0, null);
     }
     
     private String createQueryJob(String objectName, String whereClause, int recordLimit) throws IOException, ParseException {
-        // First, get all field names for this object
-        String fields = getObjectFields(objectName);
+        return createQueryJob(objectName, whereClause, recordLimit, null);
+    }
+    
+    private String createQueryJob(String objectName, String whereClause, int recordLimit, java.util.Set<String> selectedFields) throws IOException, ParseException {
+        // Get field names - either from selection or by querying all fields
+        String fields;
+        if (selectedFields != null && !selectedFields.isEmpty()) {
+            // Use the user-selected fields (ensure Id is always included)
+            java.util.Set<String> fieldsToUse = new java.util.LinkedHashSet<>(selectedFields);
+            fieldsToUse.add("Id"); // Always include Id
+            fields = String.join(", ", fieldsToUse);
+            logger.info("{}: Using {} selected fields", objectName, fieldsToUse.size());
+        } else {
+            // Get all field names for this object
+            fields = getObjectFields(objectName);
+        }
         
         String url = String.format("%s/services/data/v%s/jobs/query", instanceUrl, apiVersion);
         
