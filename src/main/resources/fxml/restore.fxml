@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.backupforce.ui.RestoreController"
+           styleClass="main-container" stylesheets="@../css/windows11-dark.css">
+    
+    <!-- Header -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="15" styleClass="header-bar" style="-fx-padding: 15 20;">
+            <Button fx:id="backButton" text="← Back" onAction="#handleBack" 
+                   styleClass="secondary-button" style="-fx-font-size: 12px;"/>
+            <Label text="🔄 Data Restoration" style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: #ffffff;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="connectionLabel" text="Not Connected" 
+                  style="-fx-font-size: 12px; -fx-text-fill: #6c757d;"/>
+        </HBox>
+    </top>
+    
+    <!-- Main Content -->
+    <center>
+        <HBox spacing="15" style="-fx-padding: 15;">
+            
+            <!-- Left Panel: Source Selection -->
+            <VBox spacing="15" prefWidth="350" style="-fx-padding: 10;">
+                
+                <!-- Source Type Selection -->
+                <VBox spacing="10" styleClass="config-card">
+                    <Label text="📁 Restore Source" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                    
+                    <HBox spacing="15" style="-fx-padding: 8 0;">
+                        <RadioButton fx:id="folderSourceRadio" text="Backup Folder" 
+                                    toggleGroup="$sourceToggle" selected="true"
+                                    style="-fx-text-fill: #e8e8e8;"/>
+                        <RadioButton fx:id="databaseSourceRadio" text="Database Connection" 
+                                    toggleGroup="$sourceToggle"
+                                    style="-fx-text-fill: #e8e8e8;"/>
+                    </HBox>
+                    <fx:define>
+                        <ToggleGroup fx:id="sourceToggle"/>
+                    </fx:define>
+                    
+                    <!-- Folder Selection (shown when folder radio selected) -->
+                    <VBox fx:id="folderSelectionPane" spacing="8">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <TextField fx:id="restoreSourceField" HBox.hgrow="ALWAYS" 
+                                      styleClass="modern-text-field" editable="false"
+                                      promptText="Select backup folder..."/>
+                            <Button fx:id="browseRestoreButton" text="Browse" onAction="#handleBrowseRestore" 
+                                   styleClass="secondary-button" style="-fx-padding: 6px 14px;"/>
+                        </HBox>
+                    </VBox>
+                    
+                    <!-- Database Selection (shown when database radio selected) -->
+                    <VBox fx:id="databaseSelectionPane" spacing="8" visible="false" managed="false">
+                        <ComboBox fx:id="databaseConnectionCombo" maxWidth="Infinity" 
+                                 promptText="Select database connection..."
+                                 styleClass="modern-combo-box"/>
+                        <Button text="Manage Connections" onAction="#handleManageConnections"
+                               styleClass="link-button" style="-fx-font-size: 11px;"/>
+                    </VBox>
+                    
+                    <Button fx:id="scanSourceButton" text="🔍 Scan Source" onAction="#handleScanSource" 
+                           prefWidth="150" styleClass="secondary-button" style="-fx-padding: 8px 16px;"/>
+                </VBox>
+                
+                <!-- Available Objects -->
+                <VBox spacing="10" styleClass="config-card" VBox.vgrow="ALWAYS">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="📋 Available Objects" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="objectCountLabel" text="0 objects" 
+                              style="-fx-font-size: 11px; -fx-text-fill: #6c757d;"/>
+                    </HBox>
+                    
+                    <TextField fx:id="objectSearchField" promptText="🔍 Filter objects..." 
+                              styleClass="modern-text-field"/>
+                    
+                    <HBox spacing="8">
+                        <Button text="Select All" onAction="#handleSelectAll" 
+                               styleClass="link-button" style="-fx-font-size: 11px;"/>
+                        <Button text="Deselect All" onAction="#handleDeselectAll" 
+                               styleClass="link-button" style="-fx-font-size: 11px;"/>
+                    </HBox>
+                    
+                    <TableView fx:id="objectsTable" VBox.vgrow="ALWAYS" styleClass="modern-table">
+                        <columns>
+                            <TableColumn fx:id="selectColumn" text="" prefWidth="40"/>
+                            <TableColumn fx:id="objectNameColumn" text="Object" prefWidth="150"/>
+                            <TableColumn fx:id="recordCountColumn" text="Records" prefWidth="80"/>
+                            <TableColumn fx:id="lastBackupColumn" text="Backup Date" prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="Scan a source to see available objects" 
+                                  style="-fx-text-fill: #6c757d;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </VBox>
+            
+            <!-- Right Panel: Restore Options & Progress -->
+            <VBox spacing="15" HBox.hgrow="ALWAYS" style="-fx-padding: 10;">
+                
+                <!-- Restore Options -->
+                <VBox spacing="10" styleClass="config-card">
+                    <Label text="⚙️ Restore Options" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                    
+                    <HBox spacing="20" style="-fx-padding: 8 0;">
+                        <VBox spacing="8">
+                            <RadioButton fx:id="insertOnlyRadio" text="Insert Only (new records)" 
+                                        toggleGroup="$restoreModeToggle" selected="true"
+                                        style="-fx-text-fill: #e8e8e8;"/>
+                            <RadioButton fx:id="upsertRadio" text="Upsert (insert or update)" 
+                                        toggleGroup="$restoreModeToggle"
+                                        style="-fx-text-fill: #e8e8e8;"/>
+                            <RadioButton fx:id="updateOnlyRadio" text="Update Only (existing records)" 
+                                        toggleGroup="$restoreModeToggle"
+                                        style="-fx-text-fill: #e8e8e8;"/>
+                        </VBox>
+                        <fx:define>
+                            <ToggleGroup fx:id="restoreModeToggle"/>
+                        </fx:define>
+                    </HBox>
+                    
+                    <Separator style="-fx-background-color: #3d3d3d;"/>
+                    
+                    <CheckBox fx:id="validateBeforeRestoreCheck" text="Validate data before restore" 
+                             selected="true" style="-fx-text-fill: #e8e8e8;"/>
+                    <CheckBox fx:id="stopOnErrorCheck" text="Stop on first error" 
+                             selected="false" style="-fx-text-fill: #e8e8e8;"/>
+                    <CheckBox fx:id="preserveIdsCheck" text="Preserve original Salesforce IDs" 
+                             selected="false" style="-fx-text-fill: #e8e8e8;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 8 0 0 0;">
+                        <Label text="Batch Size:" style="-fx-text-fill: #adb5bd;"/>
+                        <ComboBox fx:id="batchSizeCombo" prefWidth="100" styleClass="modern-combo-box"/>
+                    </HBox>
+                </VBox>
+                
+                <!-- Target Org Info -->
+                <VBox spacing="8" styleClass="config-card">
+                    <Label text="🎯 Target Salesforce Org" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                    <Label fx:id="targetOrgLabel" text="No org connected" 
+                          style="-fx-font-size: 12px; -fx-text-fill: #6c757d;"/>
+                    <Label text="⚠️ Data will be inserted/updated in your connected Salesforce org" 
+                          style="-fx-font-size: 11px; -fx-text-fill: #FFC107;"/>
+                </VBox>
+                
+                <!-- Action Buttons -->
+                <HBox spacing="15" alignment="CENTER" style="-fx-padding: 10 0;">
+                    <Button fx:id="startRestoreButton" text="▶ Start Restore" onAction="#handleStartRestore" 
+                           prefWidth="150" prefHeight="40" styleClass="primary-button" disable="true"
+                           style="-fx-font-size: 14px; -fx-font-weight: 600;"/>
+                    <Button fx:id="stopRestoreButton" text="⏹ Stop" onAction="#handleStopRestore" 
+                           prefWidth="100" prefHeight="40" styleClass="danger-button" disable="true"
+                           style="-fx-font-size: 14px;"/>
+                </HBox>
+                
+                <!-- Progress Section -->
+                <VBox spacing="10" styleClass="progress-card" VBox.vgrow="ALWAYS">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="📊 Restore Progress" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="progressPercentLabel" text="0%" 
+                              style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #4CAF50;"/>
+                    </HBox>
+                    
+                    <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="8" progress="0"
+                                styleClass="modern-progress-bar"/>
+                    
+                    <HBox spacing="20">
+                        <Label fx:id="currentObjectLabel" text="Ready" 
+                              style="-fx-font-size: 12px; -fx-text-fill: #adb5bd;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="recordsProcessedLabel" text="0 / 0 records" 
+                              style="-fx-font-size: 12px; -fx-text-fill: #6c757d;"/>
+                    </HBox>
+                    
+                    <Label text="Log:" style="-fx-font-size: 12px; -fx-text-fill: #adb5bd; -fx-padding: 8 0 0 0;"/>
+                    <TextArea fx:id="logArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true"
+                             styleClass="log-area" style="-fx-font-family: 'Consolas', monospace; -fx-font-size: 11px;"/>
+                </VBox>
+            </VBox>
+        </HBox>
+    </center>
+    
+</BorderPane>
