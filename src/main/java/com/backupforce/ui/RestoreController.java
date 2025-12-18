@@ -10,6 +10,7 @@ import com.backupforce.restore.RestoreExecutor;
 import com.backupforce.restore.RestoreExecutor.RestoreOptions;
 import com.backupforce.restore.RestoreExecutor.RestoreResult;
 import com.backupforce.restore.RestoreExecutor.RestoreProgress;
+import com.backupforce.restore.TransformationConfig;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleLongProperty;
@@ -26,6 +27,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import org.slf4j.Logger;
@@ -82,6 +84,11 @@ public class RestoreController {
     @FXML private CheckBox dryRunCheck;
     @FXML private ComboBox<Integer> batchSizeCombo;
     
+    // Transformation
+    @FXML private Label transformStatusLabel;
+    @FXML private Button configureTransformButton;
+    @FXML private Button loadTransformButton;
+    
     // Target org
     @FXML private Label connectionLabel;
     @FXML private Label targetOrgLabel;
@@ -104,6 +111,7 @@ public class RestoreController {
     private volatile boolean restoreRunning = false;
     private RestoreExecutor restoreExecutor;
     private ExecutorService executorService;
+    private TransformationConfig transformationConfig;
     
     @FXML
     public void initialize() {
@@ -281,22 +289,25 @@ public class RestoreController {
     @FXML
     private void handleBack() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/backup.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
             Parent root = loader.load();
             
-            BackupController controller = loader.getController();
+            HomeController controller = loader.getController();
             if (connectionInfo != null) {
                 controller.setConnectionInfo(connectionInfo);
             }
             
-            Scene scene = new Scene(root, 1100, 750);
+            Scene scene = new Scene(root, 820, 560);
             Stage stage = (Stage) backButton.getScene().getWindow();
             stage.setScene(scene);
+            stage.setResizable(true);
+            stage.setMinWidth(700);
+            stage.setMinHeight(500);
             stage.centerOnScreen();
             
         } catch (IOException e) {
-            logger.error("Error returning to backup screen", e);
-            showError("Failed to return to backup screen: " + e.getMessage());
+            logger.error("Error returning to home screen", e);
+            showError("Failed to return to home screen: " + e.getMessage());
         }
     }
     
@@ -359,6 +370,13 @@ public class RestoreController {
         }
         
         logMessage("Scanning folder: " + sourcePath);
+        startRestoreButton.setDisable(true);
+        scanSourceButton.setDisable(true);
+        
+        // Show scanning indicator
+        progressBar.setProgress(-1); // Indeterminate initially
+        currentObjectLabel.setText("Scanning...");
+        recordsProcessedLabel.setText("0 files scanned");
         
         // Find CSV and JSON files
         File[] backupFiles = sourceDir.listFiles((dir, name) -> 
@@ -371,26 +389,78 @@ public class RestoreController {
             return;
         }
         
-        for (File file : backupFiles) {
-            String objectName = file.getName().replaceAll("\\.(csv|json)$", "");
-            long recordCount = countRecordsInFile(file);
-            String lastModified = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            
-            try {
-                lastModified = Files.getLastModifiedTime(file.toPath())
-                    .toInstant()
-                    .atZone(java.time.ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-            } catch (IOException e) {
-                // Use default
+        // Create background task to scan files
+        Task<List<RestoreObject>> scanTask = new Task<>() {
+            @Override
+            protected List<RestoreObject> call() throws Exception {
+                List<RestoreObject> objects = new ArrayList<>();
+                int total = backupFiles.length;
+                int processed = 0;
+                
+                for (File file : backupFiles) {
+                    if (isCancelled()) break;
+                    
+                    String objectName = file.getName().replaceAll("\\.(csv|json)$", "");
+                    
+                    // Use fast line counting for large files
+                    long recordCount = countRecordsInFileFast(file);
+                    
+                    String lastModified = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    try {
+                        lastModified = Files.getLastModifiedTime(file.toPath())
+                            .toInstant()
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    } catch (IOException e) {
+                        // Use default
+                    }
+                    
+                    objects.add(new RestoreObject(objectName, recordCount, lastModified, file.getAbsolutePath()));
+                    
+                    processed++;
+                    int current = processed;
+                    String fileName = objectName;
+                    // Update UI more frequently for better feedback
+                    Platform.runLater(() -> {
+                        recordsProcessedLabel.setText(current + " / " + total + " files scanned");
+                        currentObjectLabel.setText("Scanning: " + fileName);
+                    });
+                    updateProgress(processed, total);
+                }
+                
+                return objects;
             }
-            
-            restoreObjects.add(new RestoreObject(objectName, recordCount, lastModified, file.getAbsolutePath()));
-        }
+        };
         
-        updateObjectCount();
-        startRestoreButton.setDisable(restoreObjects.isEmpty());
-        logMessage("Found " + restoreObjects.size() + " backup files");
+        // Bind progress bar to task progress
+        progressBar.progressProperty().bind(scanTask.progressProperty());
+        
+        scanTask.setOnSucceeded(event -> {
+            progressBar.progressProperty().unbind();
+            progressBar.setProgress(1.0);
+            currentObjectLabel.setText("Scan complete");
+            scanSourceButton.setDisable(false);
+            
+            List<RestoreObject> objects = scanTask.getValue();
+            restoreObjects.addAll(objects);
+            updateObjectCount();
+            startRestoreButton.setDisable(restoreObjects.isEmpty());
+            logMessage("Found " + restoreObjects.size() + " backup files");
+        });
+        
+        scanTask.setOnFailed(event -> {
+            progressBar.progressProperty().unbind();
+            progressBar.setProgress(0);
+            currentObjectLabel.setText("Scan failed");
+            scanSourceButton.setDisable(false);
+            
+            logMessage("Error scanning folder: " + scanTask.getException().getMessage());
+            logger.error("Folder scan failed", scanTask.getException());
+        });
+        
+        Thread thread = new Thread(scanTask);
+        thread.setDaemon(true);
+        thread.start();
     }
     
     private void scanDatabaseSource() {
@@ -468,6 +538,79 @@ public class RestoreController {
         }
     }
     
+    /**
+     * Fast line counting using buffered byte reading.
+     * For very large files (>50MB), uses file size estimation to avoid long waits.
+     */
+    private long countRecordsInFileFast(File file) {
+        if (file.getName().toLowerCase().endsWith(".json")) {
+            // For JSON, return rough estimate based on file size
+            return file.length() / 500;
+        }
+        
+        long fileSize = file.length();
+        
+        // For very large files (>50MB), use estimation to avoid long waits
+        // Average CSV row is ~200-500 bytes depending on content
+        if (fileSize > 50 * 1024 * 1024) { // 50MB
+            // Sample first 1MB to estimate average line length
+            long avgLineLength = estimateAverageLineLength(file, 1024 * 1024);
+            if (avgLineLength > 0) {
+                return Math.max(0, (fileSize / avgLineLength) - 1);
+            }
+            // Fallback: assume 300 bytes per line
+            return Math.max(0, (fileSize / 300) - 1);
+        }
+        
+        // For smaller files, count newlines efficiently
+        long count = 0;
+        try (java.io.BufferedInputStream bis = new java.io.BufferedInputStream(
+                new java.io.FileInputStream(file), 65536)) {
+            byte[] buffer = new byte[65536];
+            int bytesRead;
+            while ((bytesRead = bis.read(buffer)) != -1) {
+                for (int i = 0; i < bytesRead; i++) {
+                    if (buffer[i] == '\n') {
+                        count++;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return 0;
+        }
+        
+        // Subtract 1 for header row
+        return Math.max(0, count - 1);
+    }
+    
+    /**
+     * Sample the first N bytes of a file to estimate average line length.
+     */
+    private long estimateAverageLineLength(File file, int sampleSize) {
+        long lines = 0;
+        long bytesRead = 0;
+        
+        try (java.io.BufferedInputStream bis = new java.io.BufferedInputStream(
+                new java.io.FileInputStream(file), 65536)) {
+            byte[] buffer = new byte[65536];
+            int read;
+            while ((read = bis.read(buffer)) != -1 && bytesRead < sampleSize) {
+                int limit = (int) Math.min(read, sampleSize - bytesRead);
+                for (int i = 0; i < limit; i++) {
+                    if (buffer[i] == '\n') {
+                        lines++;
+                    }
+                }
+                bytesRead += limit;
+            }
+        } catch (IOException e) {
+            return 0;
+        }
+        
+        if (lines == 0) return 0;
+        return bytesRead / lines;
+    }
+    
     private void updateObjectCount() {
         int total = restoreObjects.size();
         int filtered = filteredObjects.size();
@@ -490,6 +633,89 @@ public class RestoreController {
     private void handleDeselectAll() {
         filteredObjects.forEach(obj -> obj.setSelected(false));
         updateObjectCount();
+    }
+    
+    @FXML
+    private void handleConfigureTransformations() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/transformation.fxml"));
+            Parent root = loader.load();
+            
+            TransformationController controller = loader.getController();
+            controller.setConnectionInfo(connectionInfo);
+            
+            // Pass the backup directory
+            String sourcePath = restoreSourceField.getText();
+            if (sourcePath != null && !sourcePath.trim().isEmpty()) {
+                File backupDir = new File(sourcePath);
+                if (backupDir.exists() && backupDir.isDirectory()) {
+                    controller.setBackupDirectory(backupDir);
+                }
+            }
+            
+            // Pass the selected objects
+            Set<String> selectedObjectNames = restoreObjects.stream()
+                .filter(RestoreObject::isSelected)
+                .map(RestoreObject::getName)
+                .collect(java.util.stream.Collectors.toSet());
+            controller.setSelectedObjects(selectedObjectNames);
+            
+            // Pass existing config if we have one
+            if (transformationConfig != null) {
+                controller.setTransformationConfig(transformationConfig);
+            }
+            
+            // Set callback to receive the config when user applies
+            controller.setOnApply(config -> {
+                this.transformationConfig = config;
+                updateTransformationStatus();
+            });
+            
+            Stage dialogStage = new Stage();
+            dialogStage.setTitle("Configure Cross-Org Transformations");
+            dialogStage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+            dialogStage.initOwner(configureTransformButton.getScene().getWindow());
+            dialogStage.setScene(new Scene(root, 1000, 700));
+            dialogStage.showAndWait();
+            
+        } catch (Exception e) {
+            logger.error("Failed to open transformation dialog", e);
+            showError("Failed to open transformation configuration: " + e.getMessage());
+        }
+    }
+    
+    @FXML
+    private void handleLoadTransformConfig() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Load Transformation Config");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("JSON Files", "*.json")
+        );
+        
+        File file = fileChooser.showOpenDialog(loadTransformButton.getScene().getWindow());
+        if (file != null) {
+            try {
+                transformationConfig = TransformationConfig.loadFromFile(file);
+                updateTransformationStatus();
+                logMessage("Loaded transformation config: " + file.getName());
+            } catch (Exception e) {
+                logger.error("Failed to load transformation config", e);
+                showError("Failed to load config: " + e.getMessage());
+            }
+        }
+    }
+    
+    private void updateTransformationStatus() {
+        if (transformationConfig == null) {
+            transformStatusLabel.setText("Not configured");
+            transformStatusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #6c757d;");
+        } else {
+            int mappings = transformationConfig.getUserMappings().size() + 
+                          transformationConfig.getRecordTypeMappings().size() +
+                          transformationConfig.getObjectConfigs().size();
+            transformStatusLabel.setText("✓ " + mappings + " mappings configured");
+            transformStatusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #4CAF50;");
+        }
     }
     
     @FXML
@@ -579,10 +805,6 @@ public class RestoreController {
             logMessage("Using external ID field: " + externalIdFieldCombo.getValue());
         }
         
-        if (dryRunCheck.isSelected()) {
-            logMessage("🔍 DRY RUN MODE - No data will be modified in Salesforce");
-        }
-        
         if (preserveIdsCheck.isSelected()) {
             logMessage("Preserve IDs enabled - will attempt to use original Salesforce IDs");
         }
@@ -590,6 +812,12 @@ public class RestoreController {
         // Order objects by dependency (parents first)
         logMessage("Analyzing object dependencies...");
         List<RestoreObject> orderedObjects = orderObjectsByDependency(objects);
+        
+        if (dryRunCheck.isSelected()) {
+            logMessage("🔍 DRY RUN MODE - Generating preview...");
+            showDryRunPreview(orderedObjects, options, mode);
+            return;
+        }
         logMessage("Restore order: " + orderedObjects.stream()
             .map(RestoreObject::getName)
             .collect(Collectors.joining(" → ")));
@@ -684,6 +912,248 @@ public class RestoreController {
             startRestoreButton.setDisable(false);
             stopRestoreButton.setDisable(true);
         }
+    }
+    
+    private void showDryRunPreview(List<RestoreObject> objects, RestoreOptions options, 
+                                   RestoreExecutor.RestoreMode mode) {
+        logMessage("Generating preview for " + objects.size() + " objects...");
+        
+        // Create preview dialog
+        Stage previewStage = new Stage();
+        previewStage.setTitle("🔍 Dry Run Preview - What Will Be Imported");
+        previewStage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        previewStage.initOwner(startRestoreButton.getScene().getWindow());
+        
+        // Create main container with dark theme
+        VBox mainContainer = new VBox(15);
+        mainContainer.getStyleClass().add("main-container");
+        mainContainer.setStyle("-fx-background-color: #1a1a1a; -fx-padding: 20;");
+        
+        // Header
+        Label headerLabel = new Label("Preview: Data to be " + mode.name() + "ed into Salesforce");
+        headerLabel.getStyleClass().add("section-title");
+        
+        Label infoLabel = new Label("This is a dry run. No data will be modified. Review the data below before proceeding.");
+        infoLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4FC3F7;");
+        
+        // Object selector
+        ComboBox<String> objectSelector = new ComboBox<>();
+        objectSelector.getStyleClass().add("modern-combo");
+        objectSelector.setPromptText("Select object to preview...");
+        objectSelector.setMinWidth(300);
+        for (RestoreObject obj : objects) {
+            objectSelector.getItems().add(obj.getName() + " (" + obj.getRecordCount() + " records)");
+        }
+        
+        // Data table (shows first 100 rows)
+        TableView<Map<String, String>> previewTable = new TableView<>();
+        previewTable.getStyleClass().add("modern-table");
+        previewTable.setMinHeight(400);
+        previewTable.setPlaceholder(new Label("Select an object to preview data"));
+        VBox.setVgrow(previewTable, javafx.scene.layout.Priority.ALWAYS);
+        
+        // Summary area
+        TextArea summaryArea = new TextArea();
+        summaryArea.getStyleClass().add("modern-text-area");
+        summaryArea.setEditable(false);
+        summaryArea.setWrapText(true);
+        summaryArea.setPrefHeight(150);
+        
+        // Object selector listener
+        objectSelector.setOnAction(e -> {
+            String selected = objectSelector.getValue();
+            if (selected == null) return;
+            
+            int idx = objectSelector.getSelectionModel().getSelectedIndex();
+            RestoreObject obj = objects.get(idx);
+            
+            loadPreviewData(obj, previewTable, summaryArea, options);
+        });
+        
+        // Buttons
+        javafx.scene.layout.HBox buttonBox = new javafx.scene.layout.HBox(15);
+        buttonBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        
+        Button proceedButton = new Button("✓ Proceed with Restore");
+        proceedButton.getStyleClass().add("success-button");
+        proceedButton.setOnAction(e -> {
+            previewStage.close();
+            dryRunCheck.setSelected(false); // Uncheck dry run
+            startRestore(objects); // Actually do the restore
+        });
+        
+        Button cancelButton = new Button("Cancel");
+        cancelButton.getStyleClass().add("secondary-button");
+        cancelButton.setOnAction(e -> {
+            previewStage.close();
+            logMessage("Dry run preview closed. No changes made.");
+            restoreRunning = false;
+            startRestoreButton.setDisable(false);
+            stopRestoreButton.setDisable(true);
+        });
+        
+        buttonBox.getChildren().addAll(cancelButton, proceedButton);
+        
+        // Build summary
+        StringBuilder summary = new StringBuilder();
+        summary.append("=== DRY RUN SUMMARY ===\n");
+        summary.append("Mode: ").append(mode).append("\n");
+        summary.append("Objects: ").append(objects.size()).append("\n");
+        summary.append("Order: ").append(objects.stream()
+            .map(RestoreObject::getName)
+            .collect(Collectors.joining(" → "))).append("\n\n");
+        
+        long totalRecords = objects.stream().mapToLong(RestoreObject::getRecordCount).sum();
+        summary.append("Total Records: ").append(String.format("%,d", totalRecords)).append("\n\n");
+        
+        if (transformationConfig != null) {
+            int mappings = transformationConfig.getUserMappings().size() + 
+                          transformationConfig.getRecordTypeMappings().size();
+            summary.append("Transformations: ").append(mappings).append(" mappings configured\n");
+        } else {
+            summary.append("Transformations: None configured\n");
+        }
+        
+        summaryArea.setText(summary.toString());
+        
+        // Summary label with styling
+        Label summaryLabel = new Label("Summary:");
+        summaryLabel.getStyleClass().add("field-label");
+        
+        mainContainer.getChildren().addAll(
+            headerLabel, infoLabel, objectSelector, previewTable, 
+            summaryLabel, summaryArea, buttonBox
+        );
+        
+        Scene scene = new Scene(mainContainer, 1000, 700);
+        scene.getStylesheets().add(getClass().getResource("/css/windows11-dark.css").toExternalForm());
+        previewStage.setScene(scene);
+        previewStage.show();
+        
+        // Auto-select first object
+        if (!objectSelector.getItems().isEmpty()) {
+            objectSelector.getSelectionModel().select(0);
+        }
+    }
+    
+    private void loadPreviewData(RestoreObject obj, TableView<Map<String, String>> table, 
+                                  TextArea summaryArea, RestoreOptions options) {
+        table.getColumns().clear();
+        table.getItems().clear();
+        
+        try {
+            Path csvPath = Path.of(obj.getFilePath());
+            List<String> lines = Files.readAllLines(csvPath);
+            
+            if (lines.isEmpty()) {
+                summaryArea.appendText("\nNo data in " + obj.getName());
+                return;
+            }
+            
+            // Parse header
+            String[] headers = parseCSVLine(lines.get(0));
+            
+            // Create columns (limit to 15 columns for readability)
+            int colLimit = Math.min(headers.length, 15);
+            for (int i = 0; i < colLimit; i++) {
+                final int colIdx = i;
+                TableColumn<Map<String, String>, String> col = new TableColumn<>(headers[i]);
+                col.setCellValueFactory(data -> 
+                    new SimpleStringProperty(data.getValue().getOrDefault(headers[colIdx], "")));
+                col.setPrefWidth(120);
+                table.getColumns().add(col);
+            }
+            
+            if (headers.length > 15) {
+                TableColumn<Map<String, String>, String> moreCol = new TableColumn<>("... +" + (headers.length - 15) + " more");
+                moreCol.setCellValueFactory(data -> new SimpleStringProperty("..."));
+                moreCol.setPrefWidth(80);
+                table.getColumns().add(moreCol);
+            }
+            
+            // Load first 100 rows
+            int rowLimit = Math.min(lines.size() - 1, 100);
+            for (int r = 1; r <= rowLimit; r++) {
+                String[] values = parseCSVLine(lines.get(r));
+                Map<String, String> row = new LinkedHashMap<>();
+                for (int c = 0; c < Math.min(values.length, headers.length); c++) {
+                    String value = values[c];
+                    
+                    // Apply transformations for preview if configured
+                    if (transformationConfig != null) {
+                        value = applyPreviewTransformation(obj.getName(), headers[c], value);
+                    }
+                    
+                    row.put(headers[c], value);
+                }
+                table.getItems().add(row);
+            }
+            
+            // Update summary
+            summaryArea.appendText("\n\n" + obj.getName() + ": " + (lines.size() - 1) + " records");
+            if (lines.size() > 101) {
+                summaryArea.appendText(" (showing first 100)");
+            }
+            summaryArea.appendText("\nFields: " + headers.length);
+            
+        } catch (IOException e) {
+            summaryArea.appendText("\nError loading " + obj.getName() + ": " + e.getMessage());
+        }
+    }
+    
+    private String[] parseCSVLine(String line) {
+        // Simple CSV parsing (handles basic cases)
+        List<String> values = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        
+        for (char c : line.toCharArray()) {
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                values.add(current.toString().trim());
+                current = new StringBuilder();
+            } else {
+                current.append(c);
+            }
+        }
+        values.add(current.toString().trim());
+        
+        return values.toArray(new String[0]);
+    }
+    
+    private String applyPreviewTransformation(String objectName, String fieldName, String value) {
+        if (value == null || value.isEmpty() || transformationConfig == null) {
+            return value;
+        }
+        
+        // Check for RecordTypeId mapping
+        if ("RecordTypeId".equalsIgnoreCase(fieldName)) {
+            String mapped = transformationConfig.getRecordTypeMappings().get(value);
+            if (mapped != null) {
+                return mapped + " ⟵ " + value;
+            }
+        }
+        
+        // Check for user field mapping
+        if (fieldName.toLowerCase().contains("ownerid") || fieldName.toLowerCase().contains("userid")) {
+            String mapped = transformationConfig.getUserMappings().get(value);
+            if (mapped != null) {
+                return mapped + " ⟵ " + value;
+            }
+        }
+        
+        // Check for picklist/field mappings in object config
+        TransformationConfig.ObjectTransformConfig objConfig = 
+            transformationConfig.getObjectConfigs().get(objectName);
+        if (objConfig != null) {
+            Map<String, String> picklistMappings = objConfig.getPicklistMappings().get(fieldName);
+            if (picklistMappings != null && picklistMappings.containsKey(value)) {
+                return picklistMappings.get(value) + " ⟵ " + value;
+            }
+        }
+        
+        return value;
     }
     
     private void logMessage(String message) {

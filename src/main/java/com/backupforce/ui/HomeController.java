@@ -46,17 +46,24 @@ public class HomeController {
     @FXML private Label lastBackupRowsLabel;
     
     @FXML private VBox dataBackupCard;
+    @FXML private VBox dataRestoreCard;
     @FXML private VBox configBackupCard;
     @FXML private VBox metadataBackupCard;
     @FXML private HBox connectionsContainer;
     @FXML private MenuButton settingsMenuButton;
     
+    // Restore card labels
+    @FXML private Label restoreSourcesLabel;
+    @FXML private Label lastRestoreRowsLabel;
+    @FXML private Label lastDataRestoreLabel;
+    
     private ConnectionInfo connectionInfo;
     
     @FXML
     public void initialize() {
-        // Add hover effects to data backup card only (others are disabled)
+        // Add hover effects to active cards
         setupCardHoverEffect(dataBackupCard);
+        setupCardHoverEffect(dataRestoreCard);
         
         // Load recent activity stats
         loadRecentActivity();
@@ -66,6 +73,9 @@ public class HomeController {
         
         // Load data backup card metrics
         loadDataBackupMetrics();
+        
+        // Load data restore card metrics
+        loadDataRestoreMetrics();
     }
     
     private void loadDataBackupMetrics() {
@@ -126,6 +136,36 @@ public class HomeController {
             return destination.substring(0, 12) + "...";
         }
         return destination;
+    }
+    
+    private void loadDataRestoreMetrics() {
+        // Load from preferences
+        String lastRestoreDate = prefs.get("lastRestoreDate", null);
+        long lastRestoreRows = prefs.getLong("lastRestoreRowCount", 0);
+        int restoreSourceCount = prefs.getInt("restoreSourceCount", 0);
+        
+        // Show restore sources count
+        if (restoreSourcesLabel != null) {
+            restoreSourcesLabel.setText(restoreSourceCount > 0 ? String.valueOf(restoreSourceCount) : "--");
+        }
+        
+        // Show last restore row count
+        if (lastRestoreRowsLabel != null) {
+            if (lastRestoreRows > 0) {
+                lastRestoreRowsLabel.setText(formatRowCount(lastRestoreRows));
+            } else {
+                lastRestoreRowsLabel.setText("--");
+            }
+        }
+        
+        // Show last restore info
+        if (lastDataRestoreLabel != null) {
+            if (lastRestoreDate != null) {
+                lastDataRestoreLabel.setText(lastRestoreDate);
+            } else {
+                lastDataRestoreLabel.setText("No restores yet");
+            }
+        }
     }
     
     private void setupCardHoverEffect(VBox card) {
@@ -335,7 +375,9 @@ public class HomeController {
             Scene scene = new Scene(root, 820, 560);
             Stage stage = (Stage) settingsMenuButton.getScene().getWindow();
             stage.setScene(scene);
-            stage.setResizable(false);
+            stage.setResizable(true);
+            stage.setMinWidth(700);
+            stage.setMinHeight(500);
             stage.centerOnScreen();
             
         } catch (Exception e) {
@@ -413,6 +455,12 @@ public class HomeController {
     }
     
     @FXML
+    private void handleDataRestore(MouseEvent event) {
+        logger.info("User selected Data Restore");
+        navigateToRestore();
+    }
+    
+    @FXML
     private void handleConfigBackup(MouseEvent event) {
         logger.info("User selected Configuration Backup");
         navigateToBackup("config");
@@ -448,6 +496,29 @@ public class HomeController {
         }
     }
     
+    private void navigateToRestore() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/restore.fxml"));
+            Parent root = loader.load();
+            
+            RestoreController controller = loader.getController();
+            controller.setConnectionInfo(connectionInfo);
+            
+            Scene scene = new Scene(root, 1200, 800);
+            
+            Stage stage = (Stage) dataRestoreCard.getScene().getWindow();
+            stage.setScene(scene);
+            stage.setResizable(true);
+            stage.setMinWidth(1000);
+            stage.setMinHeight(700);
+            stage.centerOnScreen();
+            
+        } catch (Exception e) {
+            logger.error("Failed to navigate to restore screen", e);
+            statusLabel.setText("Error: " + e.getMessage());
+        }
+    }
+    
     @FXML
     private void handleLogout() {
         logger.info("User logged out");
@@ -459,6 +530,9 @@ public class HomeController {
             
             Stage stage = (Stage) usernameLabel.getScene().getWindow();
             stage.setScene(scene);
+            stage.setResizable(true);
+            stage.setMinWidth(500);
+            stage.setMinHeight(600);
             stage.centerOnScreen();
             
         } catch (Exception e) {

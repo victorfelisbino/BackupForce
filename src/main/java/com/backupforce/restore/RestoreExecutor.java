@@ -134,6 +134,38 @@ public class RestoreExecutor {
             }
         }
         
+        // Apply data transformations for cross-org restores if configured
+        List<Map<String, Object>> transformedRecords = null;
+        DataTransformer.TransformationStatistics transformStats = null;
+        if (effectiveOptions.hasTransformations()) {
+            log(objectName + ": Applying data transformations...");
+            DataTransformer transformer = new DataTransformer(effectiveOptions.getTransformationConfig());
+            transformer.setLogCallback(this::log);
+            
+            try {
+                transformedRecords = transformer.transformRecords(
+                    objectName, records, effectiveOptions.getRunningUserId());
+                transformStats = transformer.getStatistics();
+                
+                log(String.format("%s: Transformed %d records (skipped %d), applied %d mappings",
+                    objectName, transformStats.getTransformedRecords(), 
+                    transformStats.getSkippedRecords(), transformStats.getTotalMappingsApplied()));
+                    
+                result.setTransformationStats(transformStats);
+                
+                if (transformStats.getSkippedRecords() > 0) {
+                    log(objectName + ": ⚠️ " + transformStats.getSkippedRecords() + 
+                        " records skipped due to unmapped values");
+                }
+            } catch (DataTransformer.DataTransformationException e) {
+                log(objectName + ": ❌ Transformation failed: " + e.getMessage());
+                result.addError("Transformation failed: " + e.getMessage());
+                if (effectiveOptions.isStopOnError()) {
+                    return result;
+                }
+            }
+        }
+        
         // Resolve relationships if enabled
         if (effectiveOptions.isResolveRelationships()) {
             log(objectName + ": Resolving relationship references...");
@@ -1016,6 +1048,7 @@ public class RestoreExecutor {
         private boolean completed;
         private final List<String> errors = new ArrayList<>();
         private final List<String> createdIds = new ArrayList<>();
+        private DataTransformer.TransformationStatistics transformationStats;
         
         public RestoreResult(String objectName) {
             this.objectName = objectName;
@@ -1039,6 +1072,9 @@ public class RestoreExecutor {
         public void setCompleted(boolean completed) { this.completed = completed; }
         public List<String> getErrors() { return errors; }
         public List<String> getCreatedIds() { return createdIds; }
+        public DataTransformer.TransformationStatistics getTransformationStats() { return transformationStats; }
+        public void setTransformationStats(DataTransformer.TransformationStatistics stats) { this.transformationStats = stats; }
+        public boolean hasTransformations() { return transformationStats != null; }
     }
     
     public static class BatchResult {
@@ -1113,6 +1149,8 @@ public class RestoreExecutor {
         private String externalIdField;
         private int maxRetries = 3;
         private long retryDelayMs = 2000;
+        private TransformationConfig transformationConfig;
+        private String runningUserId;
         
         public int getBatchSize() { return batchSize; }
         public void setBatchSize(int size) { this.batchSize = size; }
@@ -1132,5 +1170,10 @@ public class RestoreExecutor {
         public void setMaxRetries(int retries) { this.maxRetries = retries; }
         public long getRetryDelayMs() { return retryDelayMs; }
         public void setRetryDelayMs(long delay) { this.retryDelayMs = delay; }
+        public TransformationConfig getTransformationConfig() { return transformationConfig; }
+        public void setTransformationConfig(TransformationConfig config) { this.transformationConfig = config; }
+        public String getRunningUserId() { return runningUserId; }
+        public void setRunningUserId(String userId) { this.runningUserId = userId; }
+        public boolean hasTransformations() { return transformationConfig != null; }
     }
 }

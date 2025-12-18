@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Text?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" 
+      fx:controller="com.backupforce.ui.TransformationController"
+      stylesheets="@../css/windows11-dark.css"
+      spacing="10" styleClass="transformation-container">
+    
+    <padding>
+        <Insets top="15" right="15" bottom="15" left="15"/>
+    </padding>
+    
+    <!-- Header Section -->
+    <HBox alignment="CENTER_LEFT" spacing="10">
+        <Label text="Cross-Org Data Transformation" styleClass="section-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="btnAnalyze" text="🔍 Analyze Schema" onAction="#handleAnalyzeSchema"
+                styleClass="primary-button"/>
+        <Button fx:id="btnSaveMappings" text="💾 Save Mappings" onAction="#handleSaveMappings"
+                styleClass="secondary-button"/>
+        <Button fx:id="btnLoadMappings" text="📂 Load Mappings" onAction="#handleLoadMappings"
+                styleClass="secondary-button"/>
+    </HBox>
+    
+    <Separator/>
+    
+    <!-- Info Banner -->
+    <HBox fx:id="infoBanner" styleClass="info-banner" alignment="CENTER_LEFT" spacing="10" managed="false" visible="false">
+        <Label fx:id="lblInfoMessage" wrapText="true" HBox.hgrow="ALWAYS"/>
+        <Button text="✕" styleClass="close-button" onAction="#hideInfoBanner"/>
+    </HBox>
+    
+    <!-- Main Content - TabPane for different mapping types -->
+    <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
+        
+        <!-- RecordType Mappings Tab -->
+        <Tab text="RecordTypes">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Object:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbRecordTypeObject" promptText="Select Object" 
+                              prefWidth="200" onAction="#handleRecordTypeObjectChange"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="🔮 Auto-Suggest Mappings" onAction="#handleAutoSuggestRecordTypes"
+                            styleClass="suggest-button"/>
+                </HBox>
+                
+                <TableView fx:id="tblRecordTypeMappings" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="colRtSourceId" text="Source ID" prefWidth="180"/>
+                        <TableColumn fx:id="colRtSourceName" text="Source Name" prefWidth="150"/>
+                        <TableColumn fx:id="colRtTargetMapping" text="Target RecordType" prefWidth="250"/>
+                        <TableColumn fx:id="colRtStatus" text="Status" prefWidth="100"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No RecordType mismatches detected. Click 'Analyze Schema' to scan."/>
+                    </placeholder>
+                </TableView>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Unmapped behavior:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbRtUnmappedBehavior" prefWidth="200"/>
+                    <Label fx:id="lblRtUnmappedHelp" text="" styleClass="help-text"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        
+        <!-- User Mappings Tab -->
+        <Tab text="Users">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <CheckBox fx:id="chkUseRunningUser" text="Use current user for all unmapped users"
+                              onAction="#handleUseRunningUserChange"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="🔮 Auto-Suggest Mappings" onAction="#handleAutoSuggestUsers"
+                            styleClass="suggest-button"/>
+                </HBox>
+                
+                <TableView fx:id="tblUserMappings" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="colUserSourceId" text="Source User ID" prefWidth="180"/>
+                        <TableColumn fx:id="colUserSourceName" text="Source Name" prefWidth="180"/>
+                        <TableColumn fx:id="colUserTargetMapping" text="Target User" prefWidth="250"/>
+                        <TableColumn fx:id="colUserStatus" text="Status" prefWidth="100"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No User mismatches detected. Click 'Analyze Schema' to scan."/>
+                    </placeholder>
+                </TableView>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Unmapped behavior:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbUserUnmappedBehavior" prefWidth="200"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        
+        <!-- Picklist Mappings Tab -->
+        <Tab text="Picklists">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Object:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbPicklistObject" promptText="Select Object" 
+                              prefWidth="200" onAction="#handlePicklistObjectChange"/>
+                    <Label text="Field:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbPicklistField" promptText="Select Field"
+                              prefWidth="200" onAction="#handlePicklistFieldChange"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="🔮 Auto-Suggest" onAction="#handleAutoSuggestPicklists"
+                            styleClass="suggest-button"/>
+                </HBox>
+                
+                <TableView fx:id="tblPicklistMappings" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="colPlSourceValue" text="Source Value" prefWidth="200"/>
+                        <TableColumn fx:id="colPlTargetMapping" text="Target Value" prefWidth="250"/>
+                        <TableColumn fx:id="colPlStatus" text="Status" prefWidth="100"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No Picklist mismatches detected. Select an object and field to view."/>
+                    </placeholder>
+                </TableView>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Unmapped behavior:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbPlUnmappedBehavior" prefWidth="200"/>
+                    <Label text="Default value:" styleClass="field-label"/>
+                    <TextField fx:id="txtPlDefaultValue" prefWidth="150" promptText="Optional"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        
+        <!-- Field Mappings Tab -->
+        <Tab text="Fields">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Object:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbFieldObject" promptText="Select Object"
+                              prefWidth="200" onAction="#handleFieldObjectChange"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="➕ Add Field Mapping" onAction="#handleAddFieldMapping"
+                            styleClass="secondary-button"/>
+                </HBox>
+                
+                <TableView fx:id="tblFieldMappings" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="colFieldSource" text="Source Field" prefWidth="200"/>
+                        <TableColumn fx:id="colFieldTarget" text="Target Field" prefWidth="200"/>
+                        <TableColumn fx:id="colFieldExcluded" text="Excluded" prefWidth="80"/>
+                        <TableColumn fx:id="colFieldActions" text="Actions" prefWidth="100"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No field mappings configured. Add mappings to rename or exclude fields."/>
+                    </placeholder>
+                </TableView>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Missing fields in target:" styleClass="field-label"/>
+                    <TextArea fx:id="txtMissingFields" prefHeight="60" editable="false"
+                              promptText="Fields that exist in backup but not in target org"
+                              HBox.hgrow="ALWAYS"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        
+        <!-- Value Transformations Tab -->
+        <Tab text="Value Transforms">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Object:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbTransformObject" promptText="Select Object"
+                              prefWidth="200" onAction="#handleTransformObjectChange"/>
+                    <Label text="Field:" styleClass="field-label"/>
+                    <ComboBox fx:id="cmbTransformField" promptText="Select Field"
+                              prefWidth="200"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="➕ Add Transform" onAction="#handleAddTransform"
+                            styleClass="secondary-button"/>
+                </HBox>
+                
+                <TableView fx:id="tblValueTransforms" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="colTransformField" text="Field" prefWidth="150"/>
+                        <TableColumn fx:id="colTransformType" text="Type" prefWidth="120"/>
+                        <TableColumn fx:id="colTransformPattern" text="Pattern/Value" prefWidth="200"/>
+                        <TableColumn fx:id="colTransformReplacement" text="Replacement" prefWidth="150"/>
+                        <TableColumn fx:id="colTransformActions" text="Actions" prefWidth="100"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="No value transformations configured. Add transforms for regex replacements, prefixes, etc."/>
+                    </placeholder>
+                </TableView>
+                
+                <HBox alignment="CENTER_LEFT" spacing="10" styleClass="transform-help">
+                    <Label text="💡" styleClass="tip-icon"/>
+                    <Label text="Value transforms apply to every record. Use for: adding prefixes, regex replacements, case changes, etc."
+                           styleClass="help-text" wrapText="true" HBox.hgrow="ALWAYS"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        
+        <!-- Summary Tab -->
+        <Tab text="Summary">
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <Label text="Schema Comparison Summary" styleClass="subsection-title"/>
+                
+                <GridPane hgap="20" vgap="10">
+                    <Label text="Objects analyzed:" GridPane.columnIndex="0" GridPane.rowIndex="0" styleClass="field-label"/>
+                    <Label fx:id="lblObjectsAnalyzed" text="0" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                    
+                    <Label text="RecordType mismatches:" GridPane.columnIndex="0" GridPane.rowIndex="1" styleClass="field-label"/>
+                    <Label fx:id="lblRtMismatches" text="0" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                    
+                    <Label text="User mismatches:" GridPane.columnIndex="0" GridPane.rowIndex="2" styleClass="field-label"/>
+                    <Label fx:id="lblUserMismatches" text="0" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    
+                    <Label text="Picklist mismatches:" GridPane.columnIndex="0" GridPane.rowIndex="3" styleClass="field-label"/>
+                    <Label fx:id="lblPicklistMismatches" text="0" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                    
+                    <Label text="Missing fields:" GridPane.columnIndex="0" GridPane.rowIndex="4" styleClass="field-label"/>
+                    <Label fx:id="lblMissingFields" text="0" GridPane.columnIndex="1" GridPane.rowIndex="4"/>
+                    
+                    <Label text="Mappings configured:" GridPane.columnIndex="0" GridPane.rowIndex="5" styleClass="field-label"/>
+                    <Label fx:id="lblMappingsConfigured" text="0" GridPane.columnIndex="1" GridPane.rowIndex="5"/>
+                </GridPane>
+                
+                <Separator/>
+                
+                <Label text="Validation Results" styleClass="subsection-title"/>
+                
+                <TextArea fx:id="txtValidationResults" prefHeight="150" editable="false"
+                          promptText="Run validation to check mapping completeness..."
+                          VBox.vgrow="ALWAYS"/>
+                
+                <HBox alignment="CENTER_RIGHT" spacing="10">
+                    <Button text="🔍 Validate Mappings" onAction="#handleValidateMappings"
+                            styleClass="primary-button"/>
+                    <Button text="✅ Apply and Continue" onAction="#handleApplyMappings"
+                            styleClass="success-button"/>
+                </HBox>
+            </VBox>
+        </Tab>
+    </TabPane>
+    
+    <!-- Status Bar -->
+    <HBox fx:id="statusBar" styleClass="status-bar" alignment="CENTER_LEFT" spacing="10">
+        <ProgressIndicator fx:id="progressIndicator" prefWidth="20" prefHeight="20" 
+                           visible="false" managed="false"/>
+        <Label fx:id="lblStatus" text="Ready. Select backup source and click 'Analyze Schema' to detect mismatches."/>
+    </HBox>
+    
+</VBox>

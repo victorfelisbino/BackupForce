@@ -22,6 +22,9 @@ The Data Restoration feature enables restoring backed-up Salesforce data (CSV fi
 | **Phase 4** | Advanced Options | ✅ Complete | Medium |
 | **Phase 5** | Validation & Safety | ✅ Complete | Medium |
 | **Phase 6** | Testing | ✅ Complete | High |
+| **Phase 7** | Cross-Org Data Transformation | ✅ Complete | High |
+| **Phase 8** | Duplicate Record Handling | ⏳ Planned | High |
+| **Phase 9** | Related Record Creation | ⏳ Planned | Medium |
 
 ---
 
@@ -156,6 +159,149 @@ The Data Restoration feature enables restoring backed-up Salesforce data (CSV fi
 
 ---
 
+## ✅ Phase 7: Cross-Org Data Transformation (Complete)
+
+Cross-org restore allows restoring data between different Salesforce orgs that may have different configurations (RecordTypes, picklist values, users, etc.).
+
+### 7.1 Schema Comparison
+- [x] Compare backup metadata with target org (SchemaComparer)
+- [x] Detect RecordType mismatches (missing, renamed)
+- [x] Detect picklist value differences
+- [x] Detect user reference mismatches
+- [x] Generate comparison report with suggestions
+
+### 7.2 Transformation Configuration
+- [x] TransformationConfig for persisting mappings
+- [x] Global user mappings (source user ID → target user ID)
+- [x] Global RecordType mappings (source → target)
+- [x] Per-object configurations
+- [x] Unmapped value behaviors (KEEP_ORIGINAL, USE_DEFAULT, SET_NULL, SKIP_RECORD, FAIL)
+- [x] Save/Load mappings to JSON file
+
+### 7.3 Data Transformation Engine
+- [x] DataTransformer applies mappings during restore
+- [x] RecordType ID resolution
+- [x] User/Owner ID resolution
+- [x] Picklist value mapping
+- [x] Field renaming/mapping
+- [x] Custom value transformations (regex, prefix, suffix, etc.)
+- [x] Transformation statistics tracking
+
+### 7.4 Value Transformation Types
+- [x] REGEX_REPLACE - Pattern-based text replacement
+- [x] PREFIX - Add text before values
+- [x] SUFFIX - Add text after values
+- [x] TRIM - Remove whitespace
+- [x] UPPERCASE/LOWERCASE - Case conversion
+- [x] CONSTANT - Replace with fixed value
+- [x] LOOKUP - Replace based on lookup map
+
+### 7.5 Transformation UI
+- [x] Schema analysis with target org
+- [x] RecordType mapping tab with auto-suggest
+- [x] User mapping tab with auto-suggest
+- [x] Picklist mapping tab with auto-suggest
+- [x] Field mapping tab
+- [x] Custom value transformations tab
+- [x] Validation and apply functionality
+
+### 7.6 Unit Tests
+- [x] DataTransformerTest (37 tests)
+- [x] RecordType mapping tests
+- [x] User mapping tests  
+- [x] Picklist mapping tests
+- [x] Field mapping tests
+- [x] Value transformation tests
+- [x] Statistics tests
+- [x] Edge case tests
+
+---
+
+## ⏳ Phase 8: Duplicate Record Handling (Planned)
+
+Handle duplicate records during restore with configurable rules and actions.
+
+### 8.1 Duplicate Detection Rules
+- [ ] Define duplicate matching rules per object
+- [ ] Match by field(s): Email, Name, External ID, custom fields
+- [ ] Match criteria: Exact match, fuzzy match, case-insensitive
+- [ ] Compound matching (multiple fields AND/OR)
+- [ ] Query target org to find existing duplicates
+
+### 8.2 Duplicate Actions
+- [ ] **Skip** - Don't import duplicate records
+- [ ] **Update** - Update existing record with import data
+- [ ] **Overwrite** - Replace all fields in existing record
+- [ ] **Merge** - Update only empty fields in existing record
+- [ ] **Create Anyway** - Ignore duplicates, create new record
+- [ ] **Fail** - Stop import on duplicate found
+
+### 8.3 Field-Level Update Rules
+- [ ] Choose which fields to update on duplicates
+- [ ] Update only if source value is not null/empty
+- [ ] Update only if source value is newer (date comparison)
+- [ ] Append to multi-select picklists
+- [ ] Custom merge logic per field
+
+### 8.4 Duplicate Handling UI
+- [ ] Configure duplicate rules per object
+- [ ] Preview duplicates before import
+- [ ] Duplicate action selection
+- [ ] Field-level merge configuration
+- [ ] Duplicate handling statistics
+
+### 8.5 Reporting
+- [ ] Track duplicates found vs created vs updated
+- [ ] Export duplicate report (which records matched)
+- [ ] Show field-level differences for review
+
+---
+
+## ⏳ Phase 9: Related Record Creation (Planned)
+
+Create related child records automatically during parent import (e.g., create Opportunity for each Account).
+
+### 9.1 Related Record Configuration
+- [ ] Define parent-child relationships for import
+- [ ] Select child object to create per parent
+- [ ] Map parent fields to child fields
+- [ ] Define default values for child fields
+- [ ] Multiple child objects per parent (Account → Opportunity + Contact)
+
+### 9.2 Field Mapping
+- [ ] Map parent fields to child fields (Account.Name → Opportunity.Name)
+- [ ] Formula-based field values (e.g., Opportunity.CloseDate = TODAY() + 30)
+- [ ] Static default values
+- [ ] Conditional field population (if parent field X = Y, set child field Z)
+
+### 9.3 Default Value Templates
+- [ ] Pre-defined templates for common scenarios
+- [ ] Opportunity defaults (Stage, CloseDate, Amount)
+- [ ] Contact defaults (Role, Status)
+- [ ] Custom object templates
+- [ ] Save/load templates for reuse
+
+### 9.4 Integration with Duplicate Handling
+- [ ] Check child duplicate rules before creating
+- [ ] Skip child creation if duplicate exists
+- [ ] Update existing child if duplicate found
+- [ ] Parent-child atomic transactions (rollback both on failure)
+
+### 9.5 Related Record UI
+- [ ] Visual relationship mapping interface
+- [ ] Field mapping with drag-and-drop
+- [ ] Default value configuration
+- [ ] Preview generated child records
+- [ ] Template management
+
+### 9.6 Use Cases
+- [ ] Import Accounts → Auto-create Opportunities
+- [ ] Import Accounts → Auto-create Contacts
+- [ ] Import Leads → Auto-create Tasks
+- [ ] Import custom objects with related children
+
+---
+
 ## 📅 Timeline
 
 | Phase | Target |
@@ -166,6 +312,9 @@ The Data Restoration feature enables restoring backed-up Salesforce data (CSV fi
 | Phase 4 | ✅ December 2025 (Complete) |
 | Phase 5 | ✅ December 2025 (Complete) |
 | Phase 6 | ✅ December 2025 (Complete) |
+| Phase 7 | ✅ December 2025 (Complete) |
+| Phase 8 | ⏳ January 2026 (Planned) |
+| Phase 9 | ⏳ January 2026 (Planned) |
 
 ---
 
@@ -194,6 +343,12 @@ Contributions are welcome! If you'd like to help with any of these features:
 ## 📝 Changelog
 
 ### December 18, 2025
+- ✅ Cross-Org Data Transformation (Phase 7)
+  - SchemaComparer for detecting org differences
+  - TransformationConfig for mapping configuration
+  - DataTransformer for applying transformations
+  - Transformation UI with auto-suggest
+  - 37 comprehensive unit tests
 - ✅ DatabaseScanner for Snowflake/PostgreSQL/SQL Server
 - ✅ RelationshipResolver for _ref_* column processing
 - ✅ DependencyOrderer with topological sort

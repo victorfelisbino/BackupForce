@@ -2134,3 +2134,101 @@
 .sso-checkbox .mark {
     -fx-background-color: white;
 }
+
+/* ============================================ */
+/* Transformation Dialog Styles */
+/* ============================================ */
+.transformation-container {
+    -fx-background-color: #1a1a1a;
+}
+
+.section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #f5f5f5;
+}
+
+.subsection-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #e0e0e0;
+}
+
+.info-banner {
+    -fx-background-color: #2a4a6a;
+    -fx-background-radius: 6px;
+    -fx-border-color: #2a8bd8;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-padding: 10px 15px;
+}
+
+.info-banner .label {
+    -fx-text-fill: #e8e8e8;
+}
+
+.close-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #a0a0a0;
+    -fx-font-size: 14px;
+    -fx-padding: 2px 8px;
+    -fx-cursor: hand;
+}
+
+.close-button:hover {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #404040;
+    -fx-background-radius: 4px;
+}
+
+.suggest-button {
+    -fx-background-color: #3a3a6a;
+    -fx-text-fill: #c8c8ff;
+    -fx-border-width: 0;
+    -fx-padding: 6px 12px;
+    -fx-font-size: 12px;
+}
+
+.suggest-button:hover {
+    -fx-background-color: #4a4a8a;
+}
+
+.help-text {
+    -fx-font-size: 11px;
+    -fx-text-fill: #808080;
+    -fx-font-style: italic;
+}
+
+/* Modern aliases for consistent naming */
+.modern-combo {
+    -fx-background-color: #2a2a2a;
+    -fx-border-color: #404040;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+}
+
+.modern-combo:hover {
+    -fx-border-color: #505050;
+}
+
+.modern-combo:focused {
+    -fx-border-color: #2a8bd8;
+}
+
+.modern-text-area {
+    -fx-background-color: #1e1e1e;
+    -fx-text-fill: #e8e8e8;
+    -fx-border-color: #404040;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-font-family: 'Consolas', 'Courier New', monospace;
+    -fx-font-size: 11px;
+}
+
+.modern-text-area .content {
+    -fx-background-color: #1e1e1e;
+}
+
+.main-container {
+    -fx-background-color: #1a1a1a;
+}

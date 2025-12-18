@@ -262,7 +262,9 @@ public class LoginController {
                     
                     Stage stage = (Stage) loginButton.getScene().getWindow();
                     stage.setScene(scene);
-                    stage.setResizable(false);
+                    stage.setResizable(true);
+                    stage.setMinWidth(700);
+                    stage.setMinHeight(500);
                     stage.centerOnScreen();
                 } catch (Exception ex) {
                     logger.error("Failed to load home window", ex);
@@ -431,7 +433,9 @@ public class LoginController {
                             
                             Stage stage = (Stage) oauthButton.getScene().getWindow();
                             stage.setScene(scene);
-                            stage.setResizable(false);
+                            stage.setResizable(true);
+                            stage.setMinWidth(700);
+                            stage.setMinHeight(500);
                             stage.centerOnScreen();
                         } catch (Exception ex) {
                             logger.error("Failed to load home window", ex);

@@ -146,6 +146,26 @@
                     </HBox>
                 </VBox>
                 
+                <!-- Cross-Org Transformation -->
+                <VBox spacing="8" styleClass="config-card">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="🔄 Cross-Org Transformation" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="transformStatusLabel" text="Not configured" 
+                              style="-fx-font-size: 11px; -fx-text-fill: #6c757d;"/>
+                    </HBox>
+                    <Label text="Map RecordTypes, picklists, and users between different orgs" 
+                          style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
+                    <HBox spacing="10">
+                        <Button fx:id="configureTransformButton" text="Configure Mappings..." 
+                               onAction="#handleConfigureTransformations" 
+                               styleClass="secondary-button" style="-fx-font-size: 12px;"/>
+                        <Button fx:id="loadTransformButton" text="Load Config..." 
+                               onAction="#handleLoadTransformConfig" 
+                               styleClass="secondary-button" style="-fx-font-size: 12px;"/>
+                    </HBox>
+                </VBox>
+                
                 <!-- Target Org Info -->
                 <VBox spacing="8" styleClass="config-card">
                     <Label text="🎯 Target Salesforce Org" style="-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>

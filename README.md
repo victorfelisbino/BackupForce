@@ -52,8 +52,9 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 - **Bulk API v2 Restore** - Efficiently restore millions of records back to Salesforce
 - **Insert/Update/Upsert** - Choose the right operation for your data
 - **CSV Source** - Restore from backup CSV files
-- **Relationship Resolution** - Automatically resolve lookup references (coming soon)
-- **Dependency Ordering** - Restore parent objects before children (coming soon)
+- **Relationship Resolution** - Automatically resolve lookup references
+- **Dependency Ordering** - Restore parent objects before children
+- **Cross-Org Transformation** - Map RecordTypes, picklist values, and users between different orgs
 
 ### User Experience
 - **Windows 11 Dark Theme** - Modern Fluent Design UI
@@ -74,11 +75,12 @@ See the full [Development Roadmap](docs/ROADMAP.md) for upcoming features.
 | Bulk API v2 Backup | ✅ Complete |
 | Database Export | ✅ Complete |
 | Blob/Attachment Download | ✅ Complete |
-| **Data Restoration** | 🔄 In Progress |
+| **Data Restoration** | ✅ Complete |
 | └─ Core Restore | ✅ Complete |
-| └─ Database Source | ⏳ Planned |
-| └─ Relationship Resolution | ⏳ Planned |
-| └─ Dry Run Mode | ⏳ Planned |
+| └─ Database Source | ✅ Complete |
+| └─ Relationship Resolution | ✅ Complete |
+| └─ Dependency Ordering | ✅ Complete |
+| └─ Cross-Org Transformation | ✅ Complete |
 
 ---
 
