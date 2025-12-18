@@ -17,23 +17,66 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.prefs.Preferences;
 
 /**
- * Manages saved database connections with encryption
+ * Manages saved database connections with encryption and session caching
  */
 public class ConnectionManager {
     private static final Logger logger = LoggerFactory.getLogger(ConnectionManager.class);
     private static final String PREFS_NODE = "com.backupforce.connections";
     private static final String CONNECTIONS_FILE = "connections.json";
     private static final String KEY_ALIAS = "encryption_key";
+    private static final long SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     
     private static ConnectionManager instance;
     private final Gson gson;
     private final Path configDir;
     private List<SavedConnection> connections;
     private String lastUsedConnectionId;
+    
+    // Session cache for database connections (keyed by connection ID)
+    private final Map<String, CachedSession> sessionCache = new ConcurrentHashMap<>();
+    
+    /**
+     * Cached database session with timestamp
+     */
+    public static class CachedSession {
+        private final Connection connection;
+        private final long createdAt;
+        private final String connectionId;
+        
+        public CachedSession(String connectionId, Connection connection) {
+            this.connectionId = connectionId;
+            this.connection = connection;
+            this.createdAt = System.currentTimeMillis();
+        }
+        
+        public Connection getConnection() { return connection; }
+        public long getCreatedAt() { return createdAt; }
+        public String getConnectionId() { return connectionId; }
+        
+        public boolean isValid() {
+            try {
+                return connection != null && !connection.isClosed() && 
+                       (System.currentTimeMillis() - createdAt) < SESSION_TIMEOUT_MS;
+            } catch (SQLException e) {
+                return false;
+            }
+        }
+        
+        public void close() {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException ignored) {}
+            }
+        }
+    }
     
     public static synchronized ConnectionManager getInstance() {
         if (instance == null) {
@@ -159,6 +202,73 @@ public class ConnectionManager {
             return decrypt(connection.getPassword());
         }
         return connection.getPassword();
+    }
+    
+    // ============================================
+    // Session Cache Management
+    // ============================================
+    
+    /**
+     * Get a cached session for a connection, or null if no valid session exists
+     */
+    public CachedSession getCachedSession(String connectionId) {
+        CachedSession session = sessionCache.get(connectionId);
+        if (session != null && session.isValid()) {
+            logger.debug("Using cached session for connection: {}", connectionId);
+            return session;
+        }
+        // Remove invalid session
+        if (session != null) {
+            logger.debug("Cached session expired or invalid for connection: {}", connectionId);
+            session.close();
+            sessionCache.remove(connectionId);
+        }
+        return null;
+    }
+    
+    /**
+     * Cache a database session for a connection
+     */
+    public void cacheSession(String connectionId, Connection connection) {
+        // Close any existing session first
+        CachedSession existing = sessionCache.get(connectionId);
+        if (existing != null) {
+            existing.close();
+        }
+        
+        CachedSession session = new CachedSession(connectionId, connection);
+        sessionCache.put(connectionId, session);
+        logger.info("Cached database session for connection: {}", connectionId);
+    }
+    
+    /**
+     * Check if a valid cached session exists for a connection
+     */
+    public boolean hasCachedSession(String connectionId) {
+        CachedSession session = sessionCache.get(connectionId);
+        return session != null && session.isValid();
+    }
+    
+    /**
+     * Invalidate and close a cached session
+     */
+    public void invalidateSession(String connectionId) {
+        CachedSession session = sessionCache.remove(connectionId);
+        if (session != null) {
+            session.close();
+            logger.info("Invalidated cached session for connection: {}", connectionId);
+        }
+    }
+    
+    /**
+     * Close all cached sessions (call on application shutdown)
+     */
+    public void closeAllSessions() {
+        for (CachedSession session : sessionCache.values()) {
+            session.close();
+        }
+        sessionCache.clear();
+        logger.info("Closed all cached database sessions");
     }
     
     private void loadConnections() {

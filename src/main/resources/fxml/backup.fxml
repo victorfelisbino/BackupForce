@@ -18,13 +18,13 @@
         <Region styleClass="connection-status-dot"/>
         <Label fx:id="connectionLabel" text="Connected to Salesforce" styleClass="connection-label" HBox.hgrow="ALWAYS"/>
         <Label fx:id="apiLimitsLabel" text="" 
-              style="-fx-font-size: 11px; -fx-text-fill: #888; -fx-padding: 0 10;"/>
+              style="-fx-font-size: 11px; -fx-text-fill: #adb5bd; -fx-padding: 0 10;"/>
         <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" 
                styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
     </HBox>
     
     <!-- Main Content: Horizontal Split -->
-    <SplitPane dividerPositions="0.5" VBox.vgrow="ALWAYS" style="-fx-padding: 0;">
+    <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS" style="-fx-padding: 0;">
         
         <!-- LEFT PANEL: Object Tables and Tabs -->
         <VBox spacing="14" style="-fx-padding: 16px 12px 16px 16px;">
@@ -38,12 +38,6 @@
             </HBox>
             
             <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 0 4px;">
-                <Button fx:id="configureFieldsButton" text="⚙ Fields" onAction="#handleConfigureFields" 
-                       styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;">
-                    <tooltip>
-                        <Tooltip text="Configure which fields to backup for selected objects"/>
-                    </tooltip>
-                </Button>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="selectAllButton" text="Select All" onAction="#handleSelectAll" 
                        styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;"/>
@@ -54,13 +48,15 @@
             <!-- Object Selection Table (before backup) -->
             <TableView fx:id="allObjectsTable" VBox.vgrow="ALWAYS" styleClass="modern-table">
                 <columns>
-                    <TableColumn fx:id="allSelectColumn" text="Select" prefWidth="50" 
-                                minWidth="50" maxWidth="50"/>
-                    <TableColumn fx:id="allNameColumn" text="API Name" prefWidth="180" 
+                    <TableColumn fx:id="allSelectColumn" text="" prefWidth="40" 
+                                minWidth="40" maxWidth="40"/>
+                    <TableColumn fx:id="allNameColumn" text="API Name" prefWidth="170" 
                                 minWidth="120"/>
-                    <TableColumn fx:id="allLabelColumn" text="Label" prefWidth="180" 
-                                minWidth="120"/>
-                    <TableColumn fx:id="allStatusColumn" text="Status" prefWidth="150" 
+                    <TableColumn fx:id="allLabelColumn" text="Label" prefWidth="150" 
+                                minWidth="100"/>
+                    <TableColumn fx:id="allFieldsColumn" text="Fields" prefWidth="70" 
+                                minWidth="70" maxWidth="70"/>
+                    <TableColumn fx:id="allStatusColumn" text="Status" prefWidth="140" 
                                 minWidth="100"/>
                 </columns>
                 <columnResizePolicy>
@@ -195,7 +191,7 @@
             
             <!-- Output Folder Selection -->
             <VBox spacing="6" styleClass="config-card" fx:id="outputFolderBox">
-                <Label text="Output Folder" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <Label text="Output Folder" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
                 <HBox spacing="8" alignment="CENTER_LEFT">
                     <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
                               styleClass="modern-text-field"
@@ -209,12 +205,12 @@
             
             <!-- Record Limit (for testing) -->
             <HBox spacing="10" alignment="CENTER_LEFT" styleClass="config-card">
-                <Label text="Record Limit (Testing)" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <Label text="Record Limit (Testing):" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
                 <TextField fx:id="recordLimitField" prefWidth="80" 
                           styleClass="modern-text-field"
                           style="-fx-padding: 6px 10px;"
                           text="0"/>
-                <Label text="(0 = unlimited)" style="-fx-font-size: 11px; -fx-text-fill: #666;"/>
+                <Label text="(0 = unlimited)" style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
             </HBox>
             
             <!-- Backup Mode Options -->
@@ -223,15 +219,15 @@
                     <CheckBox fx:id="incrementalBackupCheckbox" text="Incremental Backup" 
                              style="-fx-font-size: 13px;"/>
                     <Label fx:id="lastBackupLabel" text="" 
-                          style="-fx-font-size: 11px; -fx-text-fill: #888;"/>
+                          style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
                 </HBox>
                 <Label text="Only backup records modified since last successful backup" 
-                      style="-fx-font-size: 11px; -fx-text-fill: #666; -fx-padding: 0 0 0 24;"/>
+                      style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0; -fx-padding: 0 0 0 24;"/>
                 
                 <HBox spacing="12" alignment="CENTER_LEFT" style="-fx-padding: 4 0 0 0;">
                     <CheckBox fx:id="compressBackupCheckbox" text="Compress to ZIP" 
                              style="-fx-font-size: 13px;"/>
-                    <Label text="(saves disk space)" style="-fx-font-size: 11px; -fx-text-fill: #888;"/>
+                    <Label text="(saves disk space)" style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
                 </HBox>
             </VBox>
             
@@ -261,7 +257,7 @@
             
             <!-- Activity Log (TALL - grows to fill remaining space) -->
             <VBox spacing="6" styleClass="config-card" VBox.vgrow="ALWAYS">
-                <Label text="Activity Log" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
+                <Label text="Activity Log" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
                 <TextArea fx:id="logArea" editable="false" wrapText="true" 
                          styleClass="log-area" VBox.vgrow="ALWAYS"
                          style="-fx-min-height: 150px;">
@@ -274,7 +270,7 @@
             <!-- Attribution Footer -->
             <HBox alignment="CENTER" style="-fx-padding: 16 0 0 0;">
                 <Label text="Developed by Victor Felisbino • BackupForce v2.0" 
-                      style="-fx-font-size: 11px; -fx-text-fill: #8b8b8b;"/>
+                      style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
             </HBox>
         </VBox>
     </SplitPane>

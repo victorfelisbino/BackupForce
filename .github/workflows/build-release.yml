@@ -1,0 +1,327 @@
+name: Build Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 2.2.0)'
+        required: true
+        default: '2.2.0'
+
+env:
+  JAVA_VERSION: '21'
+  APP_NAME: 'BackupForce'
+
+jobs:
+  # Build JAR (platform-independent)
+  build-jar:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests -q
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-artifact
+          path: target/BackupForce.jar
+          retention-days: 1
+
+  # Build Windows Installer
+  build-windows:
+    needs: build-jar
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-artifact
+          path: target/
+
+      - name: Create jpackage input directory
+        run: |
+          mkdir -p packaging/input
+          cp target/BackupForce.jar packaging/input/
+        shell: bash
+
+      - name: Build Windows Installer (MSI)
+        run: |
+          jpackage `
+            --input packaging/input `
+            --main-jar BackupForce.jar `
+            --name BackupForce `
+            --app-version ${{ needs.build-jar.outputs.version }} `
+            --vendor "Victor Felisbino" `
+            --description "Salesforce Backup Tool" `
+            --type msi `
+            --win-menu `
+            --win-shortcut `
+            --win-dir-chooser `
+            --dest packaging/output
+        shell: powershell
+
+      - name: Build Windows Portable (EXE with bundled JRE)
+        run: |
+          jpackage `
+            --input packaging/input `
+            --main-jar BackupForce.jar `
+            --name BackupForce `
+            --app-version ${{ needs.build-jar.outputs.version }} `
+            --vendor "Victor Felisbino" `
+            --description "Salesforce Backup Tool" `
+            --type app-image `
+            --dest packaging/portable
+        shell: powershell
+
+      - name: Create Portable ZIP
+        run: |
+          cd packaging/portable
+          Compress-Archive -Path BackupForce -DestinationPath ../output/BackupForce-${{ needs.build-jar.outputs.version }}-windows-portable.zip
+        shell: powershell
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: packaging/output/
+          retention-days: 5
+
+  # Build macOS App
+  build-macos:
+    needs: build-jar
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-artifact
+          path: target/
+
+      - name: Create jpackage input directory
+        run: |
+          mkdir -p packaging/input
+          cp target/BackupForce.jar packaging/input/
+
+      - name: Build macOS App Bundle
+        run: |
+          jpackage \
+            --input packaging/input \
+            --main-jar BackupForce.jar \
+            --name BackupForce \
+            --app-version ${{ needs.build-jar.outputs.version }} \
+            --vendor "Victor Felisbino" \
+            --description "Salesforce Backup Tool" \
+            --type app-image \
+            --dest packaging/output
+
+      - name: Create macOS DMG
+        run: |
+          jpackage \
+            --input packaging/input \
+            --main-jar BackupForce.jar \
+            --name BackupForce \
+            --app-version ${{ needs.build-jar.outputs.version }} \
+            --vendor "Victor Felisbino" \
+            --description "Salesforce Backup Tool" \
+            --type dmg \
+            --dest packaging/output
+
+      - name: Create portable ZIP from app bundle
+        run: |
+          cd packaging/output
+          zip -r BackupForce-${{ needs.build-jar.outputs.version }}-macos-portable.zip BackupForce.app
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: |
+            packaging/output/*.dmg
+            packaging/output/*-macos-portable.zip
+          retention-days: 5
+
+  # Build Linux Packages
+  build-linux:
+    needs: build-jar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot rpm
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-artifact
+          path: target/
+
+      - name: Create jpackage input directory
+        run: |
+          mkdir -p packaging/input
+          cp target/BackupForce.jar packaging/input/
+
+      - name: Build Linux DEB package
+        run: |
+          jpackage \
+            --input packaging/input \
+            --main-jar BackupForce.jar \
+            --name backupforce \
+            --app-version ${{ needs.build-jar.outputs.version }} \
+            --vendor "Victor Felisbino" \
+            --description "Salesforce Backup Tool" \
+            --type deb \
+            --linux-shortcut \
+            --linux-menu-group "Office" \
+            --dest packaging/output
+
+      - name: Build Linux RPM package
+        run: |
+          jpackage \
+            --input packaging/input \
+            --main-jar BackupForce.jar \
+            --name backupforce \
+            --app-version ${{ needs.build-jar.outputs.version }} \
+            --vendor "Victor Felisbino" \
+            --description "Salesforce Backup Tool" \
+            --type rpm \
+            --linux-shortcut \
+            --linux-menu-group "Office" \
+            --dest packaging/output
+
+      - name: Build Linux Portable (AppImage-like)
+        run: |
+          jpackage \
+            --input packaging/input \
+            --main-jar BackupForce.jar \
+            --name BackupForce \
+            --app-version ${{ needs.build-jar.outputs.version }} \
+            --vendor "Victor Felisbino" \
+            --description "Salesforce Backup Tool" \
+            --type app-image \
+            --dest packaging/portable
+
+      - name: Create portable tarball
+        run: |
+          cd packaging/portable
+          tar -czvf ../output/BackupForce-${{ needs.build-jar.outputs.version }}-linux-portable.tar.gz BackupForce
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: packaging/output/
+          retention-days: 5
+
+  # Create GitHub Release
+  create-release:
+    needs: [build-jar, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Display artifacts
+        run: find artifacts/ -type f -ls
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: BackupForce v${{ needs.build-jar.outputs.version }}
+          body: |
+            ## BackupForce v${{ needs.build-jar.outputs.version }}
+            
+            ### Downloads
+            
+            | Platform | Installer | Portable |
+            |----------|-----------|----------|
+            | **Windows** | `.msi` installer | `.zip` (no install needed) |
+            | **macOS** | `.dmg` disk image | `.zip` (no install needed) |
+            | **Linux** | `.deb` (Debian/Ubuntu) / `.rpm` (RHEL/Fedora) | `.tar.gz` (no install needed) |
+            
+            ### Installation
+            
+            **Windows:** Download the `.msi` installer or extract the portable `.zip`
+            
+            **macOS:** Download the `.dmg`, open it, and drag BackupForce to Applications
+            
+            **Linux (Debian/Ubuntu):** `sudo dpkg -i backupforce_*.deb`
+            
+            **Linux (RHEL/Fedora):** `sudo rpm -i backupforce-*.rpm`
+            
+            **Portable:** Extract and run - includes bundled Java runtime
+            
+            ### Cross-Platform JAR
+            
+            If you have Java 21+ installed, you can also run:
+            ```bash
+            java -jar BackupForce.jar
+            ```
+          files: |
+            artifacts/jar-artifact/BackupForce.jar
+            artifacts/windows-artifacts/*
+            artifacts/macos-artifacts/*
+            artifacts/linux-artifacts/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -65,6 +65,7 @@ public class BackupController {
     @FXML private TableColumn<SObjectItem, Boolean> allSelectColumn;
     @FXML private TableColumn<SObjectItem, String> allNameColumn;
     @FXML private TableColumn<SObjectItem, String> allLabelColumn;
+    @FXML private TableColumn<SObjectItem, Void> allFieldsColumn;
     @FXML private TableColumn<SObjectItem, String> allStatusColumn;
     
     // All Objects Status Tab (during backup)
@@ -115,7 +116,6 @@ public class BackupController {
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
     @FXML private Button deselectAllButton;
-    @FXML private Button configureFieldsButton;
     @FXML private Button startBackupButton;
     @FXML private Button stopBackupButton;
     @FXML private Button exportResultsButton;
@@ -229,6 +229,76 @@ public class BackupController {
         allNameColumn.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
         allLabelColumn.setCellValueFactory(cellData -> cellData.getValue().labelProperty());
         allStatusColumn.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        // Fields column - gear icon button for each row
+        allFieldsColumn.setCellFactory(column -> new TableCell<SObjectItem, Void>() {
+            private final Button gearButton = new Button("⚙");
+            private final Tooltip tooltip = new Tooltip();
+            
+            {
+                // Style the gear button with high visibility
+                gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #adb5bd; " +
+                    "-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 4; -fx-cursor: hand;");
+                gearButton.setTooltip(tooltip);
+                tooltip.setShowDelay(javafx.util.Duration.millis(200));
+                
+                gearButton.setOnAction(e -> {
+                    SObjectItem item = getTableRow().getItem();
+                    if (item != null) {
+                        openFieldSelectionDialog(item);
+                    }
+                });
+                
+                // Hover effect
+                gearButton.setOnMouseEntered(e -> {
+                    SObjectItem item = getTableRow().getItem();
+                    if (item != null && item.hasCustomFieldSelection()) {
+                        gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #4caf50; " +
+                            "-fx-background-color: rgba(76,175,80,0.3); -fx-background-radius: 4; -fx-cursor: hand;");
+                    } else {
+                        gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #fff; " +
+                            "-fx-background-color: rgba(255,255,255,0.2); -fx-background-radius: 4; -fx-cursor: hand;");
+                    }
+                });
+                gearButton.setOnMouseExited(e -> {
+                    SObjectItem item = getTableRow().getItem();
+                    if (item != null && item.hasCustomFieldSelection()) {
+                        gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #4caf50; " +
+                            "-fx-background-color: rgba(76,175,80,0.15); -fx-background-radius: 4; -fx-cursor: hand;");
+                    } else {
+                        gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #adb5bd; " +
+                            "-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 4; -fx-cursor: hand;");
+                    }
+                });
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    SObjectItem sObjectItem = getTableRow().getItem();
+                    if (sObjectItem != null) {
+                        // Highlight if custom fields are configured
+                        if (sObjectItem.hasCustomFieldSelection()) {
+                            gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #4caf50; " +
+                                "-fx-background-color: rgba(76,175,80,0.15); -fx-background-radius: 4; -fx-cursor: hand;");
+                            tooltip.setText("✓ Custom fields configured\n" + sObjectItem.getFieldSelectionInfo() + 
+                                "\n\nClick to modify field selection");
+                        } else {
+                            gearButton.setStyle("-fx-padding: 4 10; -fx-font-size: 18px; -fx-text-fill: #adb5bd; " +
+                                "-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 4; -fx-cursor: hand;");
+                            tooltip.setText("Configure which fields to backup\n(Currently: All fields)");
+                        }
+                        setGraphic(gearButton);
+                        setAlignment(javafx.geometry.Pos.CENTER);
+                    } else {
+                        setGraphic(null);
+                    }
+                }
+            }
+        });
         
         // Color coding for status
         allStatusColumn.setCellFactory(column -> new TableCell<SObjectItem, String>() {
@@ -472,43 +542,71 @@ public class BackupController {
     }
     
     private void applyConnection(SavedConnection connection) {
-        logger.info("Validating connection: {}", connection.getName());
+        logger.info("Applying connection: {} (ID: {})", connection.getName(), connection.getId());
         
         // Show testing indicator
         connectionInfoBox.setVisible(true);
         connectionInfoBox.setManaged(true);
         connectionTypeLabel.setText(connection.getType());
-        connectionDetailsLabel.setText("Testing connection...");
+        connectionDetailsLabel.setText("Checking session...");
         connectionStatusIcon.setText("○");
         connectionStatusIcon.setStyle("-fx-font-size: 18px; -fx-text-fill: #888;");
         
+        // Check for cached session first (avoids re-authentication for SSO)
+        logger.debug("Checking for cached session with ID: {}", connection.getId());
+        ConnectionManager.CachedSession cachedSession = ConnectionManager.getInstance().getCachedSession(connection.getId());
+        if (cachedSession != null) {
+            logger.info("Found cached session for connection: {} (ID: {})", connection.getName(), connection.getId());
+            // Verify the cached connection is still valid
+            try {
+                if (cachedSession.getConnection().isValid(5)) {
+                    logger.info("Cached session is valid - using it for: {}", connection.getName());
+                    applyValidatedConnection(connection);
+                    return;
+                } else {
+                    logger.info("Cached session connection is closed/invalid for: {}", connection.getName());
+                    ConnectionManager.getInstance().invalidateSession(connection.getId());
+                }
+            } catch (Exception e) {
+                logger.warn("Error checking cached session validity: {}", e.getMessage());
+                ConnectionManager.getInstance().invalidateSession(connection.getId());
+            }
+        } else {
+            logger.info("No cached session found for connection: {} (ID: {})", connection.getName(), connection.getId());
+        }
+        
+        // Update status
+        connectionDetailsLabel.setText("Authenticating...");
+        
         // Validate the connection in background
-        Task<Boolean> validateTask = new Task<>() {
+        Task<java.sql.Connection> validateTask = new Task<>() {
             @Override
-            protected Boolean call() throws Exception {
+            protected java.sql.Connection call() throws Exception {
                 String jdbcUrl = buildJdbcUrl(connection);
-                logger.info("Testing JDBC URL: {}", jdbcUrl.replaceAll("password=[^&]*", "password=***"));
+                logger.info("Connecting with JDBC URL: {}", jdbcUrl.replaceAll("password=[^&]*", "password=***"));
                 String username = connection.isUseSso() ? "" : connection.getUsername();
                 String password = connection.isUseSso() ? "" : ConnectionManager.getInstance().getDecryptedPassword(connection);
                 
-                try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
-                    boolean valid = conn.isValid(10);
-                    logger.info("Connection validation result: {}", valid);
-                    return valid;
+                java.sql.Connection conn = java.sql.DriverManager.getConnection(jdbcUrl, username, password);
+                if (conn.isValid(10)) {
+                    return conn;
+                } else {
+                    conn.close();
+                    throw new Exception("Connection validation failed");
                 }
             }
         };
         
         validateTask.setOnSucceeded(e -> {
-            if (validateTask.getValue()) {
-                logger.info("Connection validated successfully: {}", connection.getName());
-                // Connection is valid - apply it
-                applyValidatedConnection(connection);
-            } else {
-                logger.warn("Connection validation failed: {}", connection.getName());
-                // Connection failed validation
-                showConnectionError(connection, "Connection validation failed");
-            }
+            java.sql.Connection conn = validateTask.getValue();
+            logger.info("Connection authenticated successfully: {}", connection.getName());
+            
+            // Cache the session for future use
+            ConnectionManager.getInstance().cacheSession(connection.getId(), conn);
+            logger.info("Session cached for connection: {} (ID: {})", connection.getName(), connection.getId());
+            
+            // Connection is valid - apply it
+            applyValidatedConnection(connection);
         });
         
         validateTask.setOnFailed(e -> {
@@ -1036,52 +1134,6 @@ public class BackupController {
             filteredObjects.forEach(item -> item.setSelected(false));
             allObjectsTable.refresh();
             updateSelectionCount();
-        }
-    }
-    
-    @FXML
-    private void handleConfigureFields() {
-        List<SObjectItem> selectedItems = allObjects.stream()
-            .filter(SObjectItem::isSelected)
-            .collect(Collectors.toList());
-        
-        if (selectedItems.isEmpty()) {
-            showError("Please select at least one object to configure fields for");
-            return;
-        }
-        
-        if (selectedItems.size() == 1) {
-            // Single object - show field selection dialog
-            SObjectItem item = selectedItems.get(0);
-            openFieldSelectionDialog(item);
-        } else {
-            // Multiple objects - ask what to do
-            Alert choice = new Alert(Alert.AlertType.CONFIRMATION);
-            choice.setTitle("Configure Fields");
-            choice.setHeaderText("Multiple objects selected (" + selectedItems.size() + ")");
-            choice.setContentText("Would you like to configure fields for each object individually, " +
-                "or reset all to backup all fields?");
-            
-            ButtonType configureEach = new ButtonType("Configure Each");
-            ButtonType resetAll = new ButtonType("Reset to All Fields");
-            ButtonType cancel = ButtonType.CANCEL;
-            
-            choice.getButtonTypes().setAll(configureEach, resetAll, cancel);
-            
-            Optional<ButtonType> result = choice.showAndWait();
-            if (result.isPresent()) {
-                if (result.get() == configureEach) {
-                    // Configure each object one by one
-                    for (SObjectItem item : selectedItems) {
-                        openFieldSelectionDialog(item);
-                    }
-                } else if (result.get() == resetAll) {
-                    // Reset all selected objects to backup all fields
-                    selectedItems.forEach(item -> item.setSelectedFields(null));
-                    allObjectsTable.refresh();
-                    logMessage("Reset field selection to 'All Fields' for " + selectedItems.size() + " objects");
-                }
-            }
         }
     }
     
