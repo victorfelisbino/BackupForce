@@ -87,6 +87,8 @@ public class RelationshipManager {
             boolean isUnique = field.has("unique") && field.get("unique").getAsBoolean();
             boolean isNameField = field.has("nameField") && field.get("nameField").getAsBoolean();
             boolean isNillable = field.has("nillable") && field.get("nillable").getAsBoolean();
+            boolean isCreateable = field.has("createable") && field.get("createable").getAsBoolean();
+            int length = field.has("length") ? field.get("length").getAsInt() : 0;
             
             FieldInfo fieldInfo = new FieldInfo(fieldName, fieldType, label);
             fieldInfo.setExternalId(isExternalId);
@@ -94,6 +96,8 @@ public class RelationshipManager {
             fieldInfo.setUnique(isUnique);
             fieldInfo.setNameField(isNameField);
             fieldInfo.setNillable(isNillable);
+            fieldInfo.setCreateable(isCreateable);
+            fieldInfo.setLength(length);
             // Required means the field is NOT nillable
             fieldInfo.setRequired(!isNillable);
             
@@ -327,6 +331,8 @@ public class RelationshipManager {
         private boolean nameField;
         private boolean required;
         private boolean nillable;
+        private boolean createable;
+        private int length;
         
         public FieldInfo(String name, String type, String label) {
             this.name = name;
@@ -343,6 +349,8 @@ public class RelationshipManager {
         public boolean isNameField() { return nameField; }
         public boolean isRequired() { return required; }
         public boolean isNillable() { return nillable; }
+        public boolean isCreateable() { return createable; }
+        public int getLength() { return length; }
         
         public void setExternalId(boolean v) { this.externalId = v; }
         public void setIdLookup(boolean v) { this.idLookup = v; }
@@ -350,6 +358,8 @@ public class RelationshipManager {
         public void setNameField(boolean v) { this.nameField = v; }
         public void setRequired(boolean v) { this.required = v; }
         public void setNillable(boolean v) { this.nillable = v; }
+        public void setCreateable(boolean v) { this.createable = v; }
+        public void setLength(int v) { this.length = v; }
     }
     
     public static class RelationshipField {

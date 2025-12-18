@@ -107,6 +107,33 @@ public class RestoreExecutor {
         log(objectName + ": Read " + records.size() + " records from CSV");
         result.setTotalRecords(records.size());
         
+        // Validate records against target org schema if enabled
+        if (effectiveOptions.isValidateBeforeRestore()) {
+            log(objectName + ": Validating fields against target org schema...");
+            FieldValidator validator = new FieldValidator(accessToken, instanceUrl);
+            FieldValidator.ValidationResult validation = validator.validateRecords(objectName, records);
+            
+            if (validation.hasErrors()) {
+                log(objectName + ": " + validation.getSummary());
+                for (String error : validation.getErrors()) {
+                    log("  ❌ " + error);
+                    result.addError(error);
+                }
+                if (effectiveOptions.isStopOnError()) {
+                    log(objectName + ": Stopping restore due to validation errors");
+                    return result;
+                }
+            }
+            if (validation.hasWarnings()) {
+                for (String warning : validation.getWarnings()) {
+                    log("  ⚠️ " + warning);
+                }
+            }
+            if (validation.isValid()) {
+                log(objectName + ": ✓ Validation passed");
+            }
+        }
+        
         // Resolve relationships if enabled
         if (effectiveOptions.isResolveRelationships()) {
             log(objectName + ": Resolving relationship references...");

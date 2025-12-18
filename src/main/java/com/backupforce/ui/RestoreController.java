@@ -194,13 +194,14 @@ public class RestoreController {
                 // Query Salesforce for external ID fields on this object
                 try {
                     RelationshipManager relManager = new RelationshipManager(
-                        connectionInfo.getAccessToken(),
-                        connectionInfo.getInstanceUrl()
+                        connectionInfo.getInstanceUrl(),
+                        connectionInfo.getSessionId(),
+                        "v59.0"
                     );
-                    List<RelationshipManager.FieldInfo> fields = relManager.getFieldsForObject(objectName);
+                    RelationshipManager.ObjectMetadata metadata = relManager.describeObject(objectName);
                     
-                    for (RelationshipManager.FieldInfo field : fields) {
-                        if (field.isExternalId()) {
+                    for (RelationshipManager.FieldInfo field : metadata.getExternalIdFields()) {
+                        if (!field.getName().equals("Id")) {
                             externalIdFields.add(field.getName());
                         }
                     }
