@@ -75,6 +75,7 @@ public class RestoreController {
     @FXML private RadioButton upsertRadio;
     @FXML private RadioButton updateOnlyRadio;
     @FXML private ToggleGroup restoreModeToggle;
+    @FXML private ComboBox<String> externalIdFieldCombo;
     @FXML private CheckBox validateBeforeRestoreCheck;
     @FXML private CheckBox stopOnErrorCheck;
     @FXML private CheckBox preserveIdsCheck;
@@ -138,6 +139,22 @@ public class RestoreController {
         batchSizeCombo.setItems(FXCollections.observableArrayList(50, 100, 200, 500, 1000, 2000));
         batchSizeCombo.setValue(200);
         
+        // Setup external ID field combo - enable only when upsert mode is selected
+        restoreModeToggle.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            boolean isUpsert = upsertRadio.isSelected();
+            externalIdFieldCombo.setDisable(!isUpsert);
+            if (!isUpsert) {
+                externalIdFieldCombo.getSelectionModel().clearSelection();
+            }
+        });
+        
+        // Populate external ID fields when object is selected
+        objectsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && connectionInfo != null) {
+                loadExternalIdFieldsForObject(newVal.getName());
+            }
+        });
+        
         logMessage("Data Restoration screen ready");
     }
     
@@ -156,6 +173,69 @@ public class RestoreController {
         lastBackupColumn.setCellValueFactory(cellData -> cellData.getValue().lastBackupProperty());
         
         objectsTable.setEditable(true);
+    }
+    
+    /**
+     * Loads external ID fields for the selected object from Salesforce metadata.
+     * External ID fields can be used for upsert operations to match existing records.
+     */
+    private void loadExternalIdFieldsForObject(String objectName) {
+        externalIdFieldCombo.getItems().clear();
+        externalIdFieldCombo.setPromptText("Loading...");
+        
+        Task<List<String>> loadTask = new Task<>() {
+            @Override
+            protected List<String> call() throws Exception {
+                List<String> externalIdFields = new ArrayList<>();
+                
+                // Always include Id as an option (for preserve IDs scenario)
+                externalIdFields.add("Id");
+                
+                // Query Salesforce for external ID fields on this object
+                try {
+                    RelationshipManager relManager = new RelationshipManager(
+                        connectionInfo.getAccessToken(),
+                        connectionInfo.getInstanceUrl()
+                    );
+                    List<RelationshipManager.FieldInfo> fields = relManager.getFieldsForObject(objectName);
+                    
+                    for (RelationshipManager.FieldInfo field : fields) {
+                        if (field.isExternalId()) {
+                            externalIdFields.add(field.getName());
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to load external ID fields for {}: {}", objectName, e.getMessage());
+                }
+                
+                return externalIdFields;
+            }
+        };
+        
+        loadTask.setOnSucceeded(event -> {
+            List<String> fields = loadTask.getValue();
+            externalIdFieldCombo.getItems().setAll(fields);
+            if (!fields.isEmpty()) {
+                externalIdFieldCombo.setValue(fields.get(0)); // Default to Id
+            }
+            externalIdFieldCombo.setPromptText("Select field");
+        });
+        
+        loadTask.setOnFailed(event -> {
+            logger.error("Failed to load external ID fields", loadTask.getException());
+            externalIdFieldCombo.getItems().add("Id");
+            externalIdFieldCombo.setValue("Id");
+            externalIdFieldCombo.setPromptText("Select field");
+        });
+        
+        executorService().submit(loadTask);
+    }
+    
+    private ExecutorService executorService() {
+        if (executorService == null || executorService.isShutdown()) {
+            executorService = Executors.newCachedThreadPool();
+        }
+        return executorService;
     }
     
     private void loadDatabaseConnections() {
@@ -489,6 +569,12 @@ public class RestoreController {
         options.setValidateBeforeRestore(validateBeforeRestoreCheck.isSelected());
         options.setResolveRelationships(true); // Always resolve relationships
         options.setPreserveIds(preserveIdsCheck.isSelected());
+        
+        // Set external ID field for upsert operations
+        if (upsertRadio.isSelected() && externalIdFieldCombo.getValue() != null) {
+            options.setExternalIdField(externalIdFieldCombo.getValue());
+            logMessage("Using external ID field: " + externalIdFieldCombo.getValue());
+        }
         
         if (preserveIdsCheck.isSelected()) {
             logMessage("Preserve IDs enabled - will attempt to use original Salesforce IDs");

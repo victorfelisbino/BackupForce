@@ -115,6 +115,11 @@
                             <RadioButton fx:id="upsertRadio" text="Upsert (insert or update)" 
                                         toggleGroup="$restoreModeToggle"
                                         style="-fx-text-fill: #e8e8e8;"/>
+                            <HBox spacing="8" alignment="CENTER_LEFT" style="-fx-padding: 0 0 0 20;">
+                                <Label text="External ID Field:" style="-fx-text-fill: #adb5bd; -fx-font-size: 11px;"/>
+                                <ComboBox fx:id="externalIdFieldCombo" prefWidth="150" styleClass="modern-combo-box" 
+                                         disable="true" promptText="Select field"/>
+                            </HBox>
                             <RadioButton fx:id="updateOnlyRadio" text="Update Only (existing records)" 
                                         toggleGroup="$restoreModeToggle"
                                         style="-fx-text-fill: #e8e8e8;"/>
