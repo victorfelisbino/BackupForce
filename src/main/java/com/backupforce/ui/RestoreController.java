@@ -488,6 +488,11 @@ public class RestoreController {
         options.setStopOnError(stopOnErrorCheck.isSelected());
         options.setValidateBeforeRestore(validateBeforeRestoreCheck.isSelected());
         options.setResolveRelationships(true); // Always resolve relationships
+        options.setPreserveIds(preserveIdsCheck.isSelected());
+        
+        if (preserveIdsCheck.isSelected()) {
+            logMessage("Preserve IDs enabled - will attempt to use original Salesforce IDs");
+        }
         
         // Order objects by dependency (parents first)
         logMessage("Analyzing object dependencies...");

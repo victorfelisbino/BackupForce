@@ -79,7 +79,22 @@ public class RestoreExecutor {
     public RestoreResult restoreFromCsv(String objectName, Path csvPath, RestoreMode mode, 
                                          RestoreOptions options) throws IOException, ParseException {
         
-        log("Starting restore for " + objectName + " in " + mode + " mode");
+        // Handle preserve IDs option - force upsert with Id as external ID
+        RestoreMode effectiveMode = mode;
+        RestoreOptions effectiveOptions = options;
+        if (options.isPreserveIds() && mode == RestoreMode.INSERT) {
+            log("Preserve IDs enabled - switching to UPSERT mode with Id as external ID");
+            effectiveMode = RestoreMode.UPSERT;
+            effectiveOptions = new RestoreOptions();
+            effectiveOptions.setBatchSize(options.getBatchSize());
+            effectiveOptions.setStopOnError(options.isStopOnError());
+            effectiveOptions.setValidateBeforeRestore(options.isValidateBeforeRestore());
+            effectiveOptions.setResolveRelationships(options.isResolveRelationships());
+            effectiveOptions.setPreserveIds(true);
+            effectiveOptions.setExternalIdField("Id"); // Use Salesforce Id as external ID
+        }
+        
+        log("Starting restore for " + objectName + " in " + effectiveMode + " mode");
         RestoreResult result = new RestoreResult(objectName);
         
         // Read and parse CSV
@@ -93,7 +108,7 @@ public class RestoreExecutor {
         result.setTotalRecords(records.size());
         
         // Resolve relationships if enabled
-        if (options.isResolveRelationships()) {
+        if (effectiveOptions.isResolveRelationships()) {
             log(objectName + ": Resolving relationship references...");
             records = relationshipResolver.resolveRelationships(objectName, records);
         }
@@ -103,8 +118,8 @@ public class RestoreExecutor {
         
         // Determine external ID field for upsert
         String externalIdField = null;
-        if (mode == RestoreMode.UPSERT) {
-            externalIdField = determineExternalIdField(metadata, options);
+        if (effectiveMode == RestoreMode.UPSERT) {
+            externalIdField = determineExternalIdField(metadata, effectiveOptions);
             if (externalIdField == null) {
                 throw new IOException("No external ID field found for upsert on " + objectName);
             }
@@ -112,7 +127,7 @@ public class RestoreExecutor {
         }
         
         // Process records in batches
-        int batchSize = options.getBatchSize();
+        int batchSize = effectiveOptions.getBatchSize();
         int totalBatches = (int) Math.ceil((double) records.size() / batchSize);
         
         for (int batchNum = 0; batchNum < totalBatches && !cancelled.get(); batchNum++) {
@@ -124,12 +139,12 @@ public class RestoreExecutor {
                 objectName, batchNum + 1, totalBatches, batch.size()));
             
             try {
-                BatchResult batchResult = processBatch(objectName, batch, mode, externalIdField, options);
+                BatchResult batchResult = processBatch(objectName, batch, effectiveMode, externalIdField, effectiveOptions);
                 result.addBatchResult(batchResult);
                 
                 updateProgress(objectName, end, records.size(), result);
                 
-                if (!batchResult.isSuccess() && options.isStopOnError()) {
+                if (!batchResult.isSuccess() && effectiveOptions.isStopOnError()) {
                     log(objectName + ": Stopping due to errors");
                     break;
                 }
@@ -139,7 +154,7 @@ public class RestoreExecutor {
                 log(objectName + ": Batch error - " + e.getMessage());
                 result.addError("Batch " + (batchNum + 1) + ": " + e.getMessage());
                 
-                if (options.isStopOnError()) {
+                if (effectiveOptions.isStopOnError()) {
                     break;
                 }
             }
