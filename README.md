@@ -2,7 +2,7 @@
 
 [![Download](https://img.shields.io/github/v/release/victorfelisbino/BackupForce?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases/latest)
 [![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
 
 A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a modern Windows 11 dark theme UI.
 
@@ -12,11 +12,20 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ## 🚀 Quick Download
 
-**[⬇️ Download BackupForce v2.0.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
+**[⬇️ Download BackupForce v2.2.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
 
-1. Download `BackupForce-2.0.0-portable.zip`
-2. Extract to any folder
-3. Run `BackupForce.exe`
+### Windows
+- `BackupForce-2.2.0.msi` - Installer
+- `BackupForce-2.2.0-portable.zip` - Portable
+
+### macOS
+- `BackupForce-2.2.0.dmg` - Disk Image
+- `BackupForce-2.2.0-macos.zip` - Portable
+
+### Linux
+- `BackupForce-2.2.0.deb` - Debian/Ubuntu
+- `BackupForce-2.2.0.rpm` - Fedora/RHEL
+- `BackupForce-2.2.0-linux.tar.gz` - Universal
 
 **No Java installation required** - runtime is bundled!
 
@@ -26,21 +35,23 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ### Data Export
 - **Bulk API v2** - Fast, efficient data extraction for millions of records
+- **Field Selection** - Choose exactly which fields to export for each object
 - **Blob Downloads** - Automatically downloads Attachment.Body, ContentVersion.VersionData, Document.Body
 - **Record Limits** - Test exports with a limited number of records
 - **Multi-threaded** - Parallel processing for faster backups
 
 ### Database Support
-| Database | Blob Storage | Status |
-|----------|-------------|--------|
-| **Snowflake** | BINARY(8MB) | ✅ Recommended |
-| **PostgreSQL** | BYTEA | ✅ Supported |
-| **SQL Server** | VARBINARY(MAX) | ✅ Supported |
-| **CSV Files** | File + Path column | ✅ Supported |
+| Database | Blob Storage | SSO Support | Status |
+|----------|-------------|-------------|--------|
+| **Snowflake** | BINARY(8MB) | ✅ Externalbrowser | ✅ Recommended |
+| **PostgreSQL** | BYTEA | — | ✅ Supported |
+| **SQL Server** | VARBINARY(MAX) | — | ✅ Supported |
+| **CSV Files** | File + Path column | — | ✅ Supported |
 
 ### User Experience
 - **Windows 11 Dark Theme** - Modern Fluent Design UI
 - **OAuth Authentication** - Secure Salesforce login
+- **Session Caching** - SSO sessions cached for 30 minutes (no repeated browser popups)
 - **Object Selection** - Search and filter 2500+ objects
 - **Progress Tracking** - Real-time progress and logging
 - **Memory Monitoring** - Automatic warnings for large objects
@@ -49,23 +60,28 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ## 📋 Requirements
 
-### For Running (Portable .exe)
-- Windows 10/11
+### For Running (Pre-built Releases)
+- **Windows**: Windows 10/11
+- **macOS**: macOS 11+ (Big Sur or later)
+- **Linux**: Ubuntu 20.04+, Debian 10+, Fedora 36+, RHEL 8+
 - No additional software needed!
 
 ### For Building from Source
-- Java 11+
-- Maven 3.6+
+- Java 21+
+- Maven 3.9+
 
 ---
 
 ## 🔧 Installation
 
-### Option 1: Portable Executable (Recommended)
+### Option 1: Download Pre-built (Recommended)
 
-1. **Download** the latest release from [Releases](https://github.com/victorfelisbino/BackupForce/releases)
-2. **Extract** `BackupForce-2.0.0-portable.zip` to any folder
-3. **Run** `BackupForce.exe`
+1. **Download** the latest release for your platform from [Releases](https://github.com/victorfelisbino/BackupForce/releases)
+2. **Install or Extract**:
+   - **Windows**: Run `.msi` installer or extract portable `.zip`
+   - **macOS**: Mount `.dmg` and drag to Applications
+   - **Linux**: Install `.deb`/`.rpm` or extract `.tar.gz`
+3. **Run** BackupForce
 
 ### Option 2: Build from Source
 
