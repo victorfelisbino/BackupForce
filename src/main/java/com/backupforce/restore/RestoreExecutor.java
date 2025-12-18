@@ -39,6 +39,7 @@ public class RestoreExecutor {
     private final String apiVersion;
     private final CloseableHttpClient httpClient;
     private final RelationshipManager relationshipManager;
+    private final RelationshipResolver relationshipResolver;
     
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private Consumer<RestoreProgress> progressCallback;
@@ -56,6 +57,7 @@ public class RestoreExecutor {
         this.apiVersion = apiVersion;
         this.httpClient = HttpClients.createDefault();
         this.relationshipManager = new RelationshipManager(instanceUrl, accessToken, apiVersion);
+        this.relationshipResolver = new RelationshipResolver(instanceUrl, accessToken, apiVersion);
     }
     
     public void setProgressCallback(Consumer<RestoreProgress> callback) {
@@ -64,6 +66,7 @@ public class RestoreExecutor {
     
     public void setLogCallback(Consumer<String> callback) {
         this.logCallback = callback;
+        this.relationshipResolver.setLogCallback(callback);
     }
     
     public void cancel() {
@@ -88,6 +91,12 @@ public class RestoreExecutor {
         
         log(objectName + ": Read " + records.size() + " records from CSV");
         result.setTotalRecords(records.size());
+        
+        // Resolve relationships if enabled
+        if (options.isResolveRelationships()) {
+            log(objectName + ": Resolving relationship references...");
+            records = relationshipResolver.resolveRelationships(objectName, records);
+        }
         
         // Get object metadata for field validation
         RelationshipManager.ObjectMetadata metadata = relationshipManager.describeObject(objectName);
@@ -738,6 +747,8 @@ public class RestoreExecutor {
         private int batchSize = 200;
         private boolean stopOnError = false;
         private boolean validateBeforeRestore = true;
+        private boolean resolveRelationships = true;
+        private boolean preserveIds = false;
         private String externalIdField;
         
         public int getBatchSize() { return batchSize; }
@@ -746,6 +757,10 @@ public class RestoreExecutor {
         public void setStopOnError(boolean stop) { this.stopOnError = stop; }
         public boolean isValidateBeforeRestore() { return validateBeforeRestore; }
         public void setValidateBeforeRestore(boolean validate) { this.validateBeforeRestore = validate; }
+        public boolean isResolveRelationships() { return resolveRelationships; }
+        public void setResolveRelationships(boolean resolve) { this.resolveRelationships = resolve; }
+        public boolean isPreserveIds() { return preserveIds; }
+        public void setPreserveIds(boolean preserve) { this.preserveIds = preserve; }
         public String getExternalIdField() { return externalIdField; }
         public void setExternalIdField(String field) { this.externalIdField = field; }
     }
