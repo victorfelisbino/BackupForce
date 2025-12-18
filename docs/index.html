@@ -299,7 +299,11 @@
                     <p>Parallel processing for faster backups. Export multiple objects simultaneously.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>💻 Cross-Platform</h3>
+                    <h3>� Data Restore</h3>
+                    <p>Restore backed-up data back to Salesforce using Bulk API v2. Supports insert, update, and upsert operations.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>�💻 Cross-Platform</h3>
                     <p>Native installers for Windows, macOS, and Linux. No Java installation required.</p>
                 </div>
                 <div class="feature-card">
@@ -360,6 +364,62 @@
                     <h4>Start Backup</h4>
                     <p>Click Start and watch your data export to CSV or your database.</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap Section -->
+    <section class="roadmap" style="padding: 80px 20px;">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 20px;">🗺️ Roadmap</h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 60px;">Track our progress on upcoming features</p>
+            <div style="max-width: 900px; margin: 0 auto;">
+                <div style="display: grid; gap: 20px;">
+                    <!-- Completed -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--success); border-radius: 12px; padding: 25px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <span style="background: var(--success); color: var(--bg-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">COMPLETE</span>
+                            <h3 style="margin: 0;">Backup Features</h3>
+                        </div>
+                        <ul style="color: var(--text-secondary); margin-left: 20px;">
+                            <li>✅ Bulk API v2 backup for millions of records</li>
+                            <li>✅ Database export (Snowflake, PostgreSQL, SQL Server)</li>
+                            <li>✅ Blob/Attachment downloads</li>
+                            <li>✅ Field selection and filtering</li>
+                        </ul>
+                    </div>
+                    <!-- In Progress -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--accent); border-radius: 12px; padding: 25px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <span style="background: var(--accent); color: var(--bg-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">IN PROGRESS</span>
+                            <h3 style="margin: 0;">Data Restoration</h3>
+                        </div>
+                        <ul style="color: var(--text-secondary); margin-left: 20px;">
+                            <li>✅ Core restore with Bulk API v2</li>
+                            <li>✅ Insert/Update/Upsert operations</li>
+                            <li>🔄 Database source scanning</li>
+                            <li>🔄 Relationship resolution</li>
+                            <li>⏳ Dependency ordering</li>
+                            <li>⏳ Dry run / preview mode</li>
+                        </ul>
+                    </div>
+                    <!-- Planned -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">PLANNED</span>
+                            <h3 style="margin: 0;">Future Enhancements</h3>
+                        </div>
+                        <ul style="color: var(--text-secondary); margin-left: 20px;">
+                            <li>⏳ Rollback on failure</li>
+                            <li>⏳ Field mapping and validation</li>
+                            <li>⏳ Preserve original Salesforce IDs</li>
+                            <li>⏳ Scheduled backups</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="text-align: center; margin-top: 30px;">
+                    <a href="ROADMAP.md" style="color: var(--accent); text-decoration: none;">View full roadmap →</a>
+                </p>
             </div>
         </div>
     </section>

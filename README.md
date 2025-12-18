@@ -48,6 +48,13 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 | **SQL Server** | VARBINARY(MAX) | — | ✅ Supported |
 | **CSV Files** | File + Path column | — | ✅ Supported |
 
+### Data Restore (NEW!)
+- **Bulk API v2 Restore** - Efficiently restore millions of records back to Salesforce
+- **Insert/Update/Upsert** - Choose the right operation for your data
+- **CSV Source** - Restore from backup CSV files
+- **Relationship Resolution** - Automatically resolve lookup references (coming soon)
+- **Dependency Ordering** - Restore parent objects before children (coming soon)
+
 ### User Experience
 - **Windows 11 Dark Theme** - Modern Fluent Design UI
 - **OAuth Authentication** - Secure Salesforce login
@@ -55,6 +62,23 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 - **Object Selection** - Search and filter 2500+ objects
 - **Progress Tracking** - Real-time progress and logging
 - **Memory Monitoring** - Automatic warnings for large objects
+
+---
+
+## 🗺️ Roadmap
+
+See the full [Development Roadmap](docs/ROADMAP.md) for upcoming features.
+
+| Feature | Status |
+|---------|--------|
+| Bulk API v2 Backup | ✅ Complete |
+| Database Export | ✅ Complete |
+| Blob/Attachment Download | ✅ Complete |
+| **Data Restoration** | 🔄 In Progress |
+| └─ Core Restore | ✅ Complete |
+| └─ Database Source | ⏳ Planned |
+| └─ Relationship Resolution | ⏳ Planned |
+| └─ Dry Run Mode | ⏳ Planned |
 
 ---
 
