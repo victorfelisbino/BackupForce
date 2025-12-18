@@ -258,7 +258,7 @@
     <section class="hero">
         <div class="container">
             <h1>BackupForce</h1>
-            <p>The easiest way to backup your Salesforce data. Export to CSV, Snowflake, PostgreSQL, or SQL Server with just a few clicks.</p>
+            <p>The complete Salesforce backup & restore solution. Export to CSV or databases, restore with cross-org transformation, and migrate data between orgs with ease.</p>
             <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="download-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
@@ -368,6 +368,42 @@
         </div>
     </section>
 
+    <!-- Cross-Org Transformation Section -->
+    <section class="transform" style="background: var(--bg-secondary); padding: 80px 20px;">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 20px;">🌐 Cross-Org Data Transformation</h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 60px; max-width: 700px; margin-left: auto; margin-right: auto;">Migrating data between Salesforce orgs? BackupForce v2.3.0 handles the hard parts automatically.</p>
+            <div style="max-width: 1000px; margin: 0 auto;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px;">
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">🏷️ RecordType Mapping</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Automatically map RecordType IDs between source and target orgs. Different IDs? No problem.</p>
+                    </div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">👤 User/Owner Mapping</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Map Owner, CreatedBy, and LastModifiedBy fields to corresponding users in the target org.</p>
+                    </div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">📝 Picklist Mapping</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Handle picklist values that differ between orgs. Map old values to new values seamlessly.</p>
+                    </div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">📁 Field Mapping</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Rename fields, exclude fields, or add constant values. Full control over your data structure.</p>
+                    </div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">⚙️ Value Transformations</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">REGEX_REPLACE, PREFIX, SUFFIX, TRIM, UPPERCASE, LOWERCASE, CONSTANT, and LOOKUP transforms.</p>
+                    </div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <h4 style="color: var(--accent); margin-bottom: 12px;">🔍 Schema Comparison</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Compare backup metadata with target org schema. Detect mismatches before you restore.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Roadmap Section -->
     <section class="roadmap" style="padding: 80px 20px;">
         <div class="container">
@@ -407,14 +443,40 @@
                     <!-- Planned -->
                     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
                         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">PLANNED</span>
-                            <h3 style="margin: 0;">Future Enhancements</h3>
+                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">COMING SOON</span>
+                            <h3 style="margin: 0;">Phase 8: Duplicate Handling</h3>
                         </div>
                         <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>⏳ Duplicate record handling</li>
-                            <li>⏳ Related record creation</li>
+                            <li>⏳ Detect duplicates before insert using matching rules</li>
+                            <li>⏳ Skip, update, or merge duplicate records</li>
+                            <li>⏳ Custom duplicate detection fields</li>
+                            <li>⏳ Duplicate report generation</li>
+                        </ul>
+                    </div>
+                    <!-- Future -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">PLANNED</span>
+                            <h3 style="margin: 0;">Phase 9: Related Records</h3>
+                        </div>
+                        <ul style="color: var(--text-secondary); margin-left: 20px;">
+                            <li>⏳ Auto-create related records during import</li>
+                            <li>⏳ Import Account → auto-create Opportunity</li>
+                            <li>⏳ Template-based record creation</li>
+                            <li>⏳ Configurable field defaults</li>
+                        </ul>
+                    </div>
+                    <!-- Long-term -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">FUTURE</span>
+                            <h3 style="margin: 0;">Long-term Vision</h3>
+                        </div>
+                        <ul style="color: var(--text-secondary); margin-left: 20px;">
                             <li>⏳ Rollback on failure</li>
-                            <li>⏳ Scheduled backups</li>
+                            <li>⏳ Scheduled/automated backups</li>
+                            <li>⏳ Incremental backups</li>
+                            <li>⏳ Email notifications</li>
                         </ul>
                     </div>
                 </div>
