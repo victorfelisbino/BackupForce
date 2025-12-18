@@ -79,6 +79,7 @@ public class RestoreController {
     @FXML private CheckBox validateBeforeRestoreCheck;
     @FXML private CheckBox stopOnErrorCheck;
     @FXML private CheckBox preserveIdsCheck;
+    @FXML private CheckBox dryRunCheck;
     @FXML private ComboBox<Integer> batchSizeCombo;
     
     // Target org
@@ -570,11 +571,16 @@ public class RestoreController {
         options.setValidateBeforeRestore(validateBeforeRestoreCheck.isSelected());
         options.setResolveRelationships(true); // Always resolve relationships
         options.setPreserveIds(preserveIdsCheck.isSelected());
+        options.setDryRun(dryRunCheck.isSelected());
         
         // Set external ID field for upsert operations
         if (upsertRadio.isSelected() && externalIdFieldCombo.getValue() != null) {
             options.setExternalIdField(externalIdFieldCombo.getValue());
             logMessage("Using external ID field: " + externalIdFieldCombo.getValue());
+        }
+        
+        if (dryRunCheck.isSelected()) {
+            logMessage("🔍 DRY RUN MODE - No data will be modified in Salesforce");
         }
         
         if (preserveIdsCheck.isSelected()) {

@@ -153,6 +153,11 @@ public class RestoreExecutor {
             log(objectName + ": Using external ID field '" + externalIdField + "' for upsert");
         }
         
+        // Dry run mode - simulate processing without making actual changes
+        if (effectiveOptions.isDryRun()) {
+            return performDryRun(objectName, records, effectiveMode, externalIdField, metadata, result);
+        }
+        
         // Process records in batches
         int batchSize = effectiveOptions.getBatchSize();
         int totalBatches = (int) Math.ceil((double) records.size() / batchSize);
@@ -228,6 +233,150 @@ public class RestoreExecutor {
         result.setCompleted(!cancelled.get());
         log(String.format("%s: Restore completed. Success: %d, Failed: %d", 
             objectName, result.getSuccessCount(), result.getFailureCount()));
+        
+        return result;
+    }
+    
+    /**
+     * Performs a dry run - simulates the restore process without making actual changes.
+     * Validates data, shows what would be restored, and identifies potential issues.
+     */
+    private RestoreResult performDryRun(String objectName, List<Map<String, String>> records,
+                                        RestoreMode mode, String externalIdField,
+                                        RelationshipManager.ObjectMetadata metadata,
+                                        RestoreResult result) {
+        log("┌─────────────────────────────────────────────");
+        log("│ 🔍 DRY RUN PREVIEW for " + objectName);
+        log("├─────────────────────────────────────────────");
+        log("│ Mode: " + mode);
+        if (externalIdField != null) {
+            log("│ External ID Field: " + externalIdField);
+        }
+        log("│ Total Records: " + records.size());
+        log("├─────────────────────────────────────────────");
+        
+        // Analyze records
+        int validRecords = 0;
+        int recordsWithIssues = 0;
+        Set<String> fieldsToCreate = new LinkedHashSet<>();
+        Set<String> missingRequiredFields = new LinkedHashSet<>();
+        Map<String, Integer> fieldValueCounts = new LinkedHashMap<>();
+        
+        // Get metadata field names
+        Set<String> metadataFieldNames = new HashSet<>();
+        for (RelationshipManager.FieldInfo field : metadata.getFields()) {
+            metadataFieldNames.add(field.getName().toLowerCase());
+        }
+        
+        for (Map<String, String> record : records) {
+            boolean hasIssues = false;
+            
+            for (Map.Entry<String, String> entry : record.entrySet()) {
+                String fieldName = entry.getKey();
+                String value = entry.getValue();
+                
+                // Skip enrichment fields
+                if (fieldName.startsWith("_ref_")) continue;
+                
+                // Track fields not in metadata
+                if (!metadataFieldNames.contains(fieldName.toLowerCase()) && !fieldName.equals("Id")) {
+                    fieldsToCreate.add(fieldName);
+                }
+                
+                // Track non-empty field values
+                if (value != null && !value.isEmpty()) {
+                    fieldValueCounts.merge(fieldName, 1, Integer::sum);
+                }
+            }
+            
+            // Check for external ID value for upsert
+            if (mode == RestoreMode.UPSERT && externalIdField != null) {
+                String extIdValue = record.get(externalIdField);
+                if (extIdValue == null || extIdValue.isEmpty()) {
+                    hasIssues = true;
+                }
+            }
+            
+            // Check for Id value for update
+            if (mode == RestoreMode.UPDATE) {
+                String idValue = record.get("Id");
+                if (idValue == null || idValue.isEmpty()) {
+                    hasIssues = true;
+                }
+            }
+            
+            if (hasIssues) {
+                recordsWithIssues++;
+            } else {
+                validRecords++;
+            }
+        }
+        
+        // Report findings
+        log("│ ✓ Valid records ready for restore: " + validRecords);
+        if (recordsWithIssues > 0) {
+            log("│ ⚠ Records with potential issues: " + recordsWithIssues);
+        }
+        
+        if (!fieldsToCreate.isEmpty()) {
+            log("├─────────────────────────────────────────────");
+            log("│ ⚠ Fields not found in target org (will be skipped):");
+            for (String field : fieldsToCreate) {
+                log("│   • " + field);
+            }
+        }
+        
+        // Show sample of data
+        log("├─────────────────────────────────────────────");
+        log("│ Field coverage (non-empty values):");
+        List<Map.Entry<String, Integer>> sortedFields = fieldValueCounts.entrySet().stream()
+            .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+            .limit(10)
+            .collect(java.util.stream.Collectors.toList());
+        
+        for (Map.Entry<String, Integer> entry : sortedFields) {
+            int percent = (int) ((entry.getValue() * 100.0) / records.size());
+            log(String.format("│   • %-25s %d records (%d%%)", 
+                entry.getKey(), entry.getValue(), percent));
+        }
+        if (fieldValueCounts.size() > 10) {
+            log("│   ... and " + (fieldValueCounts.size() - 10) + " more fields");
+        }
+        
+        // Sample records preview
+        log("├─────────────────────────────────────────────");
+        log("│ Sample records (first 3):");
+        int sampleCount = Math.min(3, records.size());
+        for (int i = 0; i < sampleCount; i++) {
+            Map<String, String> record = records.get(i);
+            log("│   Record " + (i + 1) + ":");
+            int fieldCount = 0;
+            for (Map.Entry<String, String> entry : record.entrySet()) {
+                if (entry.getKey().startsWith("_ref_")) continue;
+                if (entry.getValue() == null || entry.getValue().isEmpty()) continue;
+                String value = entry.getValue();
+                if (value.length() > 40) {
+                    value = value.substring(0, 37) + "...";
+                }
+                log(String.format("│     %-20s = %s", entry.getKey(), value));
+                fieldCount++;
+                if (fieldCount >= 5) {
+                    log("│     ... and more fields");
+                    break;
+                }
+            }
+        }
+        
+        log("└─────────────────────────────────────────────");
+        log("🔍 DRY RUN COMPLETE - No data was modified in Salesforce");
+        
+        // Set result counts (simulated)
+        result.setTotalRecords(records.size());
+        BatchResult simulated = new BatchResult();
+        simulated.setSuccessCount(validRecords);
+        simulated.setFailureCount(recordsWithIssues);
+        result.addBatchResult(simulated);
+        result.setCompleted(true);
         
         return result;
     }
@@ -960,6 +1109,7 @@ public class RestoreExecutor {
         private boolean validateBeforeRestore = true;
         private boolean resolveRelationships = true;
         private boolean preserveIds = false;
+        private boolean dryRun = false;
         private String externalIdField;
         private int maxRetries = 3;
         private long retryDelayMs = 2000;
@@ -974,6 +1124,8 @@ public class RestoreExecutor {
         public void setResolveRelationships(boolean resolve) { this.resolveRelationships = resolve; }
         public boolean isPreserveIds() { return preserveIds; }
         public void setPreserveIds(boolean preserve) { this.preserveIds = preserve; }
+        public boolean isDryRun() { return dryRun; }
+        public void setDryRun(boolean dryRun) { this.dryRun = dryRun; }
         public String getExternalIdField() { return externalIdField; }
         public void setExternalIdField(String field) { this.externalIdField = field; }
         public int getMaxRetries() { return maxRetries; }

@@ -137,6 +137,8 @@
                              selected="false" style="-fx-text-fill: #e8e8e8;"/>
                     <CheckBox fx:id="preserveIdsCheck" text="Preserve original Salesforce IDs" 
                              selected="false" style="-fx-text-fill: #e8e8e8;"/>
+                    <CheckBox fx:id="dryRunCheck" text="🔍 Dry Run (preview only, no changes)" 
+                             selected="false" style="-fx-text-fill: #4FC3F7;"/>
                     
                     <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 8 0 0 0;">
                         <Label text="Batch Size:" style="-fx-text-fill: #adb5bd;"/>
