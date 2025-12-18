@@ -283,8 +283,8 @@ public class ConnectionsController {
         comboMap.clear();
         testResultLabel.setText("");
         
-        // Close any existing Snowflake connection when switching
-        closeSnowflakeConnection();
+        // Clear local reference when switching types - session stays cached
+        clearLocalSnowflakeConnection();
         
         if (resetFields) {
             connectionNameField.clear();
@@ -423,6 +423,35 @@ public class ConnectionsController {
         GridPane.setRowIndex(schemaCombo, row);
         formGrid.getChildren().addAll(schemaLabel, schemaCombo);
         comboMap.put("Schema", schemaCombo);
+        
+        // Check for cached session and auto-connect if available
+        Platform.runLater(this::checkCachedSessionAndAutoConnect);
+    }
+    
+    /**
+     * Check if there's a cached Snowflake session and auto-connect if available
+     */
+    private void checkCachedSessionAndAutoConnect() {
+        String account = getFieldValue("Account");
+        if (account.isEmpty()) {
+            return;
+        }
+        
+        String cacheKey = editingConnectionId != null ? editingConnectionId : "temp_" + account;
+        ConnectionManager.CachedSession cachedSession = ConnectionManager.getInstance().getCachedSession(cacheKey);
+        
+        if (cachedSession != null) {
+            snowflakeConnection = cachedSession.getConnection();
+            logger.info("Auto-connecting with cached Snowflake session for: {}", cacheKey);
+            
+            connectButton.setText("✓ Connected (cached)");
+            connectButton.setDisable(true);
+            testResultLabel.setText("Using cached session - Loading options...");
+            testResultLabel.setStyle("-fx-text-fill: #4ec94e;");
+            
+            // Load warehouses and databases
+            loadSnowflakeOptions();
+        }
     }
     
     private void buildStandardForm(String type, boolean resetFields) {
@@ -477,10 +506,28 @@ public class ConnectionsController {
             return;
         }
         
+        // Check for cached session first (using account as cache key for new connections)
+        String cacheKey = editingConnectionId != null ? editingConnectionId : "temp_" + account;
+        ConnectionManager.CachedSession cachedSession = ConnectionManager.getInstance().getCachedSession(cacheKey);
+        
+        if (cachedSession != null) {
+            // Use cached connection
+            snowflakeConnection = cachedSession.getConnection();
+            logger.info("Using cached Snowflake session for: {}", account);
+            Platform.runLater(() -> {
+                connectButton.setText("✓ Connected (cached)");
+                connectButton.setDisable(true);
+                testResultLabel.setText("Using cached session - Loading options...");
+                testResultLabel.setStyle("-fx-text-fill: #4ec94e;");
+                loadSnowflakeOptions();
+            });
+            return;
+        }
+        
         connectButton.setDisable(true);
         connectButton.setText("Connecting...");
         testResultLabel.setText("Connecting to Snowflake...");
-        testResultLabel.setStyle("-fx-text-fill: #888;");
+        testResultLabel.setStyle("-fx-text-fill: #adb5bd;");
         
         Task<Connection> connectTask = new Task<>() {
             @Override
@@ -506,6 +553,12 @@ public class ConnectionsController {
         
         connectTask.setOnSucceeded(e -> {
             snowflakeConnection = connectTask.getValue();
+            
+            // Cache the session for reuse (use final copy of account from outer scope)
+            String connCacheKey = editingConnectionId != null ? editingConnectionId : "temp_" + account;
+            ConnectionManager.getInstance().cacheSession(connCacheKey, snowflakeConnection);
+            logger.info("Cached Snowflake session for: {}", connCacheKey);
+            
             Platform.runLater(() -> {
                 connectButton.setText("✓ Connected");
                 connectButton.setDisable(true);
@@ -635,13 +688,23 @@ public class ConnectionsController {
         thread.start();
     }
     
-    private void closeSnowflakeConnection() {
-        if (snowflakeConnection != null) {
-            try {
-                snowflakeConnection.close();
-            } catch (Exception ignored) {}
-            snowflakeConnection = null;
+    /**
+     * Clear the local reference to the Snowflake connection.
+     * The actual connection is kept in the session cache for reuse.
+     */
+    private void clearLocalSnowflakeConnection() {
+        // Just clear the local reference - the connection is cached in ConnectionManager
+        snowflakeConnection = null;
+    }
+    
+    /**
+     * Invalidate and close a cached Snowflake session
+     */
+    private void invalidateSnowflakeSession(String connectionId) {
+        if (connectionId != null) {
+            ConnectionManager.getInstance().invalidateSession(connectionId);
         }
+        snowflakeConnection = null;
     }
     
     private String getPromptText(String dbType, String field) {
@@ -862,7 +925,8 @@ public class ConnectionsController {
                 ConnectionManager.getInstance().deleteConnection(editingConnectionId);
                 logger.info("Deleted connection: {}", editingConnectionId);
                 
-                closeSnowflakeConnection();
+                // Invalidate the cached session for this deleted connection
+                invalidateSnowflakeSession(editingConnectionId);
                 loadSavedConnections();
                 clearTypeSelection();
                 showFormElements(false);
@@ -876,7 +940,8 @@ public class ConnectionsController {
     
     @FXML
     private void handleBack() {
-        closeSnowflakeConnection();
+        // Just clear local reference - session stays cached for next time
+        clearLocalSnowflakeConnection();
         try {
             if (returnToBackup) {
                 // Return to backup screen
