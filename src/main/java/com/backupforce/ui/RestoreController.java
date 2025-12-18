@@ -4,6 +4,8 @@ import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
 import com.backupforce.restore.DatabaseScanner;
 import com.backupforce.restore.DatabaseScanner.BackupTable;
+import com.backupforce.restore.DependencyOrderer;
+import com.backupforce.restore.RelationshipManager;
 import com.backupforce.restore.RestoreExecutor;
 import com.backupforce.restore.RestoreExecutor.RestoreOptions;
 import com.backupforce.restore.RestoreExecutor.RestoreResult;
@@ -38,6 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * Controller for the Data Restoration screen.
@@ -484,17 +487,25 @@ public class RestoreController {
         options.setBatchSize(batchSizeCombo.getValue());
         options.setStopOnError(stopOnErrorCheck.isSelected());
         options.setValidateBeforeRestore(validateBeforeRestoreCheck.isSelected());
+        options.setResolveRelationships(true); // Always resolve relationships
+        
+        // Order objects by dependency (parents first)
+        logMessage("Analyzing object dependencies...");
+        List<RestoreObject> orderedObjects = orderObjectsByDependency(objects);
+        logMessage("Restore order: " + orderedObjects.stream()
+            .map(RestoreObject::getName)
+            .collect(Collectors.joining(" → ")));
         
         // Run restore in background thread
         executorService = Executors.newSingleThreadExecutor();
         executorService.submit(() -> {
             try {
-                int totalObjects = objects.size();
+                int totalObjects = orderedObjects.size();
                 int completedObjects = 0;
                 int totalSuccess = 0;
                 int totalFailed = 0;
                 
-                for (RestoreObject obj : objects) {
+                for (RestoreObject obj : orderedObjects) {
                     if (!restoreRunning) {
                         logMessage("⏹ Restore cancelled by user");
                         break;
@@ -603,6 +614,54 @@ public class RestoreController {
             alert.setContentText(message);
             alert.showAndWait();
         });
+    }
+    
+    /**
+     * Orders objects by dependency for restoration.
+     * Parent objects are restored before children to ensure lookup fields can be populated.
+     */
+    private List<RestoreObject> orderObjectsByDependency(List<RestoreObject> objects) {
+        if (connectionInfo == null) {
+            return objects; // Can't order without connection
+        }
+        
+        try {
+            // Create dependency orderer
+            RelationshipManager relationshipManager = new RelationshipManager(
+                connectionInfo.getInstanceUrl(),
+                connectionInfo.getSessionId(),
+                "60.0"
+            );
+            DependencyOrderer orderer = new DependencyOrderer(relationshipManager);
+            orderer.setLogCallback(this::logMessage);
+            
+            // Get object names
+            Set<String> objectNames = objects.stream()
+                .map(RestoreObject::getName)
+                .collect(Collectors.toSet());
+            
+            // Get ordered list
+            List<String> orderedNames = orderer.orderForRestore(objectNames);
+            
+            // Map names back to RestoreObject instances
+            Map<String, RestoreObject> objectMap = objects.stream()
+                .collect(Collectors.toMap(RestoreObject::getName, o -> o));
+            
+            List<RestoreObject> ordered = new ArrayList<>();
+            for (String name : orderedNames) {
+                RestoreObject obj = objectMap.get(name);
+                if (obj != null) {
+                    ordered.add(obj);
+                }
+            }
+            
+            return ordered;
+            
+        } catch (Exception e) {
+            logger.warn("Could not determine dependency order, using original order: {}", e.getMessage());
+            logMessage("Warning: Could not analyze dependencies, using default order");
+            return objects;
+        }
     }
     
     // ==================== RestoreObject Model ====================

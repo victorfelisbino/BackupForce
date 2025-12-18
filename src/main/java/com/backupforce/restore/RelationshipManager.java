@@ -86,12 +86,16 @@ public class RelationshipManager {
             boolean isIdLookup = field.has("idLookup") && field.get("idLookup").getAsBoolean();
             boolean isUnique = field.has("unique") && field.get("unique").getAsBoolean();
             boolean isNameField = field.has("nameField") && field.get("nameField").getAsBoolean();
+            boolean isNillable = field.has("nillable") && field.get("nillable").getAsBoolean();
             
             FieldInfo fieldInfo = new FieldInfo(fieldName, fieldType, label);
             fieldInfo.setExternalId(isExternalId);
             fieldInfo.setIdLookup(isIdLookup);
             fieldInfo.setUnique(isUnique);
             fieldInfo.setNameField(isNameField);
+            fieldInfo.setNillable(isNillable);
+            // Required means the field is NOT nillable
+            fieldInfo.setRequired(!isNillable);
             
             // Track external ID fields
             if (isExternalId) {
@@ -321,6 +325,8 @@ public class RelationshipManager {
         private boolean idLookup;
         private boolean unique;
         private boolean nameField;
+        private boolean required;
+        private boolean nillable;
         
         public FieldInfo(String name, String type, String label) {
             this.name = name;
@@ -335,11 +341,15 @@ public class RelationshipManager {
         public boolean isIdLookup() { return idLookup; }
         public boolean isUnique() { return unique; }
         public boolean isNameField() { return nameField; }
+        public boolean isRequired() { return required; }
+        public boolean isNillable() { return nillable; }
         
         public void setExternalId(boolean v) { this.externalId = v; }
         public void setIdLookup(boolean v) { this.idLookup = v; }
         public void setUnique(boolean v) { this.unique = v; }
         public void setNameField(boolean v) { this.nameField = v; }
+        public void setRequired(boolean v) { this.required = v; }
+        public void setNillable(boolean v) { this.nillable = v; }
     }
     
     public static class RelationshipField {
