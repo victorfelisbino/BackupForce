@@ -5,7 +5,7 @@ All notable changes to BackupForce will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.3.0] - 2024-12-18
+## [2.3.0] - 2025-12-18
 
 ### Added
 
@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.2.0] - 2024-12-15
+## [2.2.0] - 2025-12-15
 
 ### Added
 - Dry run mode for restore preview
@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.1.0] - 2024-12-10
+## [2.1.0] - 2025-12-10
 
 ### Added
 - Data restoration feature with Bulk API 2.0
@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2024-11-01
+## [2.0.0] - 2025-11-01
 
 ### Added
 - Complete rewrite with JavaFX modern UI

@@ -12,20 +12,20 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ## 🚀 Quick Download
 
-**[⬇️ Download BackupForce v2.2.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
+**[⬇️ Download BackupForce v2.3.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
 
 ### Windows
-- `BackupForce-2.2.0.msi` - Installer
-- `BackupForce-2.2.0-portable.zip` - Portable
+- `BackupForce-2.3.0.msi` - Installer
+- `BackupForce-2.3.0-portable.zip` - Portable
 
 ### macOS
-- `BackupForce-2.2.0.dmg` - Disk Image
-- `BackupForce-2.2.0-macos.zip` - Portable
+- `BackupForce-2.3.0.dmg` - Disk Image
+- `BackupForce-2.3.0-macos.zip` - Portable
 
 ### Linux
-- `BackupForce-2.2.0.deb` - Debian/Ubuntu
-- `BackupForce-2.2.0.rpm` - Fedora/RHEL
-- `BackupForce-2.2.0-linux.tar.gz` - Universal
+- `BackupForce-2.3.0.deb` - Debian/Ubuntu
+- `BackupForce-2.3.0.rpm` - Fedora/RHEL
+- `BackupForce-2.3.0-linux.tar.gz` - Universal
 
 **No Java installation required** - runtime is bundled!
 
@@ -48,13 +48,15 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 | **SQL Server** | VARBINARY(MAX) | — | ✅ Supported |
 | **CSV Files** | File + Path column | — | ✅ Supported |
 
-### Data Restore (NEW!)
+### Data Restore
 - **Bulk API v2 Restore** - Efficiently restore millions of records back to Salesforce
 - **Insert/Update/Upsert** - Choose the right operation for your data
 - **CSV Source** - Restore from backup CSV files
 - **Relationship Resolution** - Automatically resolve lookup references
 - **Dependency Ordering** - Restore parent objects before children
 - **Cross-Org Transformation** - Map RecordTypes, picklist values, and users between different orgs
+- **Dry Run Preview** - Preview data transformations before actual restore
+- **Save/Load Mappings** - Persist transformation configs as JSON files
 
 ### User Experience
 - **Windows 11 Dark Theme** - Modern Fluent Design UI
