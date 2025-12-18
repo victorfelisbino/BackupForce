@@ -2,6 +2,8 @@ package com.backupforce.ui;
 
 import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
+import com.backupforce.restore.DatabaseScanner;
+import com.backupforce.restore.DatabaseScanner.BackupTable;
 import com.backupforce.restore.RestoreExecutor;
 import com.backupforce.restore.RestoreExecutor.RestoreOptions;
 import com.backupforce.restore.RestoreExecutor.RestoreResult;
@@ -13,6 +15,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -313,12 +316,56 @@ public class RestoreController {
         }
         
         logMessage("Scanning database: " + selected.getName());
+        startRestoreButton.setDisable(true);
         
-        // TODO: Implement database scanning - query for available backup tables
-        // For now, show placeholder
-        logMessage("Database scanning will be implemented in a future release");
-        showInfo("Database Restore", "Database scanning feature coming soon!\n\n" +
-                "This will query your database for available backup tables and their record counts.");
+        // Create a background task to scan the database
+        Task<List<BackupTable>> scanTask = new Task<>() {
+            @Override
+            protected List<BackupTable> call() throws Exception {
+                DatabaseScanner scanner = new DatabaseScanner(selected);
+                scanner.setLogConsumer(msg -> Platform.runLater(() -> logMessage(msg)));
+                return scanner.scanForBackupTables();
+            }
+        };
+        
+        scanTask.setOnSucceeded(event -> {
+            List<BackupTable> tables = scanTask.getValue();
+            
+            if (tables.isEmpty()) {
+                logMessage("No Salesforce backup tables found in database");
+                showInfo("No Backup Tables", 
+                    "No Salesforce backup tables were found in the selected database.\n\n" +
+                    "Tables must have an 'Id' column and at least two other common Salesforce " +
+                    "fields (Name, CreatedDate, LastModifiedDate, etc.) to be recognized.");
+            } else {
+                // Add tables to the restore objects list
+                for (BackupTable table : tables) {
+                    // Store the qualified table name as the source path
+                    String sourcePath = table.getSchema() + "." + table.getTableName();
+                    restoreObjects.add(new RestoreObject(
+                        table.getObjectName(),
+                        table.getRecordCount(),
+                        table.getLastModified(),
+                        sourcePath
+                    ));
+                }
+                
+                updateObjectCount();
+                startRestoreButton.setDisable(restoreObjects.isEmpty());
+                logMessage("Found " + tables.size() + " backup tables ready for restore");
+            }
+        });
+        
+        scanTask.setOnFailed(event -> {
+            Throwable error = scanTask.getException();
+            logger.error("Database scan failed", error);
+            logMessage("ERROR: Database scan failed - " + error.getMessage());
+            showError("Failed to scan database: " + error.getMessage());
+        });
+        
+        Thread thread = new Thread(scanTask);
+        thread.setDaemon(true);
+        thread.start();
     }
     
     private long countRecordsInFile(File file) {
