@@ -165,21 +165,59 @@ public class RestoreExecutor {
             log(String.format("%s: Processing batch %d/%d (%d records)", 
                 objectName, batchNum + 1, totalBatches, batch.size()));
             
-            try {
-                BatchResult batchResult = processBatch(objectName, batch, effectiveMode, externalIdField, effectiveOptions);
+            // Retry logic for transient failures
+            BatchResult batchResult = null;
+            Exception lastException = null;
+            int maxRetries = effectiveOptions.getMaxRetries();
+            
+            for (int attempt = 1; attempt <= maxRetries && !cancelled.get(); attempt++) {
+                try {
+                    batchResult = processBatch(objectName, batch, effectiveMode, externalIdField, effectiveOptions);
+                    
+                    // Check if we should retry due to retryable errors
+                    if (batchResult.hasRetryableErrors() && attempt < maxRetries) {
+                        log(String.format("%s: Batch has retryable errors, attempt %d/%d", 
+                            objectName, attempt, maxRetries));
+                        try {
+                            Thread.sleep(effectiveOptions.getRetryDelayMs() * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        continue;
+                    }
+                    
+                    break; // Success or non-retryable errors
+                    
+                } catch (Exception e) {
+                    lastException = e;
+                    if (isRetryableException(e) && attempt < maxRetries) {
+                        log(String.format("%s: Retryable error on attempt %d/%d: %s", 
+                            objectName, attempt, maxRetries, e.getMessage()));
+                        try {
+                            Thread.sleep(effectiveOptions.getRetryDelayMs() * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+            
+            if (batchResult != null) {
                 result.addBatchResult(batchResult);
-                
                 updateProgress(objectName, end, records.size(), result);
                 
                 if (!batchResult.isSuccess() && effectiveOptions.isStopOnError()) {
                     log(objectName + ": Stopping due to errors");
                     break;
                 }
-                
-            } catch (Exception e) {
-                logger.error("Error processing batch for " + objectName, e);
-                log(objectName + ": Batch error - " + e.getMessage());
-                result.addError("Batch " + (batchNum + 1) + ": " + e.getMessage());
+            } else if (lastException != null) {
+                logger.error("Error processing batch for " + objectName + " after " + maxRetries + " retries", lastException);
+                log(objectName + ": Batch error after " + maxRetries + " retries - " + lastException.getMessage());
+                result.addError("Batch " + (batchNum + 1) + " (after " + maxRetries + " retries): " + lastException.getMessage());
                 
                 if (effectiveOptions.isStopOnError()) {
                     break;
@@ -543,15 +581,94 @@ public class RestoreExecutor {
             
             try (ClassicHttpResponse response = httpClient.executeOpen(null, failedGet, null)) {
                 String csv = EntityUtils.toString(response.getEntity());
-                // Parse CSV errors
-                String[] lines = csv.split("\n");
-                for (int i = 1; i < lines.length && i < 20; i++) { // Limit error messages
-                    result.addError(lines[i]);
-                }
+                parseFailedResultsCsv(csv, result);
             }
         }
         
         return result;
+    }
+    
+    /**
+     * Parses Bulk API failed results CSV and extracts meaningful error messages.
+     */
+    private void parseFailedResultsCsv(String csv, BatchResult result) {
+        String[] lines = csv.split("\n");
+        if (lines.length < 2) return;
+        
+        // Parse header to find sf__Error and sf__Id columns
+        String[] headers = parseCsvLine(lines[0]);
+        int errorIndex = -1;
+        int idIndex = -1;
+        int recordIdIndex = -1;
+        
+        for (int i = 0; i < headers.length; i++) {
+            if ("sf__Error".equalsIgnoreCase(headers[i])) errorIndex = i;
+            else if ("sf__Id".equalsIgnoreCase(headers[i])) idIndex = i;
+            else if ("Id".equalsIgnoreCase(headers[i])) recordIdIndex = i;
+        }
+        
+        // Group errors by type to avoid repetitive messages
+        Map<String, Integer> errorCounts = new LinkedHashMap<>();
+        List<String> sampleErrors = new ArrayList<>();
+        
+        for (int i = 1; i < lines.length; i++) {
+            String[] values = parseCsvLine(lines[i]);
+            if (values.length <= errorIndex || errorIndex < 0) continue;
+            
+            String error = values[errorIndex];
+            if (error == null || error.isEmpty()) continue;
+            
+            // Extract the error type for grouping
+            String errorType = extractErrorType(error);
+            errorCounts.merge(errorType, 1, Integer::sum);
+            
+            // Keep sample of detailed errors (max 10)
+            if (sampleErrors.size() < 10) {
+                String recordRef = "";
+                if (recordIdIndex >= 0 && recordIdIndex < values.length) {
+                    recordRef = " [Id: " + values[recordIdIndex] + "]";
+                }
+                sampleErrors.add(error + recordRef);
+            }
+        }
+        
+        // Add summary errors
+        for (Map.Entry<String, Integer> entry : errorCounts.entrySet()) {
+            if (entry.getValue() > 1) {
+                result.addError(entry.getKey() + " (" + entry.getValue() + " records)");
+            }
+        }
+        
+        // Add sample detailed errors
+        for (String error : sampleErrors) {
+            result.addError("  → " + error);
+        }
+        
+        if (lines.length - 1 > 10) {
+            result.addError("... and " + (lines.length - 1 - 10) + " more failed records");
+        }
+    }
+    
+    /**
+     * Extracts a categorized error type from a Salesforce error message.
+     */
+    private String extractErrorType(String error) {
+        // Common Salesforce error patterns
+        if (error.contains("REQUIRED_FIELD_MISSING")) return "Required field missing";
+        if (error.contains("FIELD_CUSTOM_VALIDATION_EXCEPTION")) return "Validation rule failed";
+        if (error.contains("DUPLICATE_VALUE")) return "Duplicate value";
+        if (error.contains("INVALID_CROSS_REFERENCE_KEY")) return "Invalid lookup reference";
+        if (error.contains("MALFORMED_ID")) return "Malformed ID";
+        if (error.contains("INVALID_FIELD")) return "Invalid field";
+        if (error.contains("INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST")) return "Invalid picklist value";
+        if (error.contains("STRING_TOO_LONG")) return "String too long";
+        if (error.contains("UNABLE_TO_LOCK_ROW")) return "Row lock conflict";
+        if (error.contains("CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY")) return "Trigger/process failure";
+        if (error.contains("ENTITY_IS_DELETED")) return "Referenced record deleted";
+        if (error.contains("INSUFFICIENT_ACCESS")) return "Insufficient access";
+        
+        // Return first 50 chars as type if no pattern matched
+        return error.length() > 50 ? error.substring(0, 50) + "..." : error;
     }
     
     private List<Map<String, String>> cleanRecordsForRestore(List<Map<String, String>> records,
@@ -699,6 +816,38 @@ public class RestoreExecutor {
         }
     }
     
+    /**
+     * Determines if an exception is retryable (transient network/service issues).
+     */
+    private boolean isRetryableException(Exception e) {
+        String message = e.getMessage();
+        if (message == null) {
+            message = e.getClass().getSimpleName();
+        }
+        String lower = message.toLowerCase();
+        
+        // Network/connection errors
+        if (lower.contains("timeout") 
+            || lower.contains("connection reset")
+            || lower.contains("connection refused")
+            || lower.contains("no route to host")
+            || lower.contains("network unreachable")) {
+            return true;
+        }
+        
+        // Salesforce transient errors
+        if (lower.contains("temporarily unavailable")
+            || lower.contains("service unavailable")
+            || lower.contains("too many requests")
+            || lower.contains("429")
+            || lower.contains("503")
+            || lower.contains("504")) {
+            return true;
+        }
+        
+        return false;
+    }
+    
     public void close() {
         try {
             httpClient.close();
@@ -748,10 +897,17 @@ public class RestoreExecutor {
         private int failureCount;
         private final List<String> errors = new ArrayList<>();
         private final List<String> createdIds = new ArrayList<>();
+        private boolean hasRetryableErrors = false;
         
         public void incrementSuccess() { successCount++; }
         public void incrementFailure() { failureCount++; }
-        public void addError(String error) { errors.add(error); }
+        public void addError(String error) { 
+            errors.add(error);
+            // Check if error is retryable
+            if (isRetryableError(error)) {
+                hasRetryableErrors = true;
+            }
+        }
         public void addCreatedId(String id) { createdIds.add(id); }
         
         public int getSuccessCount() { return successCount; }
@@ -761,6 +917,19 @@ public class RestoreExecutor {
         public List<String> getErrors() { return errors; }
         public List<String> getCreatedIds() { return createdIds; }
         public boolean isSuccess() { return failureCount == 0; }
+        public boolean hasRetryableErrors() { return hasRetryableErrors; }
+        
+        private static boolean isRetryableError(String error) {
+            if (error == null) return false;
+            String lower = error.toLowerCase();
+            return lower.contains("timeout") 
+                || lower.contains("connection reset")
+                || lower.contains("temporarily unavailable")
+                || lower.contains("concurrent") && lower.contains("update")
+                || lower.contains("lock")
+                || lower.contains("unable_to_lock_row")
+                || lower.contains("request_running_too_long");
+        }
     }
     
     public static class RestoreProgress {
@@ -792,6 +961,8 @@ public class RestoreExecutor {
         private boolean resolveRelationships = true;
         private boolean preserveIds = false;
         private String externalIdField;
+        private int maxRetries = 3;
+        private long retryDelayMs = 2000;
         
         public int getBatchSize() { return batchSize; }
         public void setBatchSize(int size) { this.batchSize = size; }
@@ -805,5 +976,9 @@ public class RestoreExecutor {
         public void setPreserveIds(boolean preserve) { this.preserveIds = preserve; }
         public String getExternalIdField() { return externalIdField; }
         public void setExternalIdField(String field) { this.externalIdField = field; }
+        public int getMaxRetries() { return maxRetries; }
+        public void setMaxRetries(int retries) { this.maxRetries = retries; }
+        public long getRetryDelayMs() { return retryDelayMs; }
+        public void setRetryDelayMs(long delay) { this.retryDelayMs = delay; }
     }
 }
