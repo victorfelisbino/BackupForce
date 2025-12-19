@@ -322,9 +322,24 @@ public class LoginContentController {
     
     @FXML
     private void handleOAuthLogin() {
+        logger.info("OAuth login button clicked!");
+        
         if (isLoggingIn) {
+            logger.info("Already logging in, ignoring click");
             return;
         }
+        
+        try {
+            startOAuthProcess();
+        } catch (Throwable e) {
+            logger.error("Failed to start OAuth process", e);
+            e.printStackTrace();
+            showError("Failed to start OAuth: " + e.getMessage());
+        }
+    }
+    
+    private void startOAuthProcess() {
+        logger.info("Starting OAuth login process...");
         
         final int TIMEOUT_SECONDS = 180;
         final AtomicInteger remainingSeconds = new AtomicInteger(TIMEOUT_SECONDS);
@@ -449,14 +464,21 @@ public class LoginContentController {
         oauthTask.setOnSucceeded(e -> resetUI.run());
         oauthTask.setOnFailed(e -> {
             resetUI.run();
-            statusLabel.setText("Login failed");
+            Throwable ex = oauthTask.getException();
+            logger.error("OAuth task failed with exception", ex);
+            statusLabel.setText("Login failed: " + (ex != null ? ex.getMessage() : "unknown error"));
         });
         oauthTask.setOnCancelled(e -> {
             resetUI.run();
             statusLabel.setText("Login cancelled");
         });
         
-        new Thread(oauthTask).start();
+        Thread oauthThread = new Thread(oauthTask);
+        oauthThread.setDaemon(true);
+        oauthThread.setUncaughtExceptionHandler((t, ex) -> {
+            logger.error("Uncaught exception in OAuth thread", ex);
+        });
+        oauthThread.start();
     }
     
     @FXML
