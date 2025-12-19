@@ -1,6 +1,7 @@
 # BackupForce
 
 [![Download](https://img.shields.io/github/v/release/victorfelisbino/BackupForce?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/victorfelisbino/BackupForce/total?style=for-the-badge&color=brightgreen)](https://github.com/victorfelisbino/BackupForce/releases)
 [![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
 
