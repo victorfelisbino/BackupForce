@@ -12,8 +12,9 @@ on:
         default: '2.2.0'
 
 env:
-  JAVA_VERSION: '21'
+  JAVA_VERSION: '25'
   APP_NAME: 'BackupForce'
+  JLINK_MODULES: 'java.base,java.sql,java.desktop,java.naming,java.management,java.logging,java.xml,java.prefs,java.net.http,java.scripting,jdk.crypto.ec,jdk.unsupported,java.datatransfer,java.security.jgss,java.security.sasl,jdk.httpserver'
 
 jobs:
   # Build JAR (platform-independent)
@@ -78,6 +79,11 @@ jobs:
           cp target/BackupForce.jar packaging/input/
         shell: bash
 
+      - name: Create custom JRE with jlink
+        run: |
+          jlink --add-modules ${{ env.JLINK_MODULES }} --output packaging/runtime --no-header-files --no-man-pages --strip-debug --compress=2
+        shell: bash
+
       - name: Build Windows Installer (MSI)
         run: |
           jpackage `
@@ -91,6 +97,8 @@ jobs:
             --win-menu `
             --win-shortcut `
             --win-dir-chooser `
+            --runtime-image packaging/runtime `
+            --java-options "--enable-native-access=ALL-UNNAMED" `
             --dest packaging/output
         shell: powershell
 
@@ -104,6 +112,8 @@ jobs:
             --vendor "Victor Felisbino" `
             --description "Salesforce Backup Tool" `
             --type app-image `
+            --runtime-image packaging/runtime `
+            --java-options "--enable-native-access=ALL-UNNAMED" `
             --dest packaging/portable
         shell: powershell
 
@@ -146,6 +156,10 @@ jobs:
           mkdir -p packaging/input
           cp target/BackupForce.jar packaging/input/
 
+      - name: Create custom JRE with jlink
+        run: |
+          jlink --add-modules ${{ env.JLINK_MODULES }} --output packaging/runtime --no-header-files --no-man-pages --strip-debug --compress=2
+
       - name: Build macOS App Bundle
         run: |
           jpackage \
@@ -156,6 +170,8 @@ jobs:
             --vendor "Victor Felisbino" \
             --description "Salesforce Backup Tool" \
             --type app-image \
+            --runtime-image packaging/runtime \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --dest packaging/output
 
       - name: Create macOS DMG
@@ -168,6 +184,8 @@ jobs:
             --vendor "Victor Felisbino" \
             --description "Salesforce Backup Tool" \
             --type dmg \
+            --runtime-image packaging/runtime \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --dest packaging/output
 
       - name: Create portable ZIP from app bundle
@@ -215,6 +233,10 @@ jobs:
           mkdir -p packaging/input
           cp target/BackupForce.jar packaging/input/
 
+      - name: Create custom JRE with jlink
+        run: |
+          jlink --add-modules ${{ env.JLINK_MODULES }} --output packaging/runtime --no-header-files --no-man-pages --strip-debug --compress=2
+
       - name: Build Linux DEB package
         run: |
           jpackage \
@@ -227,6 +249,8 @@ jobs:
             --type deb \
             --linux-shortcut \
             --linux-menu-group "Office" \
+            --runtime-image packaging/runtime \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --dest packaging/output
 
       - name: Build Linux RPM package
@@ -241,6 +265,8 @@ jobs:
             --type rpm \
             --linux-shortcut \
             --linux-menu-group "Office" \
+            --runtime-image packaging/runtime \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --dest packaging/output
 
       - name: Build Linux Portable (AppImage-like)
@@ -253,6 +279,8 @@ jobs:
             --vendor "Victor Felisbino" \
             --description "Salesforce Backup Tool" \
             --type app-image \
+            --runtime-image packaging/runtime \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --dest packaging/portable
 
       - name: Create portable tarball
