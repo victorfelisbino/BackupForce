@@ -45,9 +45,9 @@ try {
              --type exe `
              --dest target/installer `
              --runtime-image target/java-runtime `
-             --app-version 2.0.0 `
+             --app-version 3.0.0 `
              --vendor "Victor Felisbino" `
-             --description "Salesforce Backup Tool with Windows 11 UI" `
+             --description "Salesforce Backup Tool - Professional Dark Theme" `
              --win-dir-chooser `
              --win-menu `
              --win-shortcut `
@@ -61,7 +61,7 @@ try {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "SUCCESS! Executable created at:" -ForegroundColor Green
-Write-Host "target\installer\BackupForce-2.0.0.exe" -ForegroundColor Cyan
+Write-Host "target\installer\BackupForce-3.0.0.exe" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Distribution Details:" -ForegroundColor Yellow

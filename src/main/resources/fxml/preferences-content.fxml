@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!-- Preferences Content Panel -->
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.PreferencesContentController"
+      spacing="0" styleClass="content-area">
+    
+    <!-- Page Header -->
+    <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
+        <Label text="Preferences" styleClass="page-header-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="saveButton" text="Save Changes" onAction="#handleSavePreferences" 
+                styleClass="btn btn-accent"/>
+    </HBox>
+    
+    <!-- Main Content -->
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="scroll-pane">
+        <VBox spacing="24">
+            <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
+            
+            <!-- Appearance Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Appearance" styleClass="panel-header"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Theme:" prefWidth="150"/>
+                    <ComboBox fx:id="themeCombo" prefWidth="250"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Font Size:" prefWidth="150"/>
+                    <ComboBox fx:id="fontSizeCombo" prefWidth="250"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Backup Defaults Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Backup Defaults" styleClass="panel-header"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Default Output Format:" prefWidth="150"/>
+                    <ComboBox fx:id="outputFormatCombo" prefWidth="250"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Default Backup Location:" prefWidth="150"/>
+                    <TextField fx:id="defaultBackupPath" prefWidth="200" HBox.hgrow="ALWAYS"/>
+                    <Button text="Browse..." onAction="#handleBrowseBackupPath" styleClass="btn"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Parallel Threads:" prefWidth="150"/>
+                    <Spinner fx:id="threadSpinner" prefWidth="100" min="1" max="20" initialValue="4"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeArchivedCheck" text="Include archived records by default"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="downloadBlobsCheck" text="Download blob/file fields by default"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Restore Defaults Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Restore Defaults" styleClass="panel-header"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Default Operation:" prefWidth="150"/>
+                    <ComboBox fx:id="restoreOpCombo" prefWidth="250"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Batch Size:" prefWidth="150"/>
+                    <Spinner fx:id="batchSpinner" prefWidth="100" min="1" max="2000" initialValue="200"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="validateBeforeRestoreCheck" text="Always validate data before restore"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Notifications Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Notifications" styleClass="panel-header"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="notifyCompleteCheck" text="Show notification when backup/restore completes"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="notifyErrorCheck" text="Show notification on errors"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="playSoundCheck" text="Play sound on completion"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Advanced Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Advanced" styleClass="panel-header"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="API Timeout (seconds):" prefWidth="150"/>
+                    <Spinner fx:id="timeoutSpinner" prefWidth="100" min="30" max="600" initialValue="120"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <Label text="Log Level:" prefWidth="150"/>
+                    <ComboBox fx:id="logLevelCombo" prefWidth="250"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="enableMetricsCheck" text="Enable performance metrics collection"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Reset Section -->
+            <HBox spacing="16" alignment="CENTER_LEFT">
+                <Button text="Reset to Defaults" onAction="#handleResetDefaults" styleClass="btn"/>
+            </HBox>
+            
+        </VBox>
+    </ScrollPane>
+</VBox>

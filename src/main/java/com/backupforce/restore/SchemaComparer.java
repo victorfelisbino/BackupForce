@@ -70,6 +70,9 @@ public class SchemaComparer {
         // Get target org metadata
         ObjectMetadata targetMetadata = describeObject(objectName);
         
+        // Store target field names in result
+        result.setTargetFields(targetMetadata.getFieldNames());
+        
         // Compare fields
         compareFields(backupFields, targetMetadata, result);
         
@@ -574,6 +577,7 @@ public class SchemaComparer {
         
         private List<RecordTypeInfo> targetRecordTypes = new ArrayList<>();
         private List<UserInfo> targetUsers = new ArrayList<>();
+        private Set<String> targetFields = new LinkedHashSet<>();
         
         public ObjectComparisonResult(String objectName) {
             this.objectName = objectName;
@@ -605,6 +609,10 @@ public class SchemaComparer {
         
         public void setTargetUsers(List<UserInfo> users) {
             this.targetUsers = users;
+        }
+        
+        public void setTargetFields(Set<String> fields) {
+            this.targetFields = fields;
         }
         
         public boolean hasMismatches() {
@@ -651,6 +659,7 @@ public class SchemaComparer {
         public List<UserMismatch> getUserMismatches() { return userMismatches; }
         public List<RecordTypeInfo> getTargetRecordTypes() { return targetRecordTypes; }
         public List<UserInfo> getTargetUsers() { return targetUsers; }
+        public Set<String> getTargetFields() { return targetFields; }
     }
     
     public static class PicklistMismatch {

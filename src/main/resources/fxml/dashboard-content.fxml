@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!-- Dashboard Content - loaded into main container -->
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.DashboardContentController"
+      spacing="0" styleClass="content-area">
+    
+    <!-- Status Bar -->
+    <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
+        <Region fx:id="statusDot" styleClass="status-dot status-dot-connected"/>
+        <Label fx:id="statusLabel" text="Connected to Salesforce" styleClass="status-text"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <HBox spacing="16" alignment="CENTER_RIGHT">
+            <Label fx:id="lastBackupLabel" text="Last backup: Never" styleClass="status-text"/>
+            <Label text="•" styleClass="status-text"/>
+            <Label fx:id="totalBackupsLabel" text="0 total backups" styleClass="status-text"/>
+        </HBox>
+    </HBox>
+    
+    <!-- Scrollable Content Area -->
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" 
+                style="-fx-background-color: transparent; -fx-background: #0d1117;">
+        <VBox spacing="24" style="-fx-padding: 24;">
+            
+            <!-- Page Header -->
+            <VBox spacing="4">
+                <Label text="Dashboard" styleClass="page-title"/>
+                <Label text="Backup and restore your Salesforce data with confidence" 
+                       styleClass="page-subtitle"/>
+            </VBox>
+            
+            <!-- Quick Stats Row -->
+            <HBox spacing="16">
+                <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                    <Label text="AVAILABLE OBJECTS" styleClass="stat-card-title"/>
+                    <Label fx:id="objectsAvailableLabel" text="--" styleClass="stat-card-value"/>
+                </VBox>
+                <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                    <Label text="LAST BACKUP" styleClass="stat-card-title"/>
+                    <Label fx:id="lastDataBackupLabel" text="Never" 
+                           styleClass="stat-card-value" style="-fx-font-size: 18px;"/>
+                </VBox>
+                <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                    <Label text="RECORDS BACKED UP" styleClass="stat-card-title"/>
+                    <Label fx:id="lastBackupRowsLabel" text="--" styleClass="stat-card-value"/>
+                </VBox>
+            </HBox>
+            
+            <!-- Action Cards Section -->
+            <VBox spacing="16">
+                <Label text="What would you like to do?" styleClass="section-title"/>
+                
+                <HBox spacing="20">
+                    <!-- Data Backup Card -->
+                    <VBox fx:id="dataBackupCard" styleClass="action-card" spacing="16" 
+                          onMouseClicked="#handleDataBackup" HBox.hgrow="ALWAYS">
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <StackPane styleClass="card-icon">
+                                <Label text="📤"/>
+                            </StackPane>
+                            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                <Label text="Data Backup" styleClass="card-title"/>
+                                <Label text="Export Salesforce records to CSV files or database" 
+                                       styleClass="card-description" wrapText="true"/>
+                            </VBox>
+                        </HBox>
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <VBox spacing="2">
+                                <Label fx:id="backupObjectsLabel" text="--" styleClass="stat-value"/>
+                                <Label text="Objects" styleClass="stat-label"/>
+                            </VBox>
+                            <VBox spacing="2">
+                                <Label fx:id="backupRowsLabel" text="--" styleClass="stat-value"/>
+                                <Label text="Last Rows" styleClass="stat-label"/>
+                            </VBox>
+                        </HBox>
+                        <Label text="Dec 17, 9:57 PM • 1 obj → backup" styleClass="card-badge" 
+                               fx:id="lastBackupBadge"/>
+                    </VBox>
+                    
+                    <!-- Data Restore Card -->
+                    <VBox fx:id="dataRestoreCard" styleClass="action-card" spacing="16" 
+                          onMouseClicked="#handleDataRestore" HBox.hgrow="ALWAYS">
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <StackPane styleClass="card-icon card-icon-success">
+                                <Label text="📥"/>
+                            </StackPane>
+                            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                <Label text="Data Restore" styleClass="card-title"/>
+                                <Label text="Restore records from backup to Salesforce" 
+                                       styleClass="card-description" wrapText="true"/>
+                            </VBox>
+                        </HBox>
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <VBox spacing="2">
+                                <Label fx:id="restoreSourcesLabel" text="--" styleClass="stat-value"/>
+                                <Label text="Sources" styleClass="stat-label"/>
+                            </VBox>
+                            <VBox spacing="2">
+                                <Label fx:id="lastRestoreRowsLabel" text="--" styleClass="stat-value"/>
+                                <Label text="Restored" styleClass="stat-label"/>
+                            </VBox>
+                        </HBox>
+                        <Label fx:id="lastDataRestoreLabel" text="No restores yet" styleClass="card-badge"/>
+                    </VBox>
+                </HBox>
+                
+                <!-- Second Row - Coming Soon Cards -->
+                <HBox spacing="20">
+                    <!-- Config Backup Card -->
+                    <VBox fx:id="configBackupCard" styleClass="action-card action-card-disabled" 
+                          spacing="16" HBox.hgrow="ALWAYS">
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <StackPane styleClass="card-icon card-icon-muted">
+                                <Label text="⚙️"/>
+                            </StackPane>
+                            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                <Label text="Config Backup" styleClass="card-title"/>
+                                <Label text="Backup validation rules, workflows, and settings" 
+                                       styleClass="card-description" wrapText="true"/>
+                            </VBox>
+                        </HBox>
+                        <Label text="Coming Soon" styleClass="badge badge-muted"/>
+                    </VBox>
+                    
+                    <!-- Metadata Backup Card -->
+                    <VBox fx:id="metadataBackupCard" styleClass="action-card action-card-disabled" 
+                          spacing="16" HBox.hgrow="ALWAYS">
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <StackPane styleClass="card-icon card-icon-muted">
+                                <Label text="📋"/>
+                            </StackPane>
+                            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                <Label text="Metadata Backup" styleClass="card-title"/>
+                                <Label text="Backup Apex, triggers, flows, and metadata" 
+                                       styleClass="card-description" wrapText="true"/>
+                            </VBox>
+                        </HBox>
+                        <Label text="Coming Soon" styleClass="badge badge-muted"/>
+                    </VBox>
+                </HBox>
+            </VBox>
+            
+            <!-- Database Connections Section -->
+            <VBox spacing="16">
+                <HBox alignment="CENTER_LEFT" spacing="16">
+                    <Label text="Database Connections" styleClass="section-title"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="+ Add Connection" onAction="#handleAddConnection" 
+                            styleClass="btn btn-accent btn-sm"/>
+                </HBox>
+                
+                <HBox fx:id="connectionsContainer" spacing="16">
+                    <VBox styleClass="empty-state" spacing="12" HBox.hgrow="ALWAYS" 
+                          style="-fx-padding: 32; -fx-alignment: CENTER;">
+                        <Label text="🔗" styleClass="empty-state-icon"/>
+                        <Label fx:id="noConnectionsLabel" text="No connections configured" 
+                               styleClass="empty-state-title"/>
+                        <Label text="Add a database connection to backup directly to your data warehouse" 
+                               styleClass="empty-state-description" wrapText="true" textAlignment="CENTER"/>
+                    </VBox>
+                </HBox>
+            </VBox>
+            
+        </VBox>
+    </ScrollPane>
+</VBox>

@@ -7,16 +7,15 @@
 <VBox xmlns:fx="http://javafx.com/fxml" 
       fx:controller="com.backupforce.ui.DatabaseSettingsController"
       prefWidth="550" prefHeight="520" 
-      styleClass="root" 
+      styleClass="root dialog-container" 
       spacing="20"
-      stylesheets="@../css/windows11-dark.css"
-      style="-fx-background-color: #1a1a1a;">
+      stylesheets="@../css/backupforce-modern.css">
     
     <padding>
         <Insets top="24" right="24" bottom="24" left="24"/>
     </padding>
     
-    <Label text="Database Connection Settings" styleClass="dialog-header"/>
+    <Label text="Database Connection Settings" styleClass="panel-header"/>
     
     <!-- Database Type Selection -->
     <HBox spacing="10" alignment="CENTER_LEFT">
@@ -25,7 +24,7 @@
                   promptText="Select database type"/>
     </HBox>
     
-    <Separator style="-fx-background-color: #333333;"/>
+    <Separator styleClass="separator"/>
     
     <GridPane fx:id="settingsGrid" hgap="12" vgap="14">
         <columnConstraints>
@@ -38,16 +37,16 @@
     </GridPane>
     
     <!-- Backup Options -->
-    <Separator style="-fx-background-color: #333333;"/>
+    <Separator styleClass="separator"/>
     <VBox spacing="10">
-        <Label text="Backup Options" styleClass="section-label"/>
-        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)" styleClass="modern-checkbox"/>
+        <Label text="Backup Options" styleClass="panel-header"/>
+        <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)"/>
         <Label text="⚠ Warning: This will delete existing data in the target tables" 
-               styleClass="warning-text" style="-fx-font-size: 11px; -fx-font-weight: normal; -fx-padding: 0 0 0 24;"/>
+               styleClass="status-text" style="-fx-font-size: 11px;"/>
     </VBox>
     
     <!-- Connection Management -->
-    <Separator style="-fx-background-color: #333333;"/>
+    <Separator styleClass="separator"/>
     <VBox spacing="10">
         <Label text="Connection Management" styleClass="section-label"/>
         <HBox spacing="10" alignment="CENTER_LEFT">
@@ -62,14 +61,14 @@
     
     <HBox spacing="12" alignment="CENTER">
         <Button text="Test Connection" onAction="#handleTestConnection" 
-                styleClass="secondary-button" prefWidth="140"/>
+                styleClass="btn btn-secondary" prefWidth="140"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="Save As New" onAction="#handleSaveAs" 
-                styleClass="secondary-button" prefWidth="120"/>
+                styleClass="btn btn-secondary" prefWidth="120"/>
         <Button text="Save" onAction="#handleSave" 
-                styleClass="primary-button" prefWidth="100"/>
+                styleClass="btn btn-primary" prefWidth="100"/>
         <Button text="Cancel" onAction="#handleCancel" 
-                styleClass="secondary-button" prefWidth="100"/>
+                styleClass="btn btn-secondary" prefWidth="100"/>
     </HBox>
     
     <Label fx:id="statusLabel" wrapText="true" style="-fx-padding: 8 0 0 0;"/>

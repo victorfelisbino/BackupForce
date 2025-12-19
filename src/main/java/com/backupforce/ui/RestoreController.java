@@ -37,6 +37,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -275,13 +276,22 @@ public class RestoreController {
         
         Platform.runLater(() -> {
             if (connInfo != null) {
-                connectionLabel.setText("✓ Connected");
-                connectionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
-                targetOrgLabel.setText(connInfo.getUsername() + " @ " + connInfo.getInstanceUrl());
+                // connectionLabel may be null in content-only FXML (loaded by MainController)
+                if (connectionLabel != null) {
+                    connectionLabel.setText("✓ Connected");
+                    connectionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
+                }
+                if (targetOrgLabel != null) {
+                    targetOrgLabel.setText(connInfo.getUsername() + " @ " + connInfo.getInstanceUrl());
+                }
             } else {
-                connectionLabel.setText("Not Connected");
-                connectionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #f44336;");
-                targetOrgLabel.setText("No org connected - return to backup screen to connect");
+                if (connectionLabel != null) {
+                    connectionLabel.setText("Not Connected");
+                    connectionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #f44336;");
+                }
+                if (targetOrgLabel != null) {
+                    targetOrgLabel.setText("No org connected - return to backup screen to connect");
+                }
             }
         });
     }
@@ -297,13 +307,13 @@ public class RestoreController {
                 controller.setConnectionInfo(connectionInfo);
             }
             
-            Scene scene = new Scene(root, 820, 560);
+            Scene scene = new Scene(root, 1100, 750);
             Stage stage = (Stage) backButton.getScene().getWindow();
             stage.setScene(scene);
             stage.setResizable(true);
-            stage.setMinWidth(700);
-            stage.setMinHeight(500);
-            stage.centerOnScreen();
+            stage.setMinWidth(950);
+            stage.setMinHeight(650);
+            stage.setMaximized(true);
             
         } catch (IOException e) {
             logger.error("Error returning to home screen", e);
@@ -328,20 +338,31 @@ public class RestoreController {
     @FXML
     private void handleManageConnections() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/connections.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/database-settings.fxml"));
             Parent root = loader.load();
             
-            ConnectionsController controller = loader.getController();
-            controller.setConnectionInfo(connectionInfo);
+            DatabaseSettingsController controller = loader.getController();
             
-            Scene scene = new Scene(root, 820, 560);
-            Stage stage = (Stage) databaseConnectionCombo.getScene().getWindow();
-            stage.setScene(scene);
-            stage.centerOnScreen();
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
+            
+            Stage dialog = new Stage();
+            dialog.setTitle("Database Connection Settings");
+            dialog.setScene(scene);
+            dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            dialog.initOwner(databaseConnectionCombo.getScene().getWindow());
+            dialog.setResizable(true);
+            dialog.setWidth(600);
+            dialog.setHeight(700);
+            
+            dialog.showAndWait();
+            
+            // Refresh database connection dropdown after dialog closes
+            loadDatabaseConnections();
             
         } catch (IOException e) {
-            logger.error("Error opening connections screen", e);
-            showError("Failed to open connections: " + e.getMessage());
+            logger.error("Error opening database settings dialog", e);
+            showError("Failed to open database settings: " + e.getMessage());
         }
     }
     
@@ -493,7 +514,7 @@ public class RestoreController {
                     "Tables must have an 'Id' column and at least two other common Salesforce " +
                     "fields (Name, CreatedDate, LastModifiedDate, etc.) to be recognized.");
             } else {
-                // Add tables to the restore objects list
+                // Add tables to the restore objects list with database source flag
                 for (BackupTable table : tables) {
                     // Store the qualified table name as the source path
                     String sourcePath = table.getSchema() + "." + table.getTableName();
@@ -501,7 +522,9 @@ public class RestoreController {
                         table.getObjectName(),
                         table.getRecordCount(),
                         table.getLastModified(),
-                        sourcePath
+                        sourcePath,
+                        true,  // isDatabaseSource = true
+                        selected  // Store the connection for later use
                     ));
                 }
                 
@@ -841,10 +864,32 @@ public class RestoreController {
                     logMessage("Restoring: " + obj.getName());
                     
                     try {
-                        Path csvPath = Path.of(obj.getFilePath());
-                        RestoreResult result = restoreExecutor.restoreFromCsv(
-                            obj.getName(), csvPath, mode, options
-                        );
+                        RestoreResult result;
+                        
+                        if (obj.isDatabaseSource()) {
+                            // Restore from database source
+                            logMessage("Source: Database table " + obj.getTableName());
+                            SavedConnection dbConn = obj.getDatabaseConnection();
+                            if (dbConn == null) {
+                                throw new IOException("Database connection not available for " + obj.getName());
+                            }
+                            
+                            // Read data from database
+                            DatabaseScanner scanner = new DatabaseScanner(dbConn);
+                            List<Map<String, Object>> dbRecords = scanner.readTableData(obj.getTableName(), 0);
+                            logMessage("Read " + dbRecords.size() + " records from database");
+                            
+                            // Use the new restoreFromDatabase method
+                            result = restoreExecutor.restoreFromDatabase(
+                                obj.getName(), dbRecords, mode, options
+                            );
+                        } else {
+                            // Restore from CSV file
+                            Path csvPath = Path.of(obj.getFilePath());
+                            result = restoreExecutor.restoreFromCsv(
+                                obj.getName(), csvPath, mode, options
+                            );
+                        }
                         
                         totalSuccess += result.getSuccessCount();
                         totalFailed += result.getFailureCount();
@@ -1026,7 +1071,7 @@ public class RestoreController {
         );
         
         Scene scene = new Scene(mainContainer, 1000, 700);
-        scene.getStylesheets().add(getClass().getResource("/css/windows11-dark.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
         previewStage.setScene(scene);
         previewStage.show();
         
@@ -1042,62 +1087,114 @@ public class RestoreController {
         table.getItems().clear();
         
         try {
-            Path csvPath = Path.of(obj.getFilePath());
-            List<String> lines = Files.readAllLines(csvPath);
+            List<String> headers;
+            List<Map<String, String>> rows = new ArrayList<>();
             
-            if (lines.isEmpty()) {
-                summaryArea.appendText("\nNo data in " + obj.getName());
-                return;
+            if (obj.isDatabaseSource()) {
+                // Load preview data from database
+                SavedConnection dbConn = obj.getDatabaseConnection();
+                if (dbConn == null) {
+                    summaryArea.appendText("\nDatabase connection not available for " + obj.getName());
+                    return;
+                }
+                
+                DatabaseScanner scanner = new DatabaseScanner(dbConn);
+                List<Map<String, Object>> dbRecords = scanner.readTableData(obj.getTableName(), 100);
+                
+                if (dbRecords.isEmpty()) {
+                    summaryArea.appendText("\nNo data in " + obj.getName());
+                    return;
+                }
+                
+                // Extract headers from first record
+                headers = new ArrayList<>(dbRecords.get(0).keySet());
+                
+                // Convert to string map for display
+                for (Map<String, Object> dbRecord : dbRecords) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String header : headers) {
+                        Object value = dbRecord.get(header);
+                        String strValue = value != null ? value.toString() : "";
+                        
+                        // Apply transformations for preview if configured
+                        if (transformationConfig != null) {
+                            strValue = applyPreviewTransformation(obj.getName(), header, strValue);
+                        }
+                        
+                        row.put(header, strValue);
+                    }
+                    rows.add(row);
+                }
+                
+                summaryArea.appendText("\n\n" + obj.getName() + ": " + obj.getRecordCount() + " records (from database)");
+                if (obj.getRecordCount() > 100) {
+                    summaryArea.appendText(" (showing first 100)");
+                }
+                summaryArea.appendText("\nFields: " + headers.size());
+                
+            } else {
+                // Load preview data from CSV file
+                Path csvPath = Path.of(obj.getFilePath());
+                List<String> lines = Files.readAllLines(csvPath);
+                
+                if (lines.isEmpty()) {
+                    summaryArea.appendText("\nNo data in " + obj.getName());
+                    return;
+                }
+                
+                // Parse header
+                String[] headerArray = parseCSVLine(lines.get(0));
+                headers = Arrays.asList(headerArray);
+                
+                // Load first 100 rows
+                int rowLimit = Math.min(lines.size() - 1, 100);
+                for (int r = 1; r <= rowLimit; r++) {
+                    String[] values = parseCSVLine(lines.get(r));
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (int c = 0; c < Math.min(values.length, headerArray.length); c++) {
+                        String value = values[c];
+                        
+                        // Apply transformations for preview if configured
+                        if (transformationConfig != null) {
+                            value = applyPreviewTransformation(obj.getName(), headerArray[c], value);
+                        }
+                        
+                        row.put(headerArray[c], value);
+                    }
+                    rows.add(row);
+                }
+                
+                summaryArea.appendText("\n\n" + obj.getName() + ": " + (lines.size() - 1) + " records");
+                if (lines.size() > 101) {
+                    summaryArea.appendText(" (showing first 100)");
+                }
+                summaryArea.appendText("\nFields: " + headers.size());
             }
             
-            // Parse header
-            String[] headers = parseCSVLine(lines.get(0));
-            
             // Create columns (limit to 15 columns for readability)
-            int colLimit = Math.min(headers.length, 15);
+            int colLimit = Math.min(headers.size(), 15);
             for (int i = 0; i < colLimit; i++) {
-                final int colIdx = i;
-                TableColumn<Map<String, String>, String> col = new TableColumn<>(headers[i]);
+                final String headerName = headers.get(i);
+                TableColumn<Map<String, String>, String> col = new TableColumn<>(headerName);
                 col.setCellValueFactory(data -> 
-                    new SimpleStringProperty(data.getValue().getOrDefault(headers[colIdx], "")));
+                    new SimpleStringProperty(data.getValue().getOrDefault(headerName, "")));
                 col.setPrefWidth(120);
                 table.getColumns().add(col);
             }
             
-            if (headers.length > 15) {
-                TableColumn<Map<String, String>, String> moreCol = new TableColumn<>("... +" + (headers.length - 15) + " more");
+            if (headers.size() > 15) {
+                TableColumn<Map<String, String>, String> moreCol = new TableColumn<>("... +" + (headers.size() - 15) + " more");
                 moreCol.setCellValueFactory(data -> new SimpleStringProperty("..."));
                 moreCol.setPrefWidth(80);
                 table.getColumns().add(moreCol);
             }
             
-            // Load first 100 rows
-            int rowLimit = Math.min(lines.size() - 1, 100);
-            for (int r = 1; r <= rowLimit; r++) {
-                String[] values = parseCSVLine(lines.get(r));
-                Map<String, String> row = new LinkedHashMap<>();
-                for (int c = 0; c < Math.min(values.length, headers.length); c++) {
-                    String value = values[c];
-                    
-                    // Apply transformations for preview if configured
-                    if (transformationConfig != null) {
-                        value = applyPreviewTransformation(obj.getName(), headers[c], value);
-                    }
-                    
-                    row.put(headers[c], value);
-                }
-                table.getItems().add(row);
-            }
+            // Add rows to table
+            table.getItems().addAll(rows);
             
-            // Update summary
-            summaryArea.appendText("\n\n" + obj.getName() + ": " + (lines.size() - 1) + " records");
-            if (lines.size() > 101) {
-                summaryArea.appendText(" (showing first 100)");
-            }
-            summaryArea.appendText("\nFields: " + headers.length);
-            
-        } catch (IOException e) {
+        } catch (Exception e) {
             summaryArea.appendText("\nError loading " + obj.getName() + ": " + e.getMessage());
+            logger.error("Error loading preview data for " + obj.getName(), e);
         }
     }
     
@@ -1239,13 +1336,22 @@ public class RestoreController {
         private final SimpleStringProperty name = new SimpleStringProperty();
         private final SimpleLongProperty recordCount = new SimpleLongProperty();
         private final SimpleStringProperty lastBackup = new SimpleStringProperty();
-        private final String filePath;
+        private final String filePath; // For file sources, this is the file path; for DB sources, it's "schema.table"
+        private final boolean isDatabaseSource;
+        private SavedConnection databaseConnection; // Only set for database sources
         
         public RestoreObject(String name, long recordCount, String lastBackup, String filePath) {
+            this(name, recordCount, lastBackup, filePath, false, null);
+        }
+        
+        public RestoreObject(String name, long recordCount, String lastBackup, String sourcePath, 
+                           boolean isDatabaseSource, SavedConnection connection) {
             this.name.set(name);
             this.recordCount.set(recordCount);
             this.lastBackup.set(lastBackup);
-            this.filePath = filePath;
+            this.filePath = sourcePath;
+            this.isDatabaseSource = isDatabaseSource;
+            this.databaseConnection = connection;
         }
         
         public boolean isSelected() { return selected.get(); }
@@ -1262,5 +1368,19 @@ public class RestoreController {
         public SimpleStringProperty lastBackupProperty() { return lastBackup; }
         
         public String getFilePath() { return filePath; }
+        
+        public boolean isDatabaseSource() { return isDatabaseSource; }
+        
+        public SavedConnection getDatabaseConnection() { return databaseConnection; }
+        
+        /**
+         * For database sources, extracts the table name from the source path (schema.table format)
+         */
+        public String getTableName() {
+            if (isDatabaseSource && filePath != null && filePath.contains(".")) {
+                return filePath.substring(filePath.lastIndexOf('.') + 1);
+            }
+            return filePath;
+        }
     }
 }

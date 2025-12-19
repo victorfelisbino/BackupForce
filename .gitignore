@@ -1,4 +1,4 @@
-# Maven
+﻿# Maven
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -35,7 +35,13 @@ backup/
 *.log
 
 # User credentials (don't commit sensitive data)
-myconfig.propertiesoauth.properties
+myconfig.properties
+oauth.properties
 
 # Salesforce CLI
 .sfdx/
+
+# Build artifacts
+dist/
+build-temp/
+bytecode.txt

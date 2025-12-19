@@ -5,6 +5,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,17 +15,24 @@ public class BackupForceApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            // Load root application container (handles login/app transitions smoothly)
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/app-root.fxml"));
             Parent root = loader.load();
             
-            Scene scene = new Scene(root, 600, 700);
-            // CSS is already loaded from FXML, no need to add it again
+            // Pass stage reference to AppController for window controls
+            AppController appController = loader.getController();
+            appController.setStage(primaryStage);
             
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
+            
+            // Use undecorated stage for custom title bar (removes ugly Windows chrome)
+            primaryStage.initStyle(StageStyle.UNDECORATED);
             primaryStage.setTitle("BackupForce - Salesforce Backup Tool");
             primaryStage.setScene(scene);
-            primaryStage.setResizable(true);
-            primaryStage.setMinWidth(500);
-            primaryStage.setMinHeight(600);
+            primaryStage.setMinWidth(550);
+            primaryStage.setMinHeight(650);
+            primaryStage.setMaximized(true);
             primaryStage.show();
             
             logger.info("BackupForce application started");

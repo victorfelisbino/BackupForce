@@ -758,6 +758,11 @@ public class BackupController {
     }
     
     private void updateConnectionLabel() {
+        // connectionLabel may be null in the content-only FXML (loaded by MainController)
+        if (connectionLabel == null) {
+            return;
+        }
+        
         StringBuilder labelText = new StringBuilder();
         labelText.append("Salesforce: ").append(connectionInfo.getUsername());
         labelText.append(" @ ").append(connectionInfo.getInstanceUrl());

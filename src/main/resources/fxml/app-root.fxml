@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!-- Root Application Container - handles both login and main app -->
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.AppController"
+      fx:id="rootVBox"
+      stylesheets="@../css/backupforce-modern.css"
+      styleClass="app-root">
+    
+    <!-- Custom Title Bar (replaces Windows chrome) -->
+    <HBox fx:id="titleBar" styleClass="custom-title-bar" spacing="10" alignment="CENTER_LEFT"
+          onMousePressed="#handleTitleBarPressed" onMouseDragged="#handleTitleBarDragged">
+        <padding><Insets top="8" right="12" bottom="8" left="12"/></padding>
+        
+        <!-- App Icon and Title -->
+        <Label text="⚡" style="-fx-font-size: 16px;"/>
+        <Label text="BackupForce" styleClass="title-bar-text"/>
+        
+        <Region HBox.hgrow="ALWAYS"/>
+        
+        <!-- Window Controls -->
+        <Button fx:id="minimizeBtn" text="─" styleClass="window-control-btn" onAction="#handleMinimize"/>
+        <Button fx:id="maximizeBtn" text="□" styleClass="window-control-btn" onAction="#handleMaximize"/>
+        <Button fx:id="closeBtn" text="✕" styleClass="window-control-btn window-close-btn" onAction="#handleClose"/>
+    </HBox>
+    
+    <!-- Main Content Area -->
+    <StackPane fx:id="rootPane" styleClass="main-container" VBox.vgrow="ALWAYS">
+        <!-- Content will be swapped here: login view OR main app view -->
+    </StackPane>
+    
+</VBox>

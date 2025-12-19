@@ -7,8 +7,10 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" 
       fx:controller="com.backupforce.ui.TransformationController"
-      stylesheets="@../css/windows11-dark.css"
-      spacing="10" styleClass="transformation-container">
+      stylesheets="@../css/backupforce-modern.css"
+      prefWidth="1000" prefHeight="700"
+      minWidth="850" minHeight="550"
+      spacing="10" styleClass="main-container content-area">
     
     <padding>
         <Insets top="15" right="15" bottom="15" left="15"/>
@@ -55,11 +57,14 @@
                 
                 <TableView fx:id="tblRecordTypeMappings" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="colRtSourceId" text="Source ID" prefWidth="180"/>
-                        <TableColumn fx:id="colRtSourceName" text="Source Name" prefWidth="150"/>
-                        <TableColumn fx:id="colRtTargetMapping" text="Target RecordType" prefWidth="250"/>
-                        <TableColumn fx:id="colRtStatus" text="Status" prefWidth="100"/>
+                        <TableColumn fx:id="colRtSourceId" text="Source ID" prefWidth="180" minWidth="100"/>
+                        <TableColumn fx:id="colRtSourceName" text="Source Name" prefWidth="150" minWidth="100"/>
+                        <TableColumn fx:id="colRtTargetMapping" text="Target RecordType" prefWidth="250" minWidth="150"/>
+                        <TableColumn fx:id="colRtStatus" text="Status" prefWidth="100" minWidth="80"/>
                     </columns>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                     <placeholder>
                         <Label text="No RecordType mismatches detected. Click 'Analyze Schema' to scan."/>
                     </placeholder>
@@ -90,11 +95,14 @@
                 
                 <TableView fx:id="tblUserMappings" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="colUserSourceId" text="Source User ID" prefWidth="180"/>
-                        <TableColumn fx:id="colUserSourceName" text="Source Name" prefWidth="180"/>
-                        <TableColumn fx:id="colUserTargetMapping" text="Target User" prefWidth="250"/>
-                        <TableColumn fx:id="colUserStatus" text="Status" prefWidth="100"/>
+                        <TableColumn fx:id="colUserSourceId" text="Source User ID" prefWidth="180" minWidth="100"/>
+                        <TableColumn fx:id="colUserSourceName" text="Source Name" prefWidth="180" minWidth="100"/>
+                        <TableColumn fx:id="colUserTargetMapping" text="Target User" prefWidth="250" minWidth="150"/>
+                        <TableColumn fx:id="colUserStatus" text="Status" prefWidth="100" minWidth="80"/>
                     </columns>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                     <placeholder>
                         <Label text="No User mismatches detected. Click 'Analyze Schema' to scan."/>
                     </placeholder>
@@ -128,10 +136,13 @@
                 
                 <TableView fx:id="tblPicklistMappings" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="colPlSourceValue" text="Source Value" prefWidth="200"/>
-                        <TableColumn fx:id="colPlTargetMapping" text="Target Value" prefWidth="250"/>
-                        <TableColumn fx:id="colPlStatus" text="Status" prefWidth="100"/>
+                        <TableColumn fx:id="colPlSourceValue" text="Source Value" prefWidth="200" minWidth="100"/>
+                        <TableColumn fx:id="colPlTargetMapping" text="Target Value" prefWidth="250" minWidth="150"/>
+                        <TableColumn fx:id="colPlStatus" text="Status" prefWidth="100" minWidth="80"/>
                     </columns>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                     <placeholder>
                         <Label text="No Picklist mismatches detected. Select an object and field to view."/>
                     </placeholder>
@@ -164,11 +175,15 @@
                 
                 <TableView fx:id="tblFieldMappings" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="colFieldSource" text="Source Field" prefWidth="200"/>
-                        <TableColumn fx:id="colFieldTarget" text="Target Field" prefWidth="200"/>
-                        <TableColumn fx:id="colFieldExcluded" text="Excluded" prefWidth="80"/>
-                        <TableColumn fx:id="colFieldActions" text="Actions" prefWidth="100"/>
+                        <TableColumn fx:id="colFieldSource" text="Source Field" prefWidth="180" minWidth="100"/>
+                        <TableColumn fx:id="colFieldTarget" text="Target Field" prefWidth="180" minWidth="100"/>
+                        <TableColumn fx:id="colFieldStatus" text="Status" prefWidth="120" minWidth="80"/>
+                        <TableColumn fx:id="colFieldExcluded" text="Excluded" prefWidth="70" minWidth="50"/>
+                        <TableColumn fx:id="colFieldActions" text="Actions" prefWidth="80" minWidth="60"/>
                     </columns>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                     <placeholder>
                         <Label text="No field mappings configured. Add mappings to rename or exclude fields."/>
                     </placeholder>
@@ -204,12 +219,15 @@
                 
                 <TableView fx:id="tblValueTransforms" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="colTransformField" text="Field" prefWidth="150"/>
-                        <TableColumn fx:id="colTransformType" text="Type" prefWidth="120"/>
-                        <TableColumn fx:id="colTransformPattern" text="Pattern/Value" prefWidth="200"/>
-                        <TableColumn fx:id="colTransformReplacement" text="Replacement" prefWidth="150"/>
-                        <TableColumn fx:id="colTransformActions" text="Actions" prefWidth="100"/>
+                        <TableColumn fx:id="colTransformField" text="Field" prefWidth="150" minWidth="100"/>
+                        <TableColumn fx:id="colTransformType" text="Type" prefWidth="120" minWidth="80"/>
+                        <TableColumn fx:id="colTransformPattern" text="Pattern/Value" prefWidth="200" minWidth="100"/>
+                        <TableColumn fx:id="colTransformReplacement" text="Replacement" prefWidth="150" minWidth="80"/>
+                        <TableColumn fx:id="colTransformActions" text="Actions" prefWidth="100" minWidth="60"/>
                     </columns>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                     <placeholder>
                         <Label text="No value transformations configured. Add transforms for regex replacements, prefixes, etc."/>
                     </placeholder>

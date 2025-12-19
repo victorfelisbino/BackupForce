@@ -6,9 +6,10 @@
 
 <BorderPane xmlns:fx="http://javafx.com/fxml" 
             fx:controller="com.backupforce.ui.ConnectionsController"
-            stylesheets="@../css/windows11-dark.css"
-            prefWidth="820" prefHeight="560"
-            style="-fx-background-color: #1a1a1a;">
+            stylesheets="@../css/backupforce-modern.css"
+            prefWidth="1100" prefHeight="750"
+            minWidth="950" minHeight="650"
+            styleClass="main-container">
     
     <!-- Top Header Bar -->
     <top>

@@ -110,7 +110,7 @@ public class RestoreExecutor {
         // Validate records against target org schema if enabled
         if (effectiveOptions.isValidateBeforeRestore()) {
             log(objectName + ": Validating fields against target org schema...");
-            FieldValidator validator = new FieldValidator(accessToken, instanceUrl);
+            FieldValidator validator = new FieldValidator(instanceUrl, accessToken);
             FieldValidator.ValidationResult validation = validator.validateRecords(objectName, records);
             
             if (validation.hasErrors()) {
@@ -209,7 +209,7 @@ public class RestoreExecutor {
             
             for (int attempt = 1; attempt <= maxRetries && !cancelled.get(); attempt++) {
                 try {
-                    batchResult = processBatch(objectName, batch, effectiveMode, externalIdField, effectiveOptions);
+                    batchResult = processBatch(objectName, batch, effectiveMode, externalIdField, effectiveOptions, metadata);
                     
                     // Check if we should retry due to retryable errors
                     if (batchResult.hasRetryableErrors() && attempt < maxRetries) {
@@ -269,6 +269,163 @@ public class RestoreExecutor {
         return result;
     }
     
+    /**
+     * Restores data from a database table to Salesforce.
+     * The data is read from the specified database connection and table.
+     * 
+     * @param objectName The Salesforce object name to restore to
+     * @param records The records retrieved from the database (as list of maps)
+     * @param mode The restore mode (INSERT, UPSERT, UPDATE)
+     * @param options Restore options including batch size, error handling, etc.
+     * @return RestoreResult containing success/failure counts and errors
+     */
+    public RestoreResult restoreFromDatabase(String objectName, List<Map<String, Object>> records, 
+                                              RestoreMode mode, RestoreOptions options) throws IOException, ParseException {
+        
+        // Convert Object maps to String maps for compatibility with existing logic
+        List<Map<String, String>> stringRecords = new ArrayList<>();
+        for (Map<String, Object> record : records) {
+            Map<String, String> stringRecord = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : record.entrySet()) {
+                Object value = entry.getValue();
+                // Convert various types to String appropriately
+                if (value == null) {
+                    stringRecord.put(entry.getKey(), null);
+                } else if (value instanceof java.sql.Timestamp) {
+                    // Format timestamps for Salesforce
+                    stringRecord.put(entry.getKey(), ((java.sql.Timestamp) value).toInstant().toString());
+                } else if (value instanceof java.sql.Date) {
+                    stringRecord.put(entry.getKey(), value.toString());
+                } else if (value instanceof java.sql.Time) {
+                    stringRecord.put(entry.getKey(), value.toString());
+                } else if (value instanceof Boolean) {
+                    stringRecord.put(entry.getKey(), ((Boolean) value) ? "true" : "false");
+                } else if (value instanceof Number) {
+                    stringRecord.put(entry.getKey(), value.toString());
+                } else {
+                    stringRecord.put(entry.getKey(), value.toString());
+                }
+            }
+            stringRecords.add(stringRecord);
+        }
+        
+        log("Converted " + records.size() + " database records for " + objectName);
+        
+        // Delegate to common restore logic
+        return restoreRecords(objectName, stringRecords, mode, options);
+    }
+    
+    /**
+     * Core restore logic shared between CSV and database sources.
+     */
+    private RestoreResult restoreRecords(String objectName, List<Map<String, String>> records,
+                                         RestoreMode mode, RestoreOptions options) throws IOException, ParseException {
+        // Handle preserve IDs option - force upsert with Id as external ID
+        RestoreMode effectiveMode = mode;
+        RestoreOptions effectiveOptions = options;
+        if (options.isPreserveIds() && mode == RestoreMode.INSERT) {
+            log("Preserve IDs enabled - switching to UPSERT mode with Id as external ID");
+            effectiveMode = RestoreMode.UPSERT;
+            effectiveOptions = new RestoreOptions();
+            effectiveOptions.setBatchSize(options.getBatchSize());
+            effectiveOptions.setStopOnError(options.isStopOnError());
+            effectiveOptions.setValidateBeforeRestore(options.isValidateBeforeRestore());
+            effectiveOptions.setResolveRelationships(options.isResolveRelationships());
+            effectiveOptions.setPreserveIds(true);
+            effectiveOptions.setExternalIdField("Id");
+        }
+        
+        log("Starting restore for " + objectName + " in " + effectiveMode + " mode");
+        RestoreResult result = new RestoreResult(objectName);
+        
+        if (records.isEmpty()) {
+            log(objectName + ": No records to restore");
+            return result;
+        }
+        
+        log(objectName + ": Processing " + records.size() + " records");
+        result.setTotalRecords(records.size());
+        
+        // Validate records if enabled
+        if (effectiveOptions.isValidateBeforeRestore()) {
+            log(objectName + ": Validating fields against target org schema...");
+            FieldValidator validator = new FieldValidator(instanceUrl, accessToken);
+            FieldValidator.ValidationResult validation = validator.validateRecords(objectName, records);
+            
+            if (validation.hasErrors()) {
+                log(objectName + ": " + validation.getSummary());
+                for (String error : validation.getErrors()) {
+                    log("  ❌ " + error);
+                    result.addError(error);
+                }
+                if (effectiveOptions.isStopOnError()) {
+                    return result;
+                }
+            }
+            if (validation.hasWarnings()) {
+                for (String warning : validation.getWarnings()) {
+                    log("  ⚠️ " + warning);
+                }
+            }
+            if (validation.isValid()) {
+                log(objectName + ": ✓ Validation passed");
+            }
+        }
+        
+        // Resolve relationships if enabled
+        if (effectiveOptions.isResolveRelationships()) {
+            log(objectName + ": Resolving relationship references...");
+            records = relationshipResolver.resolveRelationships(objectName, records);
+        }
+        
+        // Get object metadata
+        RelationshipManager.ObjectMetadata metadata = relationshipManager.describeObject(objectName);
+        
+        // Determine external ID field for upsert
+        String externalIdField = null;
+        if (effectiveMode == RestoreMode.UPSERT) {
+            externalIdField = determineExternalIdField(metadata, effectiveOptions);
+            if (externalIdField == null) {
+                throw new IOException("No external ID field found for upsert on " + objectName);
+            }
+            log(objectName + ": Using external ID field '" + externalIdField + "' for upsert");
+        }
+        
+        // Dry run mode
+        if (effectiveOptions.isDryRun()) {
+            return performDryRun(objectName, records, effectiveMode, externalIdField, metadata, result);
+        }
+        
+        // Process in batches
+        int batchSize = effectiveOptions.getBatchSize();
+        int totalBatches = (int) Math.ceil((double) records.size() / batchSize);
+        
+        for (int batchNum = 0; batchNum < totalBatches && !cancelled.get(); batchNum++) {
+            int start = batchNum * batchSize;
+            int end = Math.min(start + batchSize, records.size());
+            List<Map<String, String>> batch = records.subList(start, end);
+            
+            log(String.format("%s: Processing batch %d/%d (%d records)", 
+                objectName, batchNum + 1, totalBatches, batch.size()));
+            
+            BatchResult batchResult = processBatch(objectName, batch, effectiveMode, 
+                externalIdField, effectiveOptions, metadata);
+            result.addBatchResult(batchResult);
+            updateProgress(objectName, end, records.size(), result);
+            
+            if (!batchResult.isSuccess() && effectiveOptions.isStopOnError()) {
+                log(objectName + ": Stopping due to errors");
+                break;
+            }
+        }
+        
+        result.setCompleted(!cancelled.get());
+        log(String.format("%s: Restore completed. Success: %d, Failed: %d", 
+            objectName, result.getSuccessCount(), result.getFailureCount()));
+        
+        return result;
+    }
+
     /**
      * Performs a dry run - simulates the restore process without making actual changes.
      * Validates data, shows what would be restored, and identifies potential issues.
@@ -415,12 +572,13 @@ public class RestoreExecutor {
     
     private BatchResult processBatch(String objectName, List<Map<String, String>> records,
                                       RestoreMode mode, String externalIdField,
-                                      RestoreOptions options) throws IOException, ParseException {
+                                      RestoreOptions options, 
+                                      RelationshipManager.ObjectMetadata metadata) throws IOException, ParseException {
         
         BatchResult result = new BatchResult();
         
-        // Clean records - remove Id column for insert, remove system fields
-        List<Map<String, String>> cleanedRecords = cleanRecordsForRestore(records, mode, objectName);
+        // Clean records - remove Id column for insert, remove system fields, filter unknown fields
+        List<Map<String, String>> cleanedRecords = cleanRecordsForRestore(records, mode, objectName, metadata);
         
         switch (mode) {
             case INSERT:
@@ -853,7 +1011,8 @@ public class RestoreExecutor {
     }
     
     private List<Map<String, String>> cleanRecordsForRestore(List<Map<String, String>> records,
-                                                              RestoreMode mode, String objectName) {
+                                                              RestoreMode mode, String objectName,
+                                                              RelationshipManager.ObjectMetadata metadata) {
         List<Map<String, String>> cleaned = new ArrayList<>();
         
         // System fields that should not be inserted
@@ -862,6 +1021,20 @@ public class RestoreExecutor {
             "SystemModstamp", "IsDeleted", "LastActivityDate", "LastViewedDate",
             "LastReferencedDate", "attributes"
         );
+        
+        // Build set of valid field names from metadata (case-insensitive)
+        Set<String> validFields = new HashSet<>();
+        Set<String> createableFields = new HashSet<>();
+        if (metadata != null && metadata.getFields() != null) {
+            for (RelationshipManager.FieldInfo field : metadata.getFields()) {
+                validFields.add(field.getName().toLowerCase());
+                if (field.isCreateable()) {
+                    createableFields.add(field.getName().toLowerCase());
+                }
+            }
+        }
+        
+        Set<String> skippedFields = new HashSet<>();
         
         // Fields starting with underscore are enrichment fields, skip them
         for (Map<String, String> record : records) {
@@ -884,6 +1057,25 @@ public class RestoreExecutor {
                 // For insert mode, skip Id field
                 if (mode == RestoreMode.INSERT && field.equals("Id")) {
                     continue;
+                }
+                
+                // Skip fields that don't exist in target org
+                if (metadata != null && !validFields.isEmpty()) {
+                    if (!validFields.contains(field.toLowerCase())) {
+                        if (!skippedFields.contains(field)) {
+                            log("  ⚠️ Skipping field '" + field + "' - not found in target org");
+                            skippedFields.add(field);
+                        }
+                        continue;
+                    }
+                    // For insert mode, skip non-createable fields (except Id which is already handled)
+                    if (mode == RestoreMode.INSERT && !createableFields.contains(field.toLowerCase())) {
+                        if (!skippedFields.contains(field)) {
+                            log("  ⚠️ Skipping field '" + field + "' - not createable");
+                            skippedFields.add(field);
+                        }
+                        continue;
+                    }
                 }
                 
                 // Skip empty values

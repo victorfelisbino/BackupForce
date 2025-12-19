@@ -17,7 +17,7 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
+import java.io.*;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -75,6 +75,7 @@ public class TransformationController implements Initializable {
     @FXML private TableView<FieldMappingRow> tblFieldMappings;
     @FXML private TableColumn<FieldMappingRow, String> colFieldSource;
     @FXML private TableColumn<FieldMappingRow, String> colFieldTarget;
+    @FXML private TableColumn<FieldMappingRow, String> colFieldStatus;
     @FXML private TableColumn<FieldMappingRow, String> colFieldExcluded;
     @FXML private TableColumn<FieldMappingRow, Void> colFieldActions;
     @FXML private TextArea txtMissingFields;
@@ -108,6 +109,8 @@ public class TransformationController implements Initializable {
     private Map<String, List<RecordTypeInfo>> targetRecordTypes = new LinkedHashMap<>();
     private List<UserInfo> targetUsers = new ArrayList<>();
     private Map<String, Map<String, List<String>>> targetPicklistValues = new LinkedHashMap<>();
+    private Map<String, Set<String>> backupFieldsByObject = new LinkedHashMap<>();
+    private Map<String, Set<String>> targetFieldsByObject = new LinkedHashMap<>();
     
     // State
     private String instanceUrl;
@@ -214,6 +217,7 @@ public class TransformationController implements Initializable {
     private void setupFieldTable() {
         colFieldSource.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().sourceField));
         colFieldTarget.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().targetField));
+        colFieldStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStatus()));
         colFieldExcluded.setCellValueFactory(data -> new SimpleStringProperty(
             data.getValue().excluded ? "Yes" : "No"));
         
@@ -354,8 +358,28 @@ public class TransformationController implements Initializable {
     public void setTransformationConfig(TransformationConfig config) {
         if (config != null) {
             this.config = config;
-            // TODO: Populate UI with existing config
+            // Populate UI with existing config if we have comparison results
+            Platform.runLater(this::populateUIFromConfig);
         }
+    }
+    
+    /**
+     * Populates UI tables from an existing transformation config
+     */
+    private void populateUIFromConfig() {
+        // If we haven't analyzed yet, nothing to populate
+        if (comparisonResults.isEmpty()) {
+            return;
+        }
+        
+        // Refresh dropdowns
+        populateObjectDropdowns();
+        
+        // Update summary with loaded config
+        updateSummary();
+        
+        logger.info("Loaded transformation config with {} object configurations", 
+            config.getObjectConfigs().size());
     }
     
     public void setOnApply(Consumer<TransformationConfig> callback) {
@@ -429,8 +453,10 @@ public class TransformationController implements Initializable {
         
         int totalObjects = 0;
         int totalRtMismatches = 0;
+        int totalUserMismatches = 0;
         int totalPicklistMismatches = 0;
         int totalMissingFields = 0;
+        Map<String, UserMismatch> allUserMismatches = new LinkedHashMap<>();
         
         for (File csvFile : filesToAnalyze) {
             String objectName = csvFile.getName().replace(".csv", "");
@@ -442,30 +468,43 @@ public class TransformationController implements Initializable {
             
             Platform.runLater(() -> lblStatus.setText("Analyzing " + objectName + "..."));
             
-            // Read backup data and analyze
-            // (In real implementation, read CSV and extract metadata)
-            // For now, using placeholder logic
-            
             try {
-                // Describe object to get target metadata
+                // Read CSV headers to get backup field names
+                Set<String> backupFields = readCsvHeaders(csvFile);
+                backupFieldsByObject.put(objectName, backupFields);
+                
+                // Extract special field values from backup data
+                Map<String, Set<String>> backupPicklistVals = extractPicklistValues(csvFile, backupFields);
+                Set<String> backupRecordTypeIds = extractFieldValues(csvFile, backupFields, "RecordTypeId");
+                Set<String> backupUserIds = extractUserReferenceIds(csvFile, backupFields);
+                
+                // Compare with target org
                 ObjectComparisonResult result = comparer.compareObject(
                     objectName,
-                    Set.of(), // Would extract from CSV headers
-                    Map.of(), // Would extract picklist values
-                    Set.of(), // Would extract RecordType IDs
-                    Set.of()  // Would extract User IDs
+                    backupFields,
+                    backupPicklistVals,
+                    backupRecordTypeIds,
+                    backupUserIds
                 );
                 
                 comparisonResults.put(objectName, result);
+                
+                // Store target fields
+                if (result.getTargetFields() != null) {
+                    targetFieldsByObject.put(objectName, result.getTargetFields());
+                }
                 
                 if (result.getTargetRecordTypes() != null && !result.getTargetRecordTypes().isEmpty()) {
                     targetRecordTypes.put(objectName, result.getTargetRecordTypes());
                 }
                 
-                allUserIds.addAll(result.getUserMismatches().stream()
-                    .map(UserMismatch::getSourceUserId).collect(Collectors.toList()));
+                // Collect user mismatches (use Map to deduplicate by source user ID)
+                for (UserMismatch mismatch : result.getUserMismatches()) {
+                    allUserMismatches.putIfAbsent(mismatch.getSourceUserId(), mismatch);
+                }
                 
                 totalObjects++;
+                totalUserMismatches += result.getUserMismatches().size();
                 totalRtMismatches += result.getRecordTypeMismatches().size();
                 totalPicklistMismatches += result.getPicklistMismatches().size();
                 totalMissingFields += result.getMissingFields().size();
@@ -476,7 +515,7 @@ public class TransformationController implements Initializable {
         }
         
         // Get all active users for mapping suggestions
-        if (!allUserIds.isEmpty()) {
+        if (!comparisonResults.isEmpty()) {
             ObjectComparisonResult firstResult = comparisonResults.values().iterator().next();
             if (firstResult != null && firstResult.getTargetUsers() != null) {
                 targetUsers = firstResult.getTargetUsers();
@@ -485,14 +524,18 @@ public class TransformationController implements Initializable {
         
         final int fTotalObjects = totalObjects;
         final int fTotalRt = totalRtMismatches;
+        final int fTotalUsers = allUserMismatches.size();
         final int fTotalPl = totalPicklistMismatches;
         final int fTotalMissing = totalMissingFields;
+        final Map<String, UserMismatch> fUserMismatches = allUserMismatches;
         
         Platform.runLater(() -> {
             populateObjectDropdowns();
+            populateUserMappingsTable(fUserMismatches);
             updateSummary();
             lblObjectsAnalyzed.setText(String.valueOf(fTotalObjects));
             lblRtMismatches.setText(String.valueOf(fTotalRt));
+            lblUserMismatches.setText(String.valueOf(fTotalUsers));
             lblPicklistMismatches.setText(String.valueOf(fTotalPl));
             lblMissingFields.setText(String.valueOf(fTotalMissing));
             
@@ -508,14 +551,240 @@ public class TransformationController implements Initializable {
         comparer.close();
     }
     
+    /**
+     * Reads CSV headers to get field names from backup
+     */
+    private Set<String> readCsvHeaders(File csvFile) throws IOException {
+        Set<String> headers = new LinkedHashSet<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = reader.readLine();
+            if (headerLine != null) {
+                String[] fields = parseCsvLine(headerLine);
+                for (String field : fields) {
+                    headers.add(field.trim());
+                }
+            }
+        }
+        return headers;
+    }
+    
+    /**
+     * Extracts unique values for picklist fields from backup CSV
+     */
+    private Map<String, Set<String>> extractPicklistValues(File csvFile, Set<String> headers) throws IOException {
+        Map<String, Set<String>> picklistValues = new LinkedHashMap<>();
+        
+        // Common picklist field patterns
+        Set<String> likelyPicklistFields = new LinkedHashSet<>();
+        for (String header : headers) {
+            String lowerHeader = header.toLowerCase();
+            if (lowerHeader.contains("type") || lowerHeader.contains("status") || 
+                lowerHeader.contains("stage") || lowerHeader.contains("priority") ||
+                lowerHeader.contains("source") || lowerHeader.contains("rating") ||
+                lowerHeader.contains("industry") || lowerHeader.contains("category") ||
+                header.endsWith("__c")) {
+                likelyPicklistFields.add(header);
+            }
+        }
+        
+        // Read up to 1000 records to extract unique values
+        try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = reader.readLine();
+            if (headerLine == null) return picklistValues;
+            
+            String[] headerArray = parseCsvLine(headerLine);
+            Map<String, Integer> headerIndex = new LinkedHashMap<>();
+            for (int i = 0; i < headerArray.length; i++) {
+                headerIndex.put(headerArray[i].trim(), i);
+            }
+            
+            String line;
+            int lineCount = 0;
+            while ((line = reader.readLine()) != null && lineCount < 1000) {
+                String[] values = parseCsvLine(line);
+                
+                for (String field : likelyPicklistFields) {
+                    Integer idx = headerIndex.get(field);
+                    if (idx != null && idx < values.length) {
+                        String value = values[idx].trim();
+                        if (!value.isEmpty() && !value.equals("null")) {
+                            picklistValues.computeIfAbsent(field, k -> new LinkedHashSet<>()).add(value);
+                        }
+                    }
+                }
+                lineCount++;
+            }
+        }
+        
+        return picklistValues;
+    }
+    
+    /**
+     * Extracts unique values for a specific field from backup CSV
+     */
+    private Set<String> extractFieldValues(File csvFile, Set<String> headers, String fieldName) throws IOException {
+        Set<String> values = new LinkedHashSet<>();
+        if (!headers.contains(fieldName)) return values;
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = reader.readLine();
+            if (headerLine == null) return values;
+            
+            String[] headerArray = parseCsvLine(headerLine);
+            int fieldIndex = -1;
+            for (int i = 0; i < headerArray.length; i++) {
+                if (headerArray[i].trim().equals(fieldName)) {
+                    fieldIndex = i;
+                    break;
+                }
+            }
+            
+            if (fieldIndex < 0) return values;
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] lineValues = parseCsvLine(line);
+                if (fieldIndex < lineValues.length) {
+                    String value = lineValues[fieldIndex].trim();
+                    if (!value.isEmpty() && !value.equals("null")) {
+                        values.add(value);
+                    }
+                }
+            }
+        }
+        
+        return values;
+    }
+    
+    /**
+     * Extracts User reference IDs from backup CSV (OwnerId, CreatedById, etc.)
+     */
+    private Set<String> extractUserReferenceIds(File csvFile, Set<String> headers) throws IOException {
+        Set<String> userIds = new LinkedHashSet<>();
+        
+        // User reference fields
+        Set<String> userFields = new LinkedHashSet<>();
+        for (String header : headers) {
+            if (header.equals("OwnerId") || header.equals("CreatedById") || 
+                header.equals("LastModifiedById") || header.endsWith("__c") && 
+                (header.contains("User") || header.contains("Owner") || header.contains("Manager"))) {
+                userFields.add(header);
+            }
+        }
+        
+        if (userFields.isEmpty()) return userIds;
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+            String headerLine = reader.readLine();
+            if (headerLine == null) return userIds;
+            
+            String[] headerArray = parseCsvLine(headerLine);
+            Map<String, Integer> headerIndex = new LinkedHashMap<>();
+            for (int i = 0; i < headerArray.length; i++) {
+                headerIndex.put(headerArray[i].trim(), i);
+            }
+            
+            String line;
+            int lineCount = 0;
+            while ((line = reader.readLine()) != null && lineCount < 500) {
+                String[] values = parseCsvLine(line);
+                
+                for (String field : userFields) {
+                    Integer idx = headerIndex.get(field);
+                    if (idx != null && idx < values.length) {
+                        String value = values[idx].trim();
+                        // User IDs start with 005
+                        if (value.startsWith("005") && (value.length() == 15 || value.length() == 18)) {
+                            userIds.add(value);
+                        }
+                    }
+                }
+                lineCount++;
+            }
+        }
+        
+        return userIds;
+    }
+    
+    /**
+     * Parses a CSV line handling quoted fields
+     */
+    private String[] parseCsvLine(String line) {
+        List<String> result = new ArrayList<>();
+        boolean inQuotes = false;
+        StringBuilder current = new StringBuilder();
+        
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                result.add(current.toString());
+                current = new StringBuilder();
+            } else {
+                current.append(c);
+            }
+        }
+        result.add(current.toString());
+        
+        return result.toArray(new String[0]);
+    }
+    
     private void populateObjectDropdowns() {
-        ObservableList<String> objects = FXCollections.observableArrayList(comparisonResults.keySet());
+        ObservableList<String> objects = FXCollections.observableArrayList(backupFieldsByObject.keySet());
+        if (objects.isEmpty()) {
+            objects = FXCollections.observableArrayList(comparisonResults.keySet());
+        }
         cmbRecordTypeObject.setItems(objects);
         cmbPicklistObject.setItems(objects);
         cmbFieldObject.setItems(objects);
         cmbTransformObject.setItems(objects);
     }
     
+    /**
+     * Populates the User mappings table with mismatched users from backup
+     */
+    private void populateUserMappingsTable(Map<String, UserMismatch> userMismatches) {
+        ObservableList<UserMappingRow> rows = FXCollections.observableArrayList();
+        
+        for (Map.Entry<String, UserMismatch> entry : userMismatches.entrySet()) {
+            String sourceUserId = entry.getKey();
+            UserMismatch mismatch = entry.getValue();
+            
+            UserMappingRow row = new UserMappingRow();
+            row.sourceId = sourceUserId;
+            row.sourceName = sourceUserId; // We don't have the name from backup, show ID
+            row.targetOptions = mismatch.getTargetOptions();
+            
+            // Check if already mapped in config
+            if (config.getUserMappings().containsKey(sourceUserId)) {
+                String targetId = config.getUserMappings().get(sourceUserId);
+                row.targetId = targetId;
+                
+                // Find target user name
+                for (UserInfo target : targetUsers) {
+                    if (target.getId().equals(targetId)) {
+                        row.targetName = target.getName();
+                        break;
+                    }
+                }
+            }
+            
+            rows.add(row);
+        }
+        
+        tblUserMappings.setItems(rows);
+        
+        // Set up ComboBox items for target user selection
+        if (!targetUsers.isEmpty()) {
+            ObservableList<String> targetOptions = FXCollections.observableArrayList(
+                targetUsers.stream().map(UserInfo::toString).collect(Collectors.toList())
+            );
+            colUserTargetMapping.setCellFactory(col -> new ComboBoxTableCell<>(targetOptions));
+        }
+    }
+
     @FXML
     private void handleRecordTypeObjectChange() {
         String objectName = cmbRecordTypeObject.getValue();
@@ -599,41 +868,85 @@ public class TransformationController implements Initializable {
         String objectName = cmbFieldObject.getValue();
         if (objectName == null) return;
         
-        ObjectComparisonResult result = comparisonResults.get(objectName);
-        if (result == null) return;
+        ObservableList<FieldMappingRow> rows = FXCollections.observableArrayList();
         
-        // Show missing fields
-        if (!result.getMissingFields().isEmpty()) {
-            txtMissingFields.setText(String.join("\n", result.getMissingFields()));
-        } else {
-            txtMissingFields.setText("");
+        // Get backup fields for this object
+        Set<String> backupFields = backupFieldsByObject.get(objectName);
+        Set<String> targetFields = targetFieldsByObject.get(objectName);
+        
+        // If we don't have target fields from comparison, try to get from result
+        if (targetFields == null || targetFields.isEmpty()) {
+            ObjectComparisonResult result = comparisonResults.get(objectName);
+            if (result != null && result.getTargetFields() != null) {
+                targetFields = result.getTargetFields();
+                targetFieldsByObject.put(objectName, targetFields);
+            }
         }
         
-        // Show existing field mappings
-        ObjectTransformConfig objConfig = config.getObjectConfig(objectName);
-        if (objConfig != null) {
-            ObservableList<FieldMappingRow> rows = FXCollections.observableArrayList();
+        // Build field comparison view
+        if (backupFields != null && !backupFields.isEmpty()) {
+            Set<String> targetFieldsLower = targetFields != null ? 
+                targetFields.stream().map(String::toLowerCase).collect(Collectors.toSet()) : 
+                new HashSet<>();
             
-            for (Map.Entry<String, String> entry : objConfig.getFieldNameMappings().entrySet()) {
+            List<String> missing = new ArrayList<>();
+            
+            for (String backupField : backupFields) {
+                // Skip system fields
+                if (isSystemField(backupField)) continue;
+                
                 FieldMappingRow row = new FieldMappingRow();
-                row.sourceField = entry.getKey();
-                row.targetField = entry.getValue();
-                row.excluded = false;
+                row.sourceField = backupField;
+                
+                // Check if field exists in target (case-insensitive)
+                if (targetFieldsLower.contains(backupField.toLowerCase())) {
+                    row.targetField = backupField; // Mapping to same name
+                    row.excluded = false;
+                    row.status = "✓ Matched";
+                } else {
+                    row.targetField = "";
+                    row.excluded = false;
+                    row.status = "⚠ Not in target";
+                    missing.add(backupField);
+                }
+                
+                // Check if already configured in transformation config
+                ObjectTransformConfig objConfig = config.getObjectConfig(objectName);
+                if (objConfig != null) {
+                    if (objConfig.getFieldNameMappings().containsKey(backupField)) {
+                        row.targetField = objConfig.getFieldNameMappings().get(backupField);
+                        row.status = "→ Mapped";
+                    }
+                    if (objConfig.getExcludedFields().contains(backupField)) {
+                        row.excluded = true;
+                        row.status = "✗ Excluded";
+                    }
+                }
+                
                 rows.add(row);
             }
             
-            for (String excludedField : objConfig.getExcludedFields()) {
-                FieldMappingRow row = new FieldMappingRow();
-                row.sourceField = excludedField;
-                row.targetField = "";
-                row.excluded = true;
-                rows.add(row);
+            // Show missing fields in the text area
+            if (!missing.isEmpty()) {
+                txtMissingFields.setText("Fields in backup but not in target org:\n" + 
+                    String.join("\n", missing));
+            } else {
+                txtMissingFields.setText("All backup fields exist in target org.");
             }
-            
-            tblFieldMappings.setItems(rows);
         } else {
-            tblFieldMappings.setItems(FXCollections.observableArrayList());
+            txtMissingFields.setText("No fields found in backup. Click 'Analyze Schema' first.");
         }
+        
+        tblFieldMappings.setItems(rows);
+    }
+    
+    private boolean isSystemField(String fieldName) {
+        Set<String> systemFields = Set.of(
+            "Id", "CreatedDate", "CreatedById", "LastModifiedDate", "LastModifiedById",
+            "SystemModstamp", "IsDeleted", "LastActivityDate", "LastViewedDate",
+            "LastReferencedDate", "attributes"
+        );
+        return systemFields.contains(fieldName) || fieldName.startsWith("_ref_");
     }
     
     @FXML
@@ -641,10 +954,12 @@ public class TransformationController implements Initializable {
         String objectName = cmbTransformObject.getValue();
         if (objectName == null) return;
         
-        ObjectComparisonResult result = comparisonResults.get(objectName);
-        if (result != null) {
-            // Populate field dropdown
-            // Would need to get all fields from backup or describe result
+        // Populate field dropdown with backup fields
+        Set<String> backupFields = backupFieldsByObject.get(objectName);
+        if (backupFields != null && !backupFields.isEmpty()) {
+            cmbTransformField.setItems(FXCollections.observableArrayList(backupFields));
+        } else {
+            cmbTransformField.setItems(FXCollections.observableArrayList());
         }
         
         // Show existing transforms
@@ -1127,6 +1442,11 @@ public class TransformationController implements Initializable {
         String sourceField;
         String targetField;
         boolean excluded;
+        String status;
+        
+        public String getStatus() {
+            return status != null ? status : "";
+        }
     }
     
     public static class ValueTransformRow {

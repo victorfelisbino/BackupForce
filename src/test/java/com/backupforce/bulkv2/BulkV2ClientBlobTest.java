@@ -224,4 +224,164 @@ public class BulkV2ClientBlobTest {
         
         client.close();
     }
+    
+    // ==================== ApiLimits Tests ====================
+    
+    @Test
+    void testApiLimits_getDailyApiPercentUsed() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.dailyApiRequestsUsed = 5000;
+        limits.dailyApiRequestsMax = 100000;
+        
+        assertEquals(5.0, limits.getDailyApiPercentUsed(), 0.01);
+    }
+    
+    @Test
+    void testApiLimits_getDailyApiPercentUsed_ZeroMax() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.dailyApiRequestsUsed = 5000;
+        limits.dailyApiRequestsMax = 0;
+        
+        assertEquals(0.0, limits.getDailyApiPercentUsed(), 0.01);
+    }
+    
+    @Test
+    void testApiLimits_getBulkApiPercentUsed() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.bulkApiJobsUsed = 50;
+        limits.bulkApiJobsMax = 1000;
+        
+        assertEquals(5.0, limits.getBulkApiPercentUsed(), 0.01);
+    }
+    
+    @Test
+    void testApiLimits_getBulkApiPercentUsed_ZeroMax() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.bulkApiJobsUsed = 50;
+        limits.bulkApiJobsMax = 0;
+        
+        assertEquals(0.0, limits.getBulkApiPercentUsed(), 0.01);
+    }
+    
+    @Test
+    void testApiLimits_getFormattedDailyApi() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.dailyApiRequestsUsed = 5000;
+        limits.dailyApiRequestsMax = 100000;
+        
+        String formatted = limits.getFormattedDailyApi();
+        
+        assertTrue(formatted.contains("5,000"));
+        assertTrue(formatted.contains("100,000"));
+        assertTrue(formatted.contains("5.0%"));
+    }
+    
+    @Test
+    void testApiLimits_getFormattedBulkApi() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.bulkApiJobsUsed = 50;
+        limits.bulkApiJobsMax = 1000;
+        
+        String formatted = limits.getFormattedBulkApi();
+        
+        assertTrue(formatted.contains("50"));
+        assertTrue(formatted.contains("1,000"));
+        assertTrue(formatted.contains("jobs"));
+    }
+    
+    @Test
+    void testApiLimits_AllFields() {
+        BulkV2Client.ApiLimits limits = new BulkV2Client.ApiLimits();
+        limits.dailyApiRequestsUsed = 10000;
+        limits.dailyApiRequestsMax = 1000000;
+        limits.bulkApiJobsUsed = 100;
+        limits.bulkApiJobsMax = 5000;
+        limits.bulkApiStorageUsedMB = 500;
+        limits.bulkApiStorageMaxMB = 10000;
+        
+        assertEquals(10000, limits.dailyApiRequestsUsed);
+        assertEquals(1000000, limits.dailyApiRequestsMax);
+        assertEquals(100, limits.bulkApiJobsUsed);
+        assertEquals(5000, limits.bulkApiJobsMax);
+        assertEquals(500, limits.bulkApiStorageUsedMB);
+        assertEquals(10000, limits.bulkApiStorageMaxMB);
+    }
+    
+    @Test
+    void testGetJsonString() throws Exception {
+        BulkV2Client client = new BulkV2Client("https://test.salesforce.com", "faketoken", "59.0");
+        
+        java.lang.reflect.Method method = BulkV2Client.class.getDeclaredMethod(
+            "getJsonString", com.google.gson.JsonObject.class, String.class, String.class);
+        method.setAccessible(true);
+        
+        com.google.gson.JsonObject obj = new com.google.gson.JsonObject();
+        obj.addProperty("name", "Test");
+        obj.add("nullField", com.google.gson.JsonNull.INSTANCE);
+        
+        // Test existing field
+        String name = (String) method.invoke(client, obj, "name", "default");
+        assertEquals("Test", name);
+        
+        // Test missing field
+        String missing = (String) method.invoke(client, obj, "nonexistent", "default");
+        assertEquals("default", missing);
+        
+        // Test null field
+        String nullValue = (String) method.invoke(client, obj, "nullField", "default");
+        assertEquals("default", nullValue);
+        
+        client.close();
+    }
+    
+    @Test
+    void testClientClose() throws Exception {
+        BulkV2Client client = new BulkV2Client("https://test.salesforce.com", "faketoken", "59.0");
+        
+        // Should not throw
+        assertDoesNotThrow(() -> client.close());
+    }
+    
+    @Test
+    void testBuildBlobFileName_Document() throws Exception {
+        BulkV2Client client = new BulkV2Client("https://test.salesforce.com", "faketoken", "59.0");
+        
+        java.lang.reflect.Method method = BulkV2Client.class.getDeclaredMethod(
+            "buildBlobFileName", String.class, com.google.gson.JsonObject.class);
+        method.setAccessible(true);
+        
+        com.google.gson.JsonObject record = new com.google.gson.JsonObject();
+        record.addProperty("Id", "015ABCDEFGHIJKLMNO");
+        record.addProperty("Name", "Logo");
+        record.addProperty("Type", "png");
+        record.addProperty("ContentType", "image/png");
+        
+        String fileName = (String) method.invoke(client, "Document", record);
+        
+        assertTrue(fileName.contains("015ABCDEFGHIJKLMNO"));
+        assertTrue(fileName.endsWith(".png"));
+        
+        client.close();
+    }
+    
+    @Test
+    void testBuildBlobFileName_StaticResource() throws Exception {
+        BulkV2Client client = new BulkV2Client("https://test.salesforce.com", "faketoken", "59.0");
+        
+        java.lang.reflect.Method method = BulkV2Client.class.getDeclaredMethod(
+            "buildBlobFileName", String.class, com.google.gson.JsonObject.class);
+        method.setAccessible(true);
+        
+        com.google.gson.JsonObject record = new com.google.gson.JsonObject();
+        record.addProperty("Id", "081ABCDEFGHIJKLMNO");
+        record.addProperty("Name", "StyleBundle");
+        record.addProperty("ContentType", "application/zip");
+        
+        String fileName = (String) method.invoke(client, "StaticResource", record);
+        
+        assertTrue(fileName.contains("081ABCDEFGHIJKLMNO"));
+        assertTrue(fileName.contains("StyleBundle"));
+        
+        client.close();
+    }
 }

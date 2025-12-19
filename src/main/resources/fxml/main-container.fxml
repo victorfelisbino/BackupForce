@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="com.backupforce.ui.MainController"
+            fx:id="rootContainer"
+            stylesheets="@../css/backupforce-modern.css"
+            styleClass="main-container">
+    
+    <!-- LEFT: Sidebar Navigation (always visible after login) -->
+    <left>
+        <VBox fx:id="sidebar" styleClass="sidebar" spacing="0">
+            
+            <!-- App Branding -->
+            <HBox styleClass="app-brand" spacing="10" alignment="CENTER_LEFT">
+                <Label text="⚡" styleClass="app-logo-icon"/>
+                <Label text="BackupForce" styleClass="app-logo"/>
+            </HBox>
+            
+            <!-- Navigation Items -->
+            <VBox styleClass="nav-section" spacing="2" VBox.vgrow="ALWAYS">
+                <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
+                
+                <Label text="MAIN" styleClass="nav-section-title"/>
+                
+                <HBox fx:id="navDashboard" styleClass="nav-item nav-item-active" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToDashboard">
+                    <Label text="🏠" styleClass="nav-icon"/>
+                    <Label text="Dashboard"/>
+                </HBox>
+                
+                <HBox fx:id="navBackup" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToBackup">
+                    <Label text="📤" styleClass="nav-icon"/>
+                    <Label text="Data Backup"/>
+                </HBox>
+                
+                <HBox fx:id="navRestore" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToRestore">
+                    <Label text="📥" styleClass="nav-icon"/>
+                    <Label text="Data Restore"/>
+                </HBox>
+                
+                <Region prefHeight="16"/>
+                <Label text="SETTINGS" styleClass="nav-section-title"/>
+                
+                <HBox fx:id="navConnections" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToConnections">
+                    <Label text="🔗" styleClass="nav-icon"/>
+                    <Label text="Connections"/>
+                </HBox>
+                
+                <HBox fx:id="navPreferences" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToPreferences">
+                    <Label text="⚙️" styleClass="nav-icon"/>
+                    <Label text="Preferences"/>
+                </HBox>
+                
+                <HBox fx:id="navAbout" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToAbout">
+                    <Label text="ℹ️" styleClass="nav-icon"/>
+                    <Label text="About"/>
+                </HBox>
+                
+                <Region VBox.vgrow="ALWAYS"/>
+            </VBox>
+            
+            <!-- User Panel (Footer) -->
+            <VBox styleClass="user-panel" spacing="8">
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <StackPane styleClass="user-avatar">
+                        <Label text="U"/>
+                    </StackPane>
+                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                        <Label fx:id="usernameLabel" text="user@example.com" styleClass="user-name"/>
+                        <Label fx:id="instanceLabel" text="production" styleClass="user-org"/>
+                    </VBox>
+                </HBox>
+                <Button text="Sign Out" onAction="#handleLogout" styleClass="btn btn-ghost" 
+                        maxWidth="Infinity"/>
+            </VBox>
+        </VBox>
+    </left>
+    
+    <!-- CENTER: Dynamic Content Area -->
+    <center>
+        <StackPane fx:id="contentArea" styleClass="content-area">
+            <!-- Content will be loaded dynamically here -->
+        </StackPane>
+    </center>
+</BorderPane>

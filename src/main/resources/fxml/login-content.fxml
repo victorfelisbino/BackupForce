@@ -3,14 +3,11 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
 
+<!-- Login Content Panel - embedded in app root -->
 <StackPane xmlns:fx="http://javafx.com/fxml" 
-           fx:controller="com.backupforce.ui.LoginController"
-           styleClass="login-page"
-           stylesheets="@../css/backupforce-modern.css"
-           prefWidth="900" prefHeight="700"
-           minWidth="700" minHeight="600">
+           fx:controller="com.backupforce.ui.LoginContentController"
+           styleClass="login-page">
     
     <!-- Main Login Content -->
     <VBox alignment="CENTER" spacing="32">
@@ -21,7 +18,7 @@
         <!-- Header -->
         <VBox spacing="8" alignment="CENTER" style="-fx-padding: 0 0 16 0;">
             <HBox spacing="12" alignment="CENTER">
-                <Label text="⚡" style="-fx-font-size: 36px;"/>
+                <Label text="⚡" style="-fx-font-size: 48px;"/>
                 <Label text="BackupForce" styleClass="login-logo"/>
             </HBox>
             <Label text="Salesforce Backup &amp; Restore Tool" styleClass="login-subtitle"/>
@@ -36,10 +33,7 @@
             <!-- Environment Selection -->
             <VBox spacing="12">
                 <Label text="Environment" styleClass="form-label"/>
-                <HBox spacing="12">
-                    <ComboBox fx:id="environmentCombo" maxWidth="Infinity" HBox.hgrow="ALWAYS" 
-                              styleClass="form-combo"/>
-                </HBox>
+                <ComboBox fx:id="environmentCombo" maxWidth="Infinity" styleClass="form-combo"/>
                 <Label fx:id="environmentUrlLabel" text="OAuth will use: https://login.salesforce.com" 
                        styleClass="form-hint"/>
             </VBox>

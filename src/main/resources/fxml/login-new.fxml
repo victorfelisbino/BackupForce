@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns:fx="http://javafx.com/fxml" 
+           fx:controller="com.backupforce.ui.LoginController"
+           stylesheets="@../css/backupforce-modern.css"
+           styleClass="login-container"
+           prefWidth="900" prefHeight="700"
+           minWidth="700" minHeight="600">
+    
+    <!-- Center Card -->
+    <VBox styleClass="login-card" spacing="32" alignment="CENTER">
+        
+        <!-- Logo and Branding -->
+        <VBox spacing="8" alignment="CENTER">
+            <Label text="⚡" style="-fx-font-size: 48px;"/>
+            <Label text="BackupForce" styleClass="login-logo"/>
+            <Label text="Secure Salesforce Backup &amp; Restore" styleClass="login-subtitle"/>
+        </VBox>
+        
+        <!-- OAuth Login Section -->
+        <VBox spacing="16" alignment="CENTER">
+            
+            <!-- Environment Selection -->
+            <VBox spacing="8" alignment="CENTER_LEFT" maxWidth="340">
+                <Label text="Salesforce Environment" styleClass="form-label"/>
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <RadioButton fx:id="productionRadio" text="Production" selected="true">
+                        <toggleGroup><ToggleGroup fx:id="environmentGroup"/></toggleGroup>
+                    </RadioButton>
+                    <RadioButton fx:id="sandboxRadio" text="Sandbox" toggleGroup="$environmentGroup"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Login Button -->
+            <Button fx:id="loginButton" text="Connect to Salesforce" 
+                    onAction="#handleOAuthLogin" 
+                    styleClass="btn btn-accent btn-lg"
+                    prefWidth="340" prefHeight="48"/>
+            
+            <!-- Status Message -->
+            <Label fx:id="statusLabel" text="" 
+                   style="-fx-text-fill: #8b949e; -fx-font-size: 13px;" 
+                   wrapText="true" textAlignment="CENTER" maxWidth="340"/>
+        </VBox>
+        
+        <!-- Divider -->
+        <HBox styleClass="login-divider" alignment="CENTER" maxWidth="340">
+            <Separator HBox.hgrow="ALWAYS"/>
+            <Label text="OR" styleClass="login-divider-text"/>
+            <Separator HBox.hgrow="ALWAYS"/>
+        </HBox>
+        
+        <!-- Manual Login Section (Collapsed by default) -->
+        <VBox fx:id="manualLoginSection" spacing="16" alignment="CENTER" maxWidth="340">
+            
+            <TitledPane text="Advanced: Username &amp; Password" expanded="false" 
+                        style="-fx-background-color: transparent;">
+                <VBox spacing="16" style="-fx-padding: 16 0 0 0;">
+                    
+                    <VBox spacing="8">
+                        <Label text="Username" styleClass="form-label"/>
+                        <TextField fx:id="usernameField" promptText="your.email@company.com" 
+                                   styleClass="text-field"/>
+                    </VBox>
+                    
+                    <VBox spacing="8">
+                        <Label text="Password + Security Token" styleClass="form-label"/>
+                        <PasswordField fx:id="passwordField" promptText="Password followed by token" 
+                                       styleClass="text-field"/>
+                    </VBox>
+                    
+                    <VBox spacing="8">
+                        <Label text="Custom Domain (optional)" styleClass="form-label"/>
+                        <TextField fx:id="domainField" promptText="mycompany.my.salesforce.com" 
+                                   styleClass="text-field"/>
+                        <Label text="Leave empty for standard login URLs" styleClass="form-hint"/>
+                    </VBox>
+                    
+                    <Button fx:id="manualLoginButton" text="Sign In" 
+                            onAction="#handleLogin" 
+                            styleClass="btn btn-secondary"
+                            maxWidth="Infinity"/>
+                </VBox>
+            </TitledPane>
+        </VBox>
+        
+        <!-- Version Info -->
+        <Label fx:id="versionLabel" text="v2.3.0" 
+               style="-fx-text-fill: #6e7681; -fx-font-size: 11px;"/>
+        
+    </VBox>
+    
+    <!-- Loading Overlay -->
+    <VBox fx:id="loadingOverlay" visible="false" managed="false" 
+          alignment="CENTER" spacing="16"
+          style="-fx-background-color: rgba(13, 17, 23, 0.9);">
+        <ProgressIndicator prefWidth="48" prefHeight="48"/>
+        <Label fx:id="loadingLabel" text="Connecting to Salesforce..." 
+               style="-fx-text-fill: #e6edf3; -fx-font-size: 14px;"/>
+    </VBox>
+    
+</StackPane>

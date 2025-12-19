@@ -951,11 +951,13 @@ public class ConnectionsController {
                 BackupController controller = loader.getController();
                 controller.setConnectionInfo(connectionInfo);
                 
-                Scene scene = new Scene(root, 1200, 800);
+                Scene scene = new Scene(root, 1100, 750);
                 Stage stage = (Stage) backButton.getScene().getWindow();
                 stage.setScene(scene);
                 stage.setResizable(true);
-                stage.centerOnScreen();
+                stage.setMinWidth(950);
+                stage.setMinHeight(650);
+                stage.setMaximized(true);
             } else {
                 // Return to home screen
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
@@ -964,11 +966,13 @@ public class ConnectionsController {
                 HomeController controller = loader.getController();
                 controller.setConnectionInfo(connectionInfo);
                 
-                Scene scene = new Scene(root, 820, 560);
+                Scene scene = new Scene(root, 1100, 750);
                 Stage stage = (Stage) backButton.getScene().getWindow();
                 stage.setScene(scene);
-                stage.setResizable(false);
-                stage.centerOnScreen();
+                stage.setResizable(true);
+                stage.setMinWidth(950);
+                stage.setMinHeight(650);
+                stage.setMaximized(true);
             }
         } catch (Exception e) {
             logger.error("Failed to navigate back", e);

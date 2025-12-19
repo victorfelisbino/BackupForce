@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
 
-A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a modern Windows 11 dark theme UI.
+A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a beautiful **GitHub-inspired dark theme** with a calming nature background for stress-free data operations.
 
 ![BackupForce Screenshot](docs/screenshot.png)
 
@@ -12,20 +12,16 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 ## 🚀 Quick Download
 
-**[⬇️ Download BackupForce v2.3.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
+**[⬇️ Download BackupForce v3.0.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
 
 ### Windows
-- `BackupForce-2.3.0.msi` - Installer
-- `BackupForce-2.3.0-portable.zip` - Portable
+- `BackupForce-3.0.0-portable.zip` - Portable (Recommended)
 
 ### macOS
-- `BackupForce-2.3.0.dmg` - Disk Image
-- `BackupForce-2.3.0-macos.zip` - Portable
+- `BackupForce-3.0.0-macos.zip` - Portable
 
 ### Linux
-- `BackupForce-2.3.0.deb` - Debian/Ubuntu
-- `BackupForce-2.3.0.rpm` - Fedora/RHEL
-- `BackupForce-2.3.0-linux.tar.gz` - Universal
+- `BackupForce-3.0.0-linux.tar.gz` - Universal
 
 **No Java installation required** - runtime is bundled!
 
@@ -59,7 +55,9 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 - **Save/Load Mappings** - Persist transformation configs as JSON files
 
 ### User Experience
-- **Windows 11 Dark Theme** - Modern Fluent Design UI
+- **GitHub Dark Theme** - Beautiful GitHub-inspired dark UI with semi-transparent panels
+- **Nature Background** - Calming mountain landscape for stress-free data operations
+- **Custom Title Bar** - Sleek integrated title bar matching the theme
 - **OAuth Authentication** - Secure Salesforce login
 - **Session Caching** - SSO sessions cached for 30 minutes (no repeated browser popups)
 - **Object Selection** - Search and filter 2500+ objects

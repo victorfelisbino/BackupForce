@@ -8,12 +8,8 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +18,14 @@ import java.util.Base64;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.prefs.Preferences;
 
-public class LoginController {
-    private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
-    private static final Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
+/**
+ * Controller for the login content panel.
+ * This controller is embedded in the AppController's root container
+ * to avoid scene changes during login-to-app transitions.
+ */
+public class LoginContentController {
+    private static final Logger logger = LoggerFactory.getLogger(LoginContentController.class);
+    private static final Preferences prefs = Preferences.userNodeForPackage(LoginContentController.class);
 
     @FXML private TextField usernameField;
     @FXML private PasswordField passwordField;
@@ -43,7 +44,14 @@ public class LoginController {
     
     private boolean isLoggingIn = false;
     private SalesforceOAuthServer currentOAuthServer = null;
-    private javafx.animation.Timeline countdownTimeline = null;
+    private Timeline countdownTimeline = null;
+    
+    // Reference to parent AppController for navigation
+    private AppController appController;
+
+    public void setAppController(AppController appController) {
+        this.appController = appController;
+    }
 
     @FXML
     public void initialize() {
@@ -79,13 +87,12 @@ public class LoginController {
     
     private void loadSavedCredentialsList() {
         try {
-            // Get all saved credential keys
             String[] keys = prefs.keys();
             java.util.Set<String> usernames = new java.util.HashSet<>();
             
             for (String key : keys) {
                 if (key.startsWith("cred_")) {
-                    String username = key.substring(5); // Remove "cred_" prefix
+                    String username = key.substring(5);
                     usernames.add(username);
                 }
             }
@@ -97,7 +104,6 @@ public class LoginController {
                 savedCredentialsList.getItems().clear();
                 savedCredentialsList.getItems().addAll(usernames.stream().sorted().collect(java.util.stream.Collectors.toList()));
                 
-                // Handle selection
                 savedCredentialsList.setOnMouseClicked(event -> {
                     if (event.getClickCount() == 2) {
                         String selected = savedCredentialsList.getSelectionModel().getSelectedItem();
@@ -145,7 +151,6 @@ public class LoginController {
             
             if (!savedUsername.isEmpty()) {
                 usernameField.setText(savedUsername);
-                // Decode password from base64 (basic obfuscation)
                 if (!savedPassword.isEmpty()) {
                     passwordField.setText(new String(Base64.getDecoder().decode(savedPassword)));
                 }
@@ -164,20 +169,17 @@ public class LoginController {
     private void saveCredentials(String username, String password, String token, int environment) {
         try {
             if (rememberCredentialsCheckBox.isSelected()) {
-                // Save in new format with username as key
                 String credData = Base64.getEncoder().encodeToString(password.getBytes()) + "|" +
                                  Base64.getEncoder().encodeToString(token.getBytes()) + "|" +
                                  environment;
                 prefs.put("cred_" + username, credData);
                 
-                // Also save as "most recent"
                 prefs.put("username", username);
                 prefs.put("password", Base64.getEncoder().encodeToString(password.getBytes()));
                 prefs.put("token", Base64.getEncoder().encodeToString(token.getBytes()));
                 prefs.putInt("environment", environment);
                 logger.info("Saved credentials for user: {}", username);
             } else {
-                // Clear saved credentials if unchecked
                 clearSavedCredentials();
             }
         } catch (Exception e) {
@@ -201,13 +203,11 @@ public class LoginController {
         String password = passwordField.getText();
         String token = tokenField.getText().trim();
         
-        // Validate input
         if (username.isEmpty() || password.isEmpty()) {
             statusLabel.setText("Username and password are required");
             return;
         }
         
-        // Combine password and token (token is optional if IP is whitelisted)
         String fullPassword = token.isEmpty() ? password : password + token;
         
         String serverUrl = environmentCombo.getSelectionModel().getSelectedIndex() == 0 
@@ -219,10 +219,9 @@ public class LoginController {
         progressIndicator.setVisible(true);
         statusLabel.setText("Authenticating...");
 
-        Task<ConnectionInfo> loginTask = new Task<ConnectionInfo>() {
+        Task<LoginController.ConnectionInfo> loginTask = new Task<>() {
             @Override
-            protected ConnectionInfo call() throws Exception {
-                // Authenticate using Partner API (SOAP)
+            protected LoginController.ConnectionInfo call() throws Exception {
                 ConnectorConfig partnerConfig = new ConnectorConfig();
                 partnerConfig.setUsername(username);
                 partnerConfig.setPassword(fullPassword);
@@ -230,45 +229,28 @@ public class LoginController {
                 
                 PartnerConnection connection = new PartnerConnection(partnerConfig);
                 
-                // Extract session info for REST API
                 String sessionId = partnerConfig.getSessionId();
                 String instanceUrl = partnerConfig.getServiceEndpoint();
-                // Remove the SOAP endpoint part to get base instance URL
                 instanceUrl = instanceUrl.substring(0, instanceUrl.indexOf("/services"));
                 
-                return new ConnectionInfo(connection, sessionId, instanceUrl, username, fullPassword, serverUrl);
+                return new LoginController.ConnectionInfo(connection, sessionId, instanceUrl, username, fullPassword, serverUrl);
             }
         };
         
         loginTask.setOnSucceeded(e -> {
             Platform.runLater(() -> {
-                ConnectionInfo connInfo = loginTask.getValue();
+                LoginController.ConnectionInfo connInfo = loginTask.getValue();
                 logger.info("Successfully authenticated to Salesforce");
                 statusLabel.setText("Authentication successful!");
                 
-                // Save credentials if remember is checked
                 saveCredentials(username, password, token, environmentCombo.getSelectionModel().getSelectedIndex());
-            
-                // Open main container
-                try {
-                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main-container.fxml"));
-                    Parent root = loader.load();
-                    
-                    MainController controller = loader.getController();
-                    controller.setConnectionInfo(connInfo);
-                    
-                    Scene scene = new Scene(root);
-                    scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
-                    
-                    Stage stage = (Stage) loginButton.getScene().getWindow();
-                    stage.setScene(scene);
-                    stage.setResizable(true);
-                    stage.setMinWidth(950);
-                    stage.setMinHeight(650);
-                    // Window stays maximized - no resize
-                } catch (Exception ex) {
-                    logger.error("Failed to load main window", ex);
-                    statusLabel.setText("Failed to open main window: " + ex.getMessage());
+                
+                // Navigate to main app via AppController
+                if (appController != null) {
+                    appController.showMainApp(connInfo);
+                } else {
+                    logger.error("AppController not set - cannot navigate to main app");
+                    statusLabel.setText("Navigation error - please restart the application");
                 }
             });
         });
@@ -281,11 +263,9 @@ public class LoginController {
                 Throwable exception = loginTask.getException();
                 logger.error("Authentication failed", exception);
                 
-                // Extract detailed error message
                 String errorMessage = extractErrorMessage(exception);
                 statusLabel.setText("Login failed");
                 
-                // Show detailed error dialog
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Authentication Failed");
                 alert.setHeaderText("Could not connect to Salesforce");
@@ -311,7 +291,6 @@ public class LoginController {
             message = exception.getClass().getSimpleName();
         }
         
-        // Common error patterns and user-friendly messages
         if (message.contains("INVALID_LOGIN")) {
             return "Invalid username, password, or security token.\n\n" +
                    "Tips:\n" +
@@ -336,7 +315,6 @@ public class LoginController {
         } else if (message.contains("INVALID_SESSION_ID")) {
             return "Session expired. Please try logging in again.";
         } else {
-            // Return the actual error message with some context
             return "Authentication error:\n\n" + message + "\n\n" +
                    "If this problem persists, verify your credentials and network connection.";
         }
@@ -348,11 +326,9 @@ public class LoginController {
             return;
         }
         
-        // Show cancel button and countdown
-        final int TIMEOUT_SECONDS = 180; // 3 minutes
+        final int TIMEOUT_SECONDS = 180;
         final AtomicInteger remainingSeconds = new AtomicInteger(TIMEOUT_SECONDS);
         
-        // Setup countdown timer
         countdownTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             int remaining = remainingSeconds.decrementAndGet();
             int minutes = remaining / 60;
@@ -360,7 +336,7 @@ public class LoginController {
             timeoutLabel.setText(String.format("Time remaining: %d:%02d", minutes, seconds));
             
             if (remaining <= 30) {
-                timeoutLabel.setStyle("-fx-text-fill: #e74c3c;"); // Red when low
+                timeoutLabel.setStyle("-fx-text-fill: #e74c3c;");
             }
         }));
         countdownTimeline.setCycleCount(TIMEOUT_SECONDS);
@@ -371,17 +347,14 @@ public class LoginController {
                 try {
                     updateMessage("Opening browser for authentication...\nComplete login in browser, then return here.");
                     
-                    // Get selected environment
                     String environment = environmentCombo.getSelectionModel().getSelectedItem();
                     String loginUrl = environment.contains("Sandbox") ? 
                         "https://test.salesforce.com" : "https://login.salesforce.com";
                     
-                    // Start OAuth flow with configurable timeout
                     currentOAuthServer = new SalesforceOAuthServer();
                     currentOAuthServer.setTimeout(TIMEOUT_SECONDS);
                     SalesforceOAuthServer.OAuthResult result = currentOAuthServer.authenticate(loginUrl);
                     
-                    // Check if cancelled
                     if (result.isCancelled()) {
                         Platform.runLater(() -> {
                             statusLabel.setText("Login cancelled");
@@ -397,50 +370,33 @@ public class LoginController {
                     
                     updateMessage("Creating session...");
                     
-                    // Create Partner connection with OAuth token
                     ConnectorConfig config = new ConnectorConfig();
                     config.setSessionId(result.accessToken);
                     config.setServiceEndpoint(result.instanceUrl + "/services/Soap/u/62.0");
                     
                     PartnerConnection connection = new PartnerConnection(config);
                     
-                    // Test connection
                     String username = connection.getUserInfo().getUserName();
                     logger.info("OAuth login successful for user: {}", username);
                     
                     updateMessage("Success! Loading main window...");
                     
-                    // Create ConnectionInfo object for OAuth session
-                    final ConnectionInfo connInfo = new ConnectionInfo(
+                    final LoginController.ConnectionInfo connInfo = new LoginController.ConnectionInfo(
                         connection,
                         result.accessToken,
                         result.instanceUrl,
                         username,
-                        null, // no password with OAuth
+                        null,
                         loginUrl
                     );
                     
-                    // Load main container
+                    // Navigate to main app via AppController
                     Platform.runLater(() -> {
-                        try {
-                            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main-container.fxml"));
-                            Parent root = loader.load();
-                            
-                            MainController controller = loader.getController();
-                            controller.setConnectionInfo(connInfo);
-                            
-                            Scene scene = new Scene(root);
-                            scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
-                            
-                            Stage stage = (Stage) oauthButton.getScene().getWindow();
-                            stage.setScene(scene);
-                            stage.setResizable(true);
-                            stage.setMinWidth(950);
-                            stage.setMinHeight(650);
-                            // Window stays maximized - no resize
-                        } catch (Exception ex) {
-                            logger.error("Failed to load main window", ex);
-                            showError("Failed to open main window: " + ex.getMessage());
+                        if (appController != null) {
+                            appController.showMainApp(connInfo);
+                        } else {
+                            logger.error("AppController not set - cannot navigate to main app");
+                            showError("Navigation error - please restart the application");
                         }
                     });
                     
@@ -507,18 +463,15 @@ public class LoginController {
     private void handleCancelOAuth() {
         logger.info("User cancelled OAuth flow");
         
-        // Stop the countdown
         if (countdownTimeline != null) {
             countdownTimeline.stop();
         }
         
-        // Cancel the OAuth server
         if (currentOAuthServer != null) {
             currentOAuthServer.cancel();
             currentOAuthServer = null;
         }
         
-        // Reset UI
         isLoggingIn = false;
         progressIndicator.setVisible(false);
         loginButton.setDisable(false);
@@ -539,32 +492,5 @@ public class LoginController {
             alert.setContentText(message);
             alert.showAndWait();
         });
-    }
-
-    // Inner class to hold connection information
-    public static class ConnectionInfo {
-        private final PartnerConnection connection;
-        private final String sessionId;
-        private final String instanceUrl;
-        private final String username;
-        private final String password;
-        private final String serverUrl;
-
-        public ConnectionInfo(PartnerConnection connection, String sessionId, String instanceUrl,
-                            String username, String password, String serverUrl) {
-            this.connection = connection;
-            this.sessionId = sessionId;
-            this.instanceUrl = instanceUrl;
-            this.username = username;
-            this.password = password;
-            this.serverUrl = serverUrl;
-        }
-
-        public PartnerConnection getConnection() { return connection; }
-        public String getSessionId() { return sessionId; }
-        public String getInstanceUrl() { return instanceUrl; }
-        public String getUsername() { return username; }
-        public String getPassword() { return password; }
-        public String getServerUrl() { return serverUrl; }
     }
 }

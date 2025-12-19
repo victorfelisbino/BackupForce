@@ -182,8 +182,12 @@ public class HomeController {
             String lastBackup = prefs.get("lastBackupDate", "No backups yet");
             int totalBackups = prefs.getInt("totalBackups", 0);
             
-            lastBackupLabel.setText(lastBackup);
-            totalBackupsLabel.setText(String.valueOf(totalBackups));
+            if (lastBackupLabel != null) {
+                lastBackupLabel.setText(lastBackup);
+            }
+            if (totalBackupsLabel != null) {
+                totalBackupsLabel.setText(String.valueOf(totalBackups));
+            }
         } catch (Exception e) {
             logger.warn("Failed to load recent activity", e);
         }
@@ -194,19 +198,25 @@ public class HomeController {
             List<SavedConnection> connections = ConnectionManager.getInstance().getConnections();
             
             if (connections.isEmpty()) {
-                noConnectionsLabel.setVisible(true);
-                noConnectionsLabel.setManaged(true);
+                if (noConnectionsLabel != null) {
+                    noConnectionsLabel.setVisible(true);
+                    noConnectionsLabel.setManaged(true);
+                }
             } else {
-                noConnectionsLabel.setVisible(false);
-                noConnectionsLabel.setManaged(false);
+                if (noConnectionsLabel != null) {
+                    noConnectionsLabel.setVisible(false);
+                    noConnectionsLabel.setManaged(false);
+                }
                 
                 // Clear existing connection chips (except the label)
-                connectionsContainer.getChildren().removeIf(node -> node instanceof VBox);
-                
-                // Add connection chips
-                for (SavedConnection conn : connections) {
-                    VBox chip = createConnectionChip(conn);
-                    connectionsContainer.getChildren().add(chip);
+                if (connectionsContainer != null) {
+                    connectionsContainer.getChildren().removeIf(node -> node instanceof VBox);
+                    
+                    // Add connection chips
+                    for (SavedConnection conn : connections) {
+                        VBox chip = createConnectionChip(conn);
+                        connectionsContainer.getChildren().add(chip);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -372,17 +382,19 @@ public class HomeController {
             controller.setConnectionInfo(connectionInfo);
             
             // Navigate to connections screen (same window, not modal)
-            Scene scene = new Scene(root, 820, 560);
+            Scene scene = new Scene(root, 1100, 750);
             Stage stage = (Stage) settingsMenuButton.getScene().getWindow();
             stage.setScene(scene);
             stage.setResizable(true);
-            stage.setMinWidth(700);
-            stage.setMinHeight(500);
+            stage.setMinWidth(950);
+            stage.setMinHeight(650);
             stage.centerOnScreen();
             
         } catch (Exception e) {
             logger.error("Failed to open connections screen", e);
-            statusLabel.setText("Error opening connections: " + e.getMessage());
+            if (statusLabel != null) {
+                statusLabel.setText("Error opening connections: " + e.getMessage());
+            }
         }
     }
     
@@ -391,9 +403,15 @@ public class HomeController {
         
         // Update UI with connection info
         if (connectionInfo != null) {
-            usernameLabel.setText(connectionInfo.getUsername());
-            instanceLabel.setText(connectionInfo.getInstanceUrl());
-            statusLabel.setText("Connected to Salesforce");
+            if (usernameLabel != null) {
+                usernameLabel.setText(connectionInfo.getUsername());
+            }
+            if (instanceLabel != null) {
+                instanceLabel.setText(connectionInfo.getInstanceUrl());
+            }
+            if (statusLabel != null) {
+                statusLabel.setText("Connected to Salesforce");
+            }
             logger.info("Home page loaded for user: {}", connectionInfo.getUsername());
             
             // Fetch available objects count from Salesforce
@@ -481,18 +499,20 @@ public class HomeController {
             controller.setConnectionInfo(connectionInfo);
             controller.setBackupType(backupType);
             
-            Scene scene = new Scene(root, 1200, 800);
+            Scene scene = new Scene(root, 1100, 750);
             
             Stage stage = (Stage) dataBackupCard.getScene().getWindow();
             stage.setScene(scene);
             stage.setResizable(true);
-            stage.setMinWidth(1000);
-            stage.setMinHeight(700);
-            stage.centerOnScreen();
+            stage.setMinWidth(950);
+            stage.setMinHeight(650);
+            stage.setMaximized(true);
             
         } catch (Exception e) {
             logger.error("Failed to navigate to backup screen", e);
-            statusLabel.setText("Error: " + e.getMessage());
+            if (statusLabel != null) {
+                statusLabel.setText("Error: " + e.getMessage());
+            }
         }
     }
     
@@ -504,18 +524,20 @@ public class HomeController {
             RestoreController controller = loader.getController();
             controller.setConnectionInfo(connectionInfo);
             
-            Scene scene = new Scene(root, 1200, 800);
+            Scene scene = new Scene(root, 1100, 750);
             
             Stage stage = (Stage) dataRestoreCard.getScene().getWindow();
             stage.setScene(scene);
             stage.setResizable(true);
-            stage.setMinWidth(1000);
-            stage.setMinHeight(700);
-            stage.centerOnScreen();
+            stage.setMinWidth(950);
+            stage.setMinHeight(650);
+            stage.setMaximized(true);
             
         } catch (Exception e) {
             logger.error("Failed to navigate to restore screen", e);
-            statusLabel.setText("Error: " + e.getMessage());
+            if (statusLabel != null) {
+                statusLabel.setText("Error: " + e.getMessage());
+            }
         }
     }
     
@@ -526,14 +548,14 @@ public class HomeController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
             Parent root = loader.load();
             
-            Scene scene = new Scene(root, 600, 700);
+            Scene scene = new Scene(root, 600, 750);
             
             Stage stage = (Stage) usernameLabel.getScene().getWindow();
             stage.setScene(scene);
             stage.setResizable(true);
-            stage.setMinWidth(500);
-            stage.setMinHeight(600);
-            stage.centerOnScreen();
+            stage.setMinWidth(550);
+            stage.setMinHeight(650);
+            stage.setMaximized(true);
             
         } catch (Exception e) {
             logger.error("Failed to navigate to login screen", e);
