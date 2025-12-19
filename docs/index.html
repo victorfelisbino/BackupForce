@@ -3,19 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BackupForce - Salesforce Backup Tool</title>
-    <meta name="description" content="Free Salesforce backup tool. Export data to CSV, Snowflake, PostgreSQL, or SQL Server. Download blobs and attachments automatically.">
+    <title>BackupForce - Free Salesforce Backup Tool</title>
+    <meta name="description" content="100% FREE Salesforce backup tool. Export data to CSV, Snowflake, PostgreSQL, or SQL Server. Download blobs and attachments automatically. No subscription, no limits.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #0d1117;
             --bg-secondary: #161b22;
-            --bg-card: #21262d;
+            --bg-card: rgba(33, 38, 45, 0.85);
+            --bg-card-hover: rgba(48, 54, 61, 0.9);
             --text-primary: #f0f6fc;
             --text-secondary: #8b949e;
-            --accent: #58a6ff;
-            --accent-hover: #79b8ff;
-            --success: #3fb950;
-            --border: #30363d;
+            --accent: #3fb950;
+            --accent-hover: #56d364;
+            --accent-blue: #58a6ff;
+            --accent-purple: #a371f7;
+            --accent-orange: #f0883e;
+            --border: rgba(48, 54, 61, 0.6);
+            --glow: rgba(63, 185, 80, 0.4);
         }
 
         * {
@@ -25,10 +32,24 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Nature Background - Fixed across page */
+        .nature-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(180deg, rgba(13, 17, 23, 0.7) 0%, rgba(13, 17, 23, 0.4) 30%, rgba(13, 17, 23, 0.6) 70%, rgba(13, 17, 23, 0.95) 100%),
+                url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80') center/cover no-repeat fixed;
+            z-index: -1;
         }
 
         .container {
@@ -37,204 +58,842 @@
             padding: 0 20px;
         }
 
+        /* Free Banner */
+        .free-banner {
+            background: linear-gradient(90deg, var(--accent), #2ea043);
+            color: var(--bg-primary);
+            text-align: center;
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .free-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            100% { left: 100%; }
+        }
+
+        /* Navigation */
+        nav {
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
         /* Hero Section */
         .hero {
             text-align: center;
-            padding: 80px 20px 60px;
-            background: linear-gradient(135deg, rgba(13, 17, 23, 0.9) 0%, rgba(22, 27, 34, 0.85) 100%),
-                        url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80') center/cover no-repeat;
+            padding: 100px 20px 80px;
             position: relative;
         }
 
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(63, 185, 80, 0.15);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(63, 185, 80, 0); }
+        }
+
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 4rem;
+            font-weight: 800;
             margin-bottom: 20px;
-            background: linear-gradient(90deg, var(--accent), var(--success));
+            background: linear-gradient(135deg, #ffffff 0%, var(--accent) 50%, var(--accent-blue) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.1;
         }
 
-        .hero p {
-            font-size: 1.3rem;
+        .hero-subtitle {
+            font-size: 1.4rem;
             color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto 40px;
+            max-width: 700px;
+            margin: 0 auto 20px;
         }
 
-        .download-btn {
+        .hero-highlight {
+            font-size: 1.1rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 40px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .btn-primary {
             display: inline-flex;
             align-items: center;
             gap: 10px;
             background: var(--accent);
             color: var(--bg-primary);
-            padding: 16px 32px;
-            border-radius: 8px;
+            padding: 18px 36px;
+            border-radius: 12px;
             text-decoration: none;
-            font-size: 1.2rem;
-            font-weight: 600;
-            transition: all 0.2s;
+            font-size: 1.1rem;
+            font-weight: 700;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px var(--glow);
         }
 
-        .download-btn:hover {
+        .btn-primary:hover {
             background: var(--accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 40px rgba(88, 166, 255, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px var(--glow);
         }
 
-        .download-btn svg {
-            width: 24px;
-            height: 24px;
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 18px 36px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
         }
 
-        .version-info {
-            margin-top: 20px;
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--accent);
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-top: 60px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Screenshot Section */
+        .screenshot-section {
+            padding: 60px 20px 100px;
+        }
+
+        .screenshot-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .screenshot-header {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: rgba(22, 27, 34, 0.8);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .screenshot-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .screenshot-dot.red { background: #ff5f56; }
+        .screenshot-dot.yellow { background: #ffbd2e; }
+        .screenshot-dot.green { background: #27c93f; }
+
+        .screenshot-placeholder {
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.9), rgba(33, 38, 45, 0.9)),
+                        url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80') center/cover;
+            min-height: 500px;
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .screenshot-placeholder::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background: rgba(13, 17, 23, 0.95);
+        }
+
+        .screenshot-ui {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 20px;
+            padding: 70px 30px 30px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .screenshot-sidebar {
+            background: rgba(22, 27, 34, 0.85);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .screenshot-nav-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
             color: var(--text-secondary);
             font-size: 0.9rem;
         }
 
+        .screenshot-nav-item.active {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--accent);
+            border-left: 3px solid var(--accent);
+        }
+
+        .screenshot-content {
+            background: rgba(33, 38, 45, 0.75);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .screenshot-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .screenshot-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .screenshot-card {
+            background: rgba(48, 54, 61, 0.6);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .screenshot-card-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .screenshot-card-text {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* Why Free Section */
+        .why-free {
+            padding: 100px 20px;
+            background: rgba(13, 17, 23, 0.8);
+        }
+
+        .why-free h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+        }
+
+        .why-free-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto 60px;
+        }
+
+        .why-free-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .why-free-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 35px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .why-free-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 40px rgba(63, 185, 80, 0.15);
+        }
+
+        .why-free-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .why-free-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .why-free-card p {
+            color: var(--text-secondary);
+        }
+
         /* Features Section */
         .features {
-            padding: 80px 20px;
+            padding: 100px 20px;
         }
 
         .features h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2.8rem;
             margin-bottom: 60px;
         }
 
         .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
         }
 
         .feature-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 30px;
-            transition: all 0.2s;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
         }
 
         .feature-card:hover {
             border-color: var(--accent);
-            transform: translateY(-4px);
+            transform: translateX(5px);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
         }
 
         .feature-card h3 {
-            font-size: 1.3rem;
-            margin-bottom: 15px;
-            color: var(--accent);
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
         }
 
         .feature-card p {
             color: var(--text-secondary);
+            font-size: 0.95rem;
         }
 
         /* Database Section */
         .databases {
-            background: var(--bg-secondary);
-            padding: 80px 20px;
+            padding: 100px 20px;
+            background: rgba(13, 17, 23, 0.8);
         }
 
         .databases h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+        }
+
+        .databases-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
             margin-bottom: 60px;
         }
 
         .db-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            max-width: 800px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
         .db-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 25px;
+            border-radius: 16px;
+            padding: 35px 25px;
             text-align: center;
+            transition: all 0.3s;
+        }
+
+        .db-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-5px);
+        }
+
+        .db-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
         }
 
         .db-card h4 {
+            font-size: 1.2rem;
             margin-bottom: 8px;
         }
 
         .db-card span {
-            color: var(--success);
+            color: var(--accent);
             font-size: 0.9rem;
+            font-weight: 500;
         }
 
         /* How It Works */
         .how-it-works {
-            padding: 80px 20px;
+            padding: 100px 20px;
         }
 
         .how-it-works h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2.8rem;
             margin-bottom: 60px;
         }
 
         .steps {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 40px;
+            max-width: 1100px;
+            margin: 0 auto;
         }
 
         .step {
             text-align: center;
-            max-width: 250px;
+            position: relative;
         }
 
         .step-number {
-            width: 60px;
-            height: 60px;
-            background: var(--accent);
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
             color: var(--bg-primary);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin: 0 auto 20px;
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin: 0 auto 25px;
+            box-shadow: 0 10px 30px var(--glow);
         }
 
         .step h4 {
-            margin-bottom: 10px;
+            font-size: 1.2rem;
+            margin-bottom: 12px;
         }
 
         .step p {
             color: var(--text-secondary);
+        }
+
+        /* Roadmap Section */
+        .roadmap {
+            padding: 100px 20px;
+            background: rgba(13, 17, 23, 0.8);
+        }
+
+        .roadmap h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+        }
+
+        .roadmap-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+            font-size: 1.1rem;
+        }
+
+        .roadmap-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            gap: 25px;
+        }
+
+        .roadmap-item {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .roadmap-item:hover {
+            transform: translateX(10px);
+        }
+
+        .roadmap-item.complete {
+            border-color: var(--accent);
+        }
+
+        .roadmap-item.coming-soon {
+            border-color: var(--accent-orange);
+        }
+
+        .roadmap-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .roadmap-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .roadmap-badge.complete {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .roadmap-badge.coming-soon {
+            background: var(--accent-orange);
+            color: var(--bg-primary);
+        }
+
+        .roadmap-badge.planned {
+            background: var(--accent-purple);
+            color: var(--bg-primary);
+        }
+
+        .roadmap-badge.future {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .roadmap-item h3 {
+            font-size: 1.3rem;
+        }
+
+        .roadmap-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .roadmap-list li {
+            color: var(--text-secondary);
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .roadmap-list li::before {
+            content: '✓';
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .roadmap-item.coming-soon .roadmap-list li::before,
+        .roadmap-item.planned .roadmap-list li::before,
+        .roadmap-item.future .roadmap-list li::before {
+            content: '○';
+            color: var(--text-secondary);
+        }
+
+        /* Privacy Section */
+        .privacy {
+            padding: 100px 20px;
+        }
+
+        .privacy h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            margin-bottom: 60px;
+        }
+
+        .privacy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto 40px;
+        }
+
+        .privacy-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 35px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .privacy-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .privacy-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .privacy-card h4 {
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+        }
+
+        .privacy-card p {
+            color: var(--text-secondary);
+        }
+
+        .security-badge {
+            background: rgba(88, 166, 255, 0.1);
+            border: 1px solid var(--accent-blue);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .security-badge p {
+            color: var(--text-secondary);
             font-size: 0.95rem;
+        }
+
+        .security-badge a {
+            color: var(--accent-blue);
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 100px 20px;
+            text-align: center;
+            background: linear-gradient(180deg, transparent, rgba(63, 185, 80, 0.1));
+        }
+
+        .cta h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .cta p {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+        }
+
+        .cta-features {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .cta-feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent);
+            font-weight: 600;
         }
 
         /* Footer */
         footer {
-            background: var(--bg-secondary);
+            background: rgba(13, 17, 23, 0.95);
             border-top: 1px solid var(--border);
-            padding: 40px 20px;
-            text-align: center;
+            padding: 60px 20px;
         }
 
-        footer p {
+        .footer-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 60px;
+            max-width: 1000px;
+            margin: 0 auto 40px;
+        }
+
+        .footer-brand h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .footer-brand p {
             color: var(--text-secondary);
+            font-size: 0.95rem;
         }
 
-        footer a {
+        .footer-links h4 {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .footer-links ul {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
             color: var(--accent);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-bottom p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .footer-bottom a {
+            color: var(--accent-blue);
             text-decoration: none;
         }
 
-        footer a:hover {
-            text-decoration: underline;
+        .disclaimer {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #6e7681;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         /* Responsive */
@@ -243,131 +902,261 @@
                 font-size: 2.5rem;
             }
 
-            .hero p {
+            .hero-subtitle {
                 font-size: 1.1rem;
             }
 
-            .features h2,
-            .databases h2,
-            .how-it-works h2 {
+            .hero-stats {
+                gap: 30px;
+            }
+
+            .stat-value {
                 font-size: 2rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .screenshot-ui {
+                grid-template-columns: 1fr;
+            }
+
+            .screenshot-sidebar {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
+    <div class="nature-bg"></div>
+
+    <!-- Free Banner -->
+    <div class="free-banner">
+        🎉 100% FREE — No subscriptions, no limits, no credit card required. Forever free!
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="#" class="logo">
+                <div class="logo-icon">⚡</div>
+                BackupForce
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#databases">Databases</a></li>
+                <li><a href="#roadmap">Roadmap</a></li>
+                <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1>BackupForce</h1>
-            <p>The complete Salesforce backup & restore solution. Beautiful GitHub-inspired dark theme with calming nature background. Export to CSV or databases with ease.</p>
-            <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="download-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
-                </svg>
-                Download v3.0.0
-            </a>
-            <p class="version-info">v3.0.0 • Free • Windows, macOS, Linux • No Java Required</p>
+            <div class="hero-badge">
+                <span>✨</span> v3.0.0 — Nature-Inspired Design
+            </div>
+            <h1>Backup Your Salesforce<br>Data for Free</h1>
+            <p class="hero-subtitle">The complete Salesforce backup & restore solution. Export millions of records to CSV or databases. Beautiful, fast, and completely free.</p>
+            <p class="hero-highlight">No subscription. No limits. No catch.</p>
+            
+            <div class="hero-buttons">
+                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
+                    </svg>
+                    Download Free
+                </a>
+                <a href="https://github.com/victorfelisbino/BackupForce" class="btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/>
+                    </svg>
+                    View on GitHub
+                </a>
+            </div>
+
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="stat-value">$0</div>
+                    <div class="stat-label">Cost Forever</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">530+</div>
+                    <div class="stat-label">Tests Passing</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">∞</div>
+                    <div class="stat-label">Records Limit</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Java Required</div>
+                </div>
+            </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features">
-        <div class="container">
-            <h2>🆕 What's New in v3.0.0</h2>
-            <div style="max-width: 800px; margin: 0 auto 60px; background: linear-gradient(135deg, rgba(46, 160, 67, 0.15), rgba(88, 166, 255, 0.15)); border: 1px solid var(--success); border-radius: 12px; padding: 30px;">
-                <div style="display: grid; gap: 15px;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem;">🌄</span>
-                        <div>
-                            <strong style="color: var(--text-primary);">Nature-Inspired Design</strong>
-                            <p style="color: var(--text-secondary); margin: 4px 0 0; font-size: 0.95rem;">Beautiful GitHub-inspired dark theme with calming mountain landscape background for stress-free data operations</p>
-                        </div>
+    <!-- App Screenshot Preview -->
+    <section class="screenshot-section">
+        <div class="screenshot-container">
+            <div class="screenshot-header">
+                <div class="screenshot-dot red"></div>
+                <div class="screenshot-dot yellow"></div>
+                <div class="screenshot-dot green"></div>
+            </div>
+            <div class="screenshot-placeholder">
+                <div class="screenshot-ui">
+                    <div class="screenshot-sidebar">
+                        <div class="screenshot-nav-item">🏠 Dashboard</div>
+                        <div class="screenshot-nav-item active">📦 Backup</div>
+                        <div class="screenshot-nav-item">♻️ Restore</div>
+                        <div class="screenshot-nav-item">🔗 Connections</div>
+                        <div class="screenshot-nav-item">⚙️ Preferences</div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem;">🪟</span>
-                        <div>
-                            <strong style="color: var(--text-primary);">Custom Title Bar</strong>
-                            <p style="color: var(--text-secondary); margin: 4px 0 0; font-size: 0.95rem;">Sleek integrated title bar that matches the dark theme perfectly</p>
-                        </div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem;">✨</span>
-                        <div>
-                            <strong style="color: var(--text-primary);">Semi-Transparent Panels</strong>
-                            <p style="color: var(--text-secondary); margin: 4px 0 0; font-size: 0.95rem;">UI panels with subtle transparency so the nature background shows through</p>
-                        </div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem;">🗄️</span>
-                        <div>
-                            <strong style="color: var(--text-primary);">Database Restore (Backend Ready)</strong>
-                            <p style="color: var(--text-secondary); margin: 4px 0 0; font-size: 0.95rem;">Restore directly from database tables - UI coming in v3.1</p>
+                    <div class="screenshot-content">
+                        <h3 class="screenshot-title">📦 Backup Your Data</h3>
+                        <div class="screenshot-grid">
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">📊</div>
+                                <div class="screenshot-card-text">Account</div>
+                            </div>
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">👥</div>
+                                <div class="screenshot-card-text">Contact</div>
+                            </div>
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">💼</div>
+                                <div class="screenshot-card-text">Opportunity</div>
+                            </div>
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">📝</div>
+                                <div class="screenshot-card-text">Case</div>
+                            </div>
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">📎</div>
+                                <div class="screenshot-card-text">Attachment</div>
+                            </div>
+                            <div class="screenshot-card">
+                                <div class="screenshot-card-icon">✨</div>
+                                <div class="screenshot-card-text">+ 2500 more</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <h2>✨ Features</h2>
+        </div>
+    </section>
+
+    <!-- Why Free Section -->
+    <section class="why-free">
+        <div class="container">
+            <h2>💚 Why Is It Free?</h2>
+            <p class="why-free-subtitle">I built this because I needed it. Now I'm sharing it with everyone.</p>
+            <div class="why-free-grid">
+                <div class="why-free-card">
+                    <div class="why-free-icon">🎁</div>
+                    <h3>Open Source</h3>
+                    <p>Full source code on GitHub. Inspect it, modify it, contribute to it. No hidden surprises.</p>
+                </div>
+                <div class="why-free-card">
+                    <div class="why-free-icon">🚫</div>
+                    <h3>No Paywalls</h3>
+                    <p>All features available. No "Pro" version, no feature limits, no record caps. Everything is included.</p>
+                </div>
+                <div class="why-free-card">
+                    <div class="why-free-icon">❤️</div>
+                    <h3>Built with Love</h3>
+                    <p>A passion project by a fellow Salesforce admin who was tired of expensive backup solutions.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2>✨ Powerful Features</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <h3>⚡ Bulk API v2</h3>
-                    <p>Fast, efficient data extraction that can handle millions of records without breaking a sweat.</p>
+                    <div class="feature-icon">⚡</div>
+                    <h3>Bulk API v2</h3>
+                    <p>Export millions of records efficiently. The same API Salesforce recommends for large data volumes.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>🎯 Field Selection</h3>
-                    <p>Choose exactly which fields to export for each object. No more bloated exports with unwanted data.</p>
+                    <div class="feature-icon">🎯</div>
+                    <h3>Field Selection</h3>
+                    <p>Choose exactly which fields to export. No more bloated backups with unwanted data.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>📎 Blob Downloads</h3>
-                    <p>Automatically downloads attachments, files, and documents with their binary content intact.</p>
+                    <div class="feature-icon">📎</div>
+                    <h3>Blob Downloads</h3>
+                    <p>Automatically download attachments, files, and documents with their binary content.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>🔐 OAuth + SSO</h3>
-                    <p>Secure authentication through Salesforce OAuth. Snowflake SSO sessions cached for 30 minutes.</p>
+                    <div class="feature-icon">🔐</div>
+                    <h3>OAuth Security</h3>
+                    <p>Login through Salesforce's official OAuth. Your password never touches this app.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>� Nature-Inspired Design</h3>
-                    <p>GitHub-inspired dark theme with semi-transparent panels over a calming mountain landscape. Stress-free data operations.</p>
+                    <div class="feature-icon">🌄</div>
+                    <h3>Nature-Inspired UI</h3>
+                    <p>Beautiful dark theme with calming mountain landscape. Stress-free data operations.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>🔄 Multi-threaded</h3>
+                    <div class="feature-icon">🔄</div>
+                    <h3>Multi-threaded</h3>
                     <p>Parallel processing for faster backups. Export multiple objects simultaneously.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>� Data Restore</h3>
-                    <p>Restore backed-up data back to Salesforce using Bulk API v2. Supports insert, update, and upsert operations.</p>
+                    <div class="feature-icon">🔀</div>
+                    <h3>Cross-Org Migration</h3>
+                    <p>RecordType, User, and Picklist mapping for seamless org-to-org data transfers.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>�💻 Cross-Platform</h3>
-                    <p>Native installers for Windows, macOS, and Linux. No Java installation required.</p>
+                    <div class="feature-icon">💻</div>
+                    <h3>Portable App</h3>
+                    <p>No installation required. Extract and run. Bundled JRE means no Java needed.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>📊 Real-time Progress</h3>
-                    <p>Watch your backup progress with detailed logging and status updates.</p>
+                    <div class="feature-icon">📊</div>
+                    <h3>Real-time Progress</h3>
+                    <p>Watch your backup with detailed logging and live status updates.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Database Section -->
-    <section class="databases">
+    <section class="databases" id="databases">
         <div class="container">
-            <h2>🗄️ Export Destinations</h2>
+            <h2>🗄️ Export Anywhere</h2>
+            <p class="databases-subtitle">Your data, your destination. Choose where your backups go.</p>
             <div class="db-grid">
                 <div class="db-card">
-                    <h4>❄️ Snowflake</h4>
+                    <div class="db-icon">❄️</div>
+                    <h4>Snowflake</h4>
                     <span>✓ BINARY blobs</span>
                 </div>
                 <div class="db-card">
-                    <h4>🐘 PostgreSQL</h4>
+                    <div class="db-icon">🐘</div>
+                    <h4>PostgreSQL</h4>
                     <span>✓ BYTEA blobs</span>
                 </div>
                 <div class="db-card">
-                    <h4>🔷 SQL Server</h4>
+                    <div class="db-icon">🔷</div>
+                    <h4>SQL Server</h4>
                     <span>✓ VARBINARY</span>
                 </div>
                 <div class="db-card">
-                    <h4>📄 CSV Files</h4>
+                    <div class="db-icon">📄</div>
+                    <h4>CSV Files</h4>
                     <span>✓ Universal</span>
                 </div>
             </div>
@@ -377,194 +1166,203 @@
     <!-- How It Works -->
     <section class="how-it-works">
         <div class="container">
-            <h2>🚀 How It Works</h2>
+            <h2>🚀 Get Started in Minutes</h2>
             <div class="steps">
                 <div class="step">
                     <div class="step-number">1</div>
                     <h4>Download & Extract</h4>
-                    <p>Download the ZIP file and extract to any folder. No installation required.</p>
+                    <p>Download the ZIP file and extract to any folder. That's it — no installer needed.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">2</div>
                     <h4>Login to Salesforce</h4>
-                    <p>Click "Login with OAuth" and authorize the app through your browser.</p>
+                    <p>Click "Login with OAuth" and authorize securely through your browser.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">3</div>
                     <h4>Select Objects</h4>
-                    <p>Choose which objects to backup from the list of 2500+ available objects.</p>
+                    <p>Choose from 2500+ objects. Pick the fields you need, skip what you don't.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">4</div>
                     <h4>Start Backup</h4>
-                    <p>Click Start and watch your data export to CSV or your database.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Cross-Org Transformation Section -->
-    <section class="transform" style="background: var(--bg-secondary); padding: 80px 20px;">
-        <div class="container">
-            <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 20px;">🌐 Cross-Org Data Transformation</h2>
-            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 60px; max-width: 700px; margin-left: auto; margin-right: auto;">Migrating data between Salesforce orgs? BackupForce v2.3.0 handles the hard parts automatically.</p>
-            <div style="max-width: 1000px; margin: 0 auto;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px;">
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">🏷️ RecordType Mapping</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Automatically map RecordType IDs between source and target orgs. Different IDs? No problem.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">👤 User/Owner Mapping</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Map Owner, CreatedBy, and LastModifiedBy fields to corresponding users in the target org.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">📝 Picklist Mapping</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Handle picklist values that differ between orgs. Map old values to new values seamlessly.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">📁 Field Mapping</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Rename fields, exclude fields, or add constant values. Full control over your data structure.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">⚙️ Value Transformations</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">REGEX_REPLACE, PREFIX, SUFFIX, TRIM, UPPERCASE, LOWERCASE, CONSTANT, and LOOKUP transforms.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <h4 style="color: var(--accent); margin-bottom: 12px;">🔍 Schema Comparison</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Compare backup metadata with target org schema. Detect mismatches before you restore.</p>
-                    </div>
+                    <p>Hit Start and watch your data flow to CSV or your database. Simple as that.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Roadmap Section -->
-    <section class="roadmap" style="padding: 80px 20px;">
+    <section class="roadmap" id="roadmap">
         <div class="container">
-            <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 20px;">🗺️ Roadmap</h2>
-            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 60px;">Track our progress on upcoming features</p>
-            <div style="max-width: 900px; margin: 0 auto;">
-                <div style="display: grid; gap: 20px;">
-                    <!-- Completed -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--success); border-radius: 12px; padding: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--success); color: var(--bg-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">COMPLETE</span>
-                            <h3 style="margin: 0;">Backup Features</h3>
-                        </div>
-                        <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>✅ Bulk API v2 backup for millions of records</li>
-                            <li>✅ Database export (Snowflake, PostgreSQL, SQL Server)</li>
-                            <li>✅ Blob/Attachment downloads</li>
-                            <li>✅ Field selection and filtering</li>
-                        </ul>
+            <h2>🗺️ Roadmap</h2>
+            <p class="roadmap-subtitle">Where we've been and where we're going. Your feedback shapes our priorities!</p>
+            
+            <div class="roadmap-grid">
+                <!-- Complete: Backup -->
+                <div class="roadmap-item complete">
+                    <div class="roadmap-header">
+                        <span class="roadmap-badge complete">Complete</span>
+                        <h3>Full Backup System</h3>
                     </div>
-                    <!-- Complete -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--success); border-radius: 12px; padding: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--success); color: var(--bg-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">COMPLETE</span>
-                            <h3 style="margin: 0;">Data Restoration</h3>
-                        </div>
-                        <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>✅ Core restore with Bulk API v2</li>
-                            <li>✅ Insert/Update/Upsert operations</li>
-                            <li>✅ Database source scanning</li>
-                            <li>✅ Relationship resolution</li>
-                            <li>✅ Dependency ordering</li>
-                            <li>✅ Dry run / preview mode</li>
-                            <li>✅ Cross-Org Transformation</li>
-                        </ul>
-                    </div>
-                    <!-- Planned -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">COMING SOON</span>
-                            <h3 style="margin: 0;">Phase 8: Duplicate Handling</h3>
-                        </div>
-                        <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>⏳ Detect duplicates before insert using matching rules</li>
-                            <li>⏳ Skip, update, or merge duplicate records</li>
-                            <li>⏳ Custom duplicate detection fields</li>
-                            <li>⏳ Duplicate report generation</li>
-                        </ul>
-                    </div>
-                    <!-- Future -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">PLANNED</span>
-                            <h3 style="margin: 0;">Phase 9: Related Records</h3>
-                        </div>
-                        <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>⏳ Auto-create related records during import</li>
-                            <li>⏳ Import Account → auto-create Opportunity</li>
-                            <li>⏳ Template-based record creation</li>
-                            <li>⏳ Configurable field defaults</li>
-                        </ul>
-                    </div>
-                    <!-- Long-term -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <span style="background: var(--border); color: var(--text-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">FUTURE</span>
-                            <h3 style="margin: 0;">Long-term Vision</h3>
-                        </div>
-                        <ul style="color: var(--text-secondary); margin-left: 20px;">
-                            <li>⏳ Rollback on failure</li>
-                            <li>⏳ Scheduled/automated backups</li>
-                            <li>⏳ Incremental backups</li>
-                            <li>⏳ Email notifications</li>
-                        </ul>
-                    </div>
+                    <ul class="roadmap-list">
+                        <li>Bulk API v2 for millions of records</li>
+                        <li>Database export (Snowflake, PostgreSQL, SQL Server)</li>
+                        <li>Blob & attachment downloads</li>
+                        <li>Field selection & filtering</li>
+                        <li>Multi-threaded processing</li>
+                        <li>Real-time progress tracking</li>
+                    </ul>
                 </div>
-                <p style="text-align: center; margin-top: 30px;">
-                    <a href="ROADMAP.md" style="color: var(--accent); text-decoration: none;">View full roadmap →</a>
+
+                <!-- Complete: UI -->
+                <div class="roadmap-item complete">
+                    <div class="roadmap-header">
+                        <span class="roadmap-badge complete">Complete</span>
+                        <h3>v3.0 — Nature-Inspired Design</h3>
+                    </div>
+                    <ul class="roadmap-list">
+                        <li>GitHub-inspired dark theme</li>
+                        <li>Calming mountain landscape background</li>
+                        <li>Semi-transparent panels</li>
+                        <li>Custom integrated title bar</li>
+                        <li>Green accent color scheme</li>
+                        <li>Smooth animations & transitions</li>
+                    </ul>
+                </div>
+
+                <!-- Coming Soon: Data Restore UI -->
+                <div class="roadmap-item coming-soon">
+                    <div class="roadmap-header">
+                        <span class="roadmap-badge coming-soon">Coming v3.1</span>
+                        <h3>🔥 Data Restore UI</h3>
+                    </div>
+                    <ul class="roadmap-list">
+                        <li>Restore from database to Salesforce</li>
+                        <li>Insert, Update, Upsert operations</li>
+                        <li>Relationship resolution</li>
+                        <li>Dependency ordering</li>
+                        <li>Cross-org transformation</li>
+                        <li>Dry run / preview mode</li>
+                    </ul>
+                </div>
+
+                <!-- Planned: Duplicate Handling -->
+                <div class="roadmap-item planned">
+                    <div class="roadmap-header">
+                        <span class="roadmap-badge planned">Planned</span>
+                        <h3>Duplicate Detection</h3>
+                    </div>
+                    <ul class="roadmap-list">
+                        <li>Detect duplicates before insert</li>
+                        <li>Skip, update, or merge options</li>
+                        <li>Custom matching rules</li>
+                        <li>Duplicate report generation</li>
+                    </ul>
+                </div>
+
+                <!-- Future -->
+                <div class="roadmap-item future">
+                    <div class="roadmap-header">
+                        <span class="roadmap-badge future">Future</span>
+                        <h3>Long-term Vision</h3>
+                    </div>
+                    <ul class="roadmap-list">
+                        <li>Scheduled automated backups</li>
+                        <li>Incremental backups</li>
+                        <li>Email notifications</li>
+                        <li>Rollback on failure</li>
+                        <li>macOS & Linux builds</li>
+                        <li>CLI version for automation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy Section -->
+    <section class="privacy">
+        <div class="container">
+            <h2>🔒 Your Data Stays Yours</h2>
+            <div class="privacy-grid">
+                <div class="privacy-card">
+                    <div class="privacy-icon">🏠</div>
+                    <h4>100% Local</h4>
+                    <p>Data exports directly from Salesforce to YOUR computer. Nothing goes through any third-party server.</p>
+                </div>
+                <div class="privacy-card">
+                    <div class="privacy-icon">🚫</div>
+                    <h4>Zero Telemetry</h4>
+                    <p>No analytics, no tracking, no data collection. I don't even know you're using it.</p>
+                </div>
+                <div class="privacy-card">
+                    <div class="privacy-icon">🔐</div>
+                    <h4>OAuth Only</h4>
+                    <p>Login through Salesforce's official OAuth flow. Your password never touches this app.</p>
+                </div>
+            </div>
+            <div class="security-badge">
+                <p>
+                    <strong>✓ Verified Safe:</strong> 
+                    <a href="https://www.virustotal.com" target="_blank">VirusTotal Scan</a> 
+                    — Minimal detections (false positives common for unsigned apps)
                 </p>
             </div>
         </div>
     </section>
 
-    <!-- Privacy & Security Section -->
-    <section class="privacy" style="background: var(--bg-secondary); padding: 80px 20px;">
+    <!-- CTA Section -->
+    <section class="cta">
         <div class="container">
-            <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 40px;">🔒 Your Data Stays Yours</h2>
-            <div style="max-width: 800px; margin: 0 auto;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 40px;">
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; text-align: center;">
-                        <div style="font-size: 2.5rem; margin-bottom: 15px;">🏠</div>
-                        <h4 style="margin-bottom: 10px;">100% Local</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Data exports directly from Salesforce to YOUR computer or YOUR server. Nothing in between.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; text-align: center;">
-                        <div style="font-size: 2.5rem; margin-bottom: 15px;">🚫</div>
-                        <h4 style="margin-bottom: 10px;">No Data Collection</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">I never see, collect, or have access to your Salesforce data. Zero telemetry, zero tracking.</p>
-                    </div>
-                    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; text-align: center;">
-                        <div style="font-size: 2.5rem; margin-bottom: 15px;">🔐</div>
-                        <h4 style="margin-bottom: 10px;">OAuth Security</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Login through Salesforce's official OAuth. Your password never touches this app.</p>
-                    </div>
-                </div>
-                <div style="background: rgba(88, 166, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 20px; text-align: center;">
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
-                        <strong style="color: var(--text-primary);">✓ Verified Safe:</strong> 
-                        <a href="https://www.virustotal.com/gui/file/72a63cc03f44c80292fd7d2d25106d18e737d5c4fefd386b459bf9eb18228a04" target="_blank" style="color: var(--accent);">VirusTotal Scan</a> 
-                        — 1/66 detections (false positive from Microsoft ML, common for unsigned apps)
-                    </p>
-                </div>
+            <h2>Ready to Backup?</h2>
+            <p>Join thousands of Salesforce admins who trust BackupForce with their data.</p>
+            <div class="cta-features">
+                <div class="cta-feature">✓ Free forever</div>
+                <div class="cta-feature">✓ No signup required</div>
+                <div class="cta-feature">✓ Works in 5 minutes</div>
             </div>
+            <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
+                </svg>
+                Download BackupForce — It's Free
+            </a>
         </div>
     </section>
 
     <!-- Footer -->
     <footer>
         <div class="container">
-            <p>Created by Victor Felisbino • <a href="https://github.com/victorfelisbino/BackupForce">View on GitHub</a></p>
-            <p style="margin-top: 10px; font-size: 0.85rem;">Free to use • Open Source • <a href="https://github.com/victorfelisbino/BackupForce/blob/master/LICENSE">MIT License</a></p>
-            <p style="margin-top: 20px; font-size: 0.75rem; color: #6e7681; max-width: 600px; margin-left: auto; margin-right: auto;">
-                <strong>Disclaimer:</strong> This tool is provided "as is" without warranty. The developer is not responsible for any data loss, 
-                unauthorized access, or misuse of this software. Users are responsible for ensuring compliance with their organization's 
-                data policies and Salesforce terms of service. Use at your own risk.
-            </p>
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>⚡ BackupForce</h3>
+                    <p>The free, open-source Salesforce backup tool. Built by a Salesforce admin, for Salesforce admins.</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub Repository</a></li>
+                        <li><a href="https://github.com/victorfelisbino/BackupForce/releases">All Releases</a></li>
+                        <li><a href="https://github.com/victorfelisbino/BackupForce/issues">Report a Bug</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="OAUTH_SETUP.md">OAuth Setup Guide</a></li>
+                        <li><a href="BUILD_EXECUTABLE.md">Build Instructions</a></li>
+                        <li><a href="V2_DATABASE_INTEGRATION.md">Database Integration</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Created with ❤️ by Victor Felisbino • <a href="https://github.com/victorfelisbino/BackupForce/blob/master/LICENSE">MIT License</a></p>
+                <p class="disclaimer">
+                    <strong>Disclaimer:</strong> This tool is provided "as is" without warranty. The developer is not responsible for any data loss, 
+                    unauthorized access, or misuse of this software. Users are responsible for ensuring compliance with their organization's 
+                    data policies and Salesforce terms of service.
+                </p>
+            </div>
         </div>
     </footer>
 </body>
