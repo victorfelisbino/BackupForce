@@ -5,274 +5,301 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<VBox xmlns:fx="http://javafx.com/fxml" 
-      fx:controller="com.backupforce.ui.BackupController"
-      styleClass="mica-background"
-      stylesheets="@../css/windows11-dark.css"
-      spacing="0">
+<BorderPane xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="com.backupforce.ui.BackupController"
+            styleClass="main-container"
+            stylesheets="@../css/backupforce-modern.css"
+            prefWidth="1200" prefHeight="800"
+            minWidth="1000" minHeight="700">
     
-    <!-- Top: Header Bar -->
-    <HBox spacing="12" alignment="CENTER_LEFT" styleClass="header-section" style="-fx-padding: 14px 20px;">
-        <Button fx:id="backButton" text="← Back" onAction="#handleBack" 
-               styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
-        <Region styleClass="connection-status-dot"/>
-        <Label fx:id="connectionLabel" text="Connected to Salesforce" styleClass="connection-label" HBox.hgrow="ALWAYS"/>
-        <Label fx:id="apiLimitsLabel" text="" 
-              style="-fx-font-size: 11px; -fx-text-fill: #adb5bd; -fx-padding: 0 10;"/>
-        <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" 
-               styleClass="secondary-button" style="-fx-padding: 7px 18px; -fx-font-size: 13px;"/>
-    </HBox>
-    
-    <!-- Main Content: Horizontal Split -->
-    <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS" style="-fx-padding: 0;">
-        
-        <!-- LEFT PANEL: Object Tables and Tabs -->
-        <VBox spacing="14" style="-fx-padding: 16px 12px 16px 16px;">
+    <!-- LEFT: Sidebar Navigation -->
+    <left>
+        <VBox styleClass="sidebar" spacing="0">
             
-            <!-- Search and Selection Bar -->
-            <HBox spacing="12" alignment="CENTER_LEFT" style="-fx-padding: 0 4px;">
-                <TextField fx:id="searchField" promptText="Search objects..." 
-                          HBox.hgrow="ALWAYS" styleClass="search-field" style="-fx-font-size: 13px;"/>
-                <Label fx:id="selectionCountLabel" text="0 objects selected" 
-                       styleClass="caption" style="-fx-padding: 0 6px; -fx-font-size: 12px;"/>
+            <!-- App Branding -->
+            <HBox styleClass="app-brand" spacing="10" alignment="CENTER_LEFT">
+                <Label text="⚡" styleClass="app-logo-icon"/>
+                <Label text="BackupForce" styleClass="app-logo"/>
             </HBox>
             
-            <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 0 4px;">
-                <Region HBox.hgrow="ALWAYS"/>
-                <Button fx:id="selectAllButton" text="Select All" onAction="#handleSelectAll" 
-                       styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;"/>
-                <Button fx:id="deselectAllButton" text="Clear" onAction="#handleDeselectAll" 
-                       styleClass="secondary-button" style="-fx-padding: 6px 16px; -fx-font-size: 13px;"/>
-            </HBox>
-            
-            <!-- Object Selection Table (before backup) -->
-            <TableView fx:id="allObjectsTable" VBox.vgrow="ALWAYS" styleClass="modern-table">
-                <columns>
-                    <TableColumn fx:id="allSelectColumn" text="" prefWidth="40" 
-                                minWidth="40" maxWidth="40"/>
-                    <TableColumn fx:id="allNameColumn" text="API Name" prefWidth="170" 
-                                minWidth="120"/>
-                    <TableColumn fx:id="allLabelColumn" text="Label" prefWidth="150" 
-                                minWidth="100"/>
-                    <TableColumn fx:id="allFieldsColumn" text="Fields" prefWidth="70" 
-                                minWidth="70" maxWidth="70"/>
-                    <TableColumn fx:id="allStatusColumn" text="Status" prefWidth="140" 
-                                minWidth="100"/>
-                </columns>
-                <columnResizePolicy>
-                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
-                </columnResizePolicy>
-            </TableView>
-            
-            <!-- Status Tabs (shown during/after backup) -->
-            <TabPane fx:id="statusTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE" 
-                     visible="false" managed="false">
-                <Tab text="All Objects" closable="false">
-                    <TableView fx:id="allStatusTable">
-                        <columns>
-                            <TableColumn fx:id="statusAllNameColumn" text="Object" prefWidth="160" 
-                                        minWidth="120"/>
-                            <TableColumn fx:id="statusAllLabelColumn" text="Label" prefWidth="160" 
-                                        minWidth="120"/>
-                            <TableColumn fx:id="statusAllStatusColumn" text="Status" prefWidth="250" 
-                                        minWidth="180"/>
-                        </columns>
-                        <columnResizePolicy>
-                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
-                        </columnResizePolicy>
-                    </TableView>
-                </Tab>
+            <!-- Navigation Items -->
+            <VBox styleClass="nav-section" spacing="2" VBox.vgrow="ALWAYS">
+                <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
                 
-                <Tab text="In Progress" closable="false">
-                    <TableView fx:id="inProgressTable">
-                        <columns>
-                            <TableColumn fx:id="progressNameColumn" text="Object" prefWidth="180" 
-                                        minWidth="140"/>
-                            <TableColumn fx:id="progressStatusColumn" text="Status" prefWidth="350" 
-                                        minWidth="200"/>
-                        </columns>
-                        <columnResizePolicy>
-                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
-                        </columnResizePolicy>
-                    </TableView>
-                </Tab>
+                <Label text="MAIN" styleClass="nav-section-title"/>
                 
-                <Tab text="Completed" closable="false">
-                    <TableView fx:id="completedTable">
-                        <columns>
-                            <TableColumn fx:id="completedNameColumn" text="Object" prefWidth="160" 
-                                        minWidth="120"/>
-                            <TableColumn fx:id="completedRecordsColumn" text="Records" prefWidth="100" 
-                                        minWidth="80"/>
-                            <TableColumn fx:id="completedSizeColumn" text="Size" prefWidth="90" 
-                                        minWidth="70"/>
-                            <TableColumn fx:id="completedTimeColumn" text="Time" prefWidth="90" 
-                                        minWidth="70"/>
-                        </columns>
-                        <columnResizePolicy>
-                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
-                        </columnResizePolicy>
-                    </TableView>
-                </Tab>
-                
-                <Tab text="Errors" closable="false">
-                    <TableView fx:id="errorsTable">
-                        <columns>
-                            <TableColumn fx:id="errorNameColumn" text="Object" prefWidth="160" 
-                                        minWidth="120"/>
-                            <TableColumn fx:id="errorMessageColumn" text="Error" prefWidth="380" 
-                                        minWidth="200"/>
-                        </columns>
-                        <columnResizePolicy>
-                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
-                        </columnResizePolicy>
-                    </TableView>
-                </Tab>
-            </TabPane>
-        </VBox>
-        
-        <!-- RIGHT PANEL: Configuration and Logs -->
-        <VBox spacing="10" style="-fx-padding: 12px 16px 12px 8px;">
-            
-            <!-- Backup Target Selection -->
-            <VBox spacing="8" styleClass="config-card">
-                <Label text="Backup Destination" styleClass="section-label"/>
-                
-                <HBox spacing="20" alignment="CENTER_LEFT" style="-fx-padding: 6 0 4 0;">
-                    <RadioButton fx:id="csvRadioButton" text="CSV Files" selected="true">
-                        <toggleGroup>
-                            <ToggleGroup fx:id="backupTargetGroup"/>
-                        </toggleGroup>
-                    </RadioButton>
-                    <RadioButton fx:id="databaseRadioButton" text="Database" 
-                                toggleGroup="$backupTargetGroup"/>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="databaseSettingsButton" text="⚙ Manage" 
-                           onAction="#handleDatabaseSettings" 
-                           styleClass="secondary-button" disable="true"
-                           style="-fx-padding: 5px 12px; -fx-font-size: 12px;"/>
+                <HBox styleClass="nav-item" spacing="10" alignment="CENTER_LEFT"
+                      onMouseClicked="#handleBack" style="-fx-cursor: hand;">
+                    <Label text="🏠" styleClass="nav-icon"/>
+                    <Label text="Dashboard"/>
                 </HBox>
                 
-                <!-- Database Connection Selector (shown when Database is selected) -->
-                <VBox fx:id="connectionSelectorBox" spacing="10" visible="false" managed="false" 
-                      style="-fx-padding: 8 0 0 0;">
-                    <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Label text="Active Connection:" style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
-                        <ComboBox fx:id="connectionCombo" promptText="Select a connection..." 
-                                 HBox.hgrow="ALWAYS" styleClass="modern-combo"
-                                 style="-fx-min-width: 250px; -fx-font-size: 13px;"/>
-                        <Button text="↻" onAction="#handleRefreshConnections" 
-                               styleClass="icon-button" 
-                               style="-fx-padding: 6px 12px; -fx-font-size: 16px; -fx-font-weight: bold;">
-                            <tooltip>
-                                <Tooltip text="Refresh connection list"/>
-                            </tooltip>
-                        </Button>
-                    </HBox>
-                    
-                    <!-- Connection Info Display -->
-                    <HBox fx:id="connectionInfoBox" spacing="12" visible="false" managed="false" 
-                          style="-fx-padding: 8; -fx-background-color: rgba(33, 150, 243, 0.1); -fx-background-radius: 6;">
-                        <VBox spacing="4" HBox.hgrow="ALWAYS">
-                            <Label fx:id="connectionTypeLabel" text="Snowflake" 
-                                  style="-fx-font-size: 11px; -fx-text-fill: #2196F3; -fx-font-weight: 600;"/>
-                            <Label fx:id="connectionDetailsLabel" text="Database.Schema" 
-                                  style="-fx-font-size: 12px; -fx-text-fill: #e0e0e0;"/>
-                        </VBox>
-                        <Label fx:id="connectionStatusIcon" text="●" 
-                              style="-fx-font-size: 18px; -fx-text-fill: #4CAF50;">
-                            <tooltip>
-                                <Tooltip text="Connection ready"/>
-                            </tooltip>
-                        </Label>
-                    </HBox>
+                <HBox styleClass="nav-item nav-item-active" spacing="10" alignment="CENTER_LEFT">
+                    <Label text="📤" styleClass="nav-icon"/>
+                    <Label text="Data Backup"/>
+                </HBox>
+                
+                <HBox styleClass="nav-item" spacing="10" alignment="CENTER_LEFT"
+                      onMouseClicked="#handleOpenRestore" style="-fx-cursor: hand;">
+                    <Label text="📥" styleClass="nav-icon"/>
+                    <Label text="Data Restore"/>
+                </HBox>
+                
+                <Region VBox.vgrow="ALWAYS"/>
+                
+                <!-- API Limits in sidebar -->
+                <VBox spacing="4" style="-fx-padding: 12; -fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 6;">
+                    <Label text="API USAGE" styleClass="nav-section-title"/>
+                    <Label fx:id="apiLimitsLabel" text="--/-- (0%)" style="-fx-font-size: 12px; -fx-text-fill: #8b949e;"/>
                 </VBox>
             </VBox>
             
-            <!-- Output Folder Selection -->
-            <VBox spacing="6" styleClass="config-card" fx:id="outputFolderBox">
-                <Label text="Output Folder" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
-                <HBox spacing="8" alignment="CENTER_LEFT">
-                    <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
-                              styleClass="modern-text-field"
-                              style="-fx-padding: 8px 10px; -fx-font-size: 12px;"
-                              promptText="Select backup folder..."/>
-                    <Button fx:id="browseButton" text="..." onAction="#handleBrowse" 
-                           styleClass="secondary-button"
-                           style="-fx-padding: 6px 14px; -fx-font-size: 13px;"/>
-                </HBox>
-            </VBox>
-            
-            <!-- Record Limit (for testing) -->
-            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="config-card">
-                <Label text="Record Limit (Testing):" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
-                <TextField fx:id="recordLimitField" prefWidth="80" 
-                          styleClass="modern-text-field"
-                          style="-fx-padding: 6px 10px;"
-                          text="0"/>
-                <Label text="(0 = unlimited)" style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
-            </HBox>
-            
-            <!-- Backup Mode Options -->
-            <VBox spacing="8" styleClass="config-card">
-                <HBox spacing="12" alignment="CENTER_LEFT">
-                    <CheckBox fx:id="incrementalBackupCheckbox" text="Incremental Backup" 
-                             style="-fx-font-size: 13px;"/>
-                    <Label fx:id="lastBackupLabel" text="" 
-                          style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
-                </HBox>
-                <Label text="Only backup records modified since last successful backup" 
-                      style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0; -fx-padding: 0 0 0 24;"/>
-                
-                <HBox spacing="12" alignment="CENTER_LEFT" style="-fx-padding: 4 0 0 0;">
-                    <CheckBox fx:id="compressBackupCheckbox" text="Compress to ZIP" 
-                             style="-fx-font-size: 13px;"/>
-                    <Label text="(saves disk space)" style="-fx-font-size: 11px; -fx-text-fill: #a0a0a0;"/>
-                </HBox>
-            </VBox>
-            
-            <!-- Progress Section -->
-            <VBox spacing="10" styleClass="progress-card">
+            <!-- User Panel -->
+            <VBox styleClass="user-panel" spacing="8">
                 <HBox spacing="10" alignment="CENTER_LEFT">
-                    <Label fx:id="progressLabel" text="Ready to start backup" styleClass="progress-label" 
-                           HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="progressPercentLabel" text="0%" styleClass="progress-percent"/>
+                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                        <Label fx:id="connectionLabel" text="Connected to Salesforce" styleClass="user-name"/>
+                    </VBox>
                 </HBox>
-                <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="6" 
-                            styleClass="modern-progress" progress="0"/>
+                <HBox spacing="8">
+                    <Button fx:id="backButton" text="← Back" onAction="#handleBack" 
+                            styleClass="btn btn-ghost" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                    <Button fx:id="logoutButton" text="Logout" onAction="#handleLogout" 
+                            styleClass="btn btn-ghost"/>
+                </HBox>
             </VBox>
-            
-            <!-- Action Buttons -->
-            <HBox spacing="10" alignment="CENTER" style="-fx-padding: 6 0 0 0;">
-                <Button fx:id="startBackupButton" text="Start Backup" onAction="#handleStartBackup" 
-                       prefWidth="140" prefHeight="36" styleClass="primary-button"
-                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
-                <Button fx:id="stopBackupButton" text="Stop" onAction="#handleStopBackup" 
-                       prefWidth="90" prefHeight="36" styleClass="danger-button"
-                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
-                <Button fx:id="exportResultsButton" text="Export" onAction="#handleExportResults" 
-                       prefWidth="90" prefHeight="36" styleClass="success-button" disable="true"
-                       style="-fx-font-size: 13px; -fx-font-weight: 600;"/>
-            </HBox>
-            
-            <!-- Activity Log (TALL - grows to fill remaining space) -->
-            <VBox spacing="6" styleClass="config-card" VBox.vgrow="ALWAYS">
-                <Label text="Activity Log" style="-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #e8e8e8;"/>
-                <TextArea fx:id="logArea" editable="false" wrapText="true" 
-                         styleClass="log-area" VBox.vgrow="ALWAYS"
-                         style="-fx-min-height: 150px;">
-                    <font>
-                        <Font name="Consolas" size="11"/>
-                    </font>
-                </TextArea>
-            </VBox>
-            
-            <!-- Attribution Footer -->
-            <HBox alignment="CENTER" style="-fx-padding: 16 0 0 0;">
-                <Label text="Developed by Victor Felisbino • BackupForce v2.0" 
-                      style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
-            </HBox>
         </VBox>
-    </SplitPane>
+    </left>
     
-</VBox>
+    <!-- CENTER: Main Content -->
+    <center>
+        <VBox spacing="0">
+            
+            <!-- Page Header with Status -->
+            <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
+                <Label text="Data Backup" styleClass="page-header-title"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="selectionCountLabel" text="0 objects selected" styleClass="status-text"/>
+            </HBox>
+            
+            <!-- Main Split Pane -->
+            <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
+                
+                <!-- LEFT: Object Selection -->
+                <VBox spacing="12" styleClass="content-area">
+                    
+                    <!-- Search and Actions -->
+                    <HBox spacing="12" alignment="CENTER_LEFT">
+                        <TextField fx:id="searchField" promptText="🔍 Search objects..." 
+                                   HBox.hgrow="ALWAYS" styleClass="form-input"/>
+                        <Button fx:id="selectAllButton" text="Select All" onAction="#handleSelectAll" 
+                                styleClass="btn btn-ghost btn-sm"/>
+                        <Button fx:id="deselectAllButton" text="Clear" onAction="#handleDeselectAll" 
+                                styleClass="btn btn-ghost btn-sm"/>
+                    </HBox>
+                    
+                    <!-- Object Selection Table -->
+                    <TableView fx:id="allObjectsTable" VBox.vgrow="ALWAYS" styleClass="data-table">
+                        <columns>
+                            <TableColumn fx:id="allSelectColumn" text="" prefWidth="40" 
+                                        minWidth="40" maxWidth="40"/>
+                            <TableColumn fx:id="allNameColumn" text="API Name" prefWidth="170" 
+                                        minWidth="120"/>
+                            <TableColumn fx:id="allLabelColumn" text="Label" prefWidth="150" 
+                                        minWidth="100"/>
+                            <TableColumn fx:id="allFieldsColumn" text="Fields" prefWidth="70" 
+                                        minWidth="70" maxWidth="70"/>
+                            <TableColumn fx:id="allStatusColumn" text="Status" prefWidth="140" 
+                                        minWidth="100"/>
+                        </columns>
+                        <columnResizePolicy>
+                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                        </columnResizePolicy>
+                    </TableView>
+                    
+                    <!-- Status Tabs (shown during/after backup) -->
+                    <TabPane fx:id="statusTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE" 
+                             visible="false" managed="false" styleClass="status-tabs">
+                        <Tab text="All Objects" closable="false">
+                            <TableView fx:id="allStatusTable" styleClass="data-table">
+                                <columns>
+                                    <TableColumn fx:id="statusAllNameColumn" text="Object" prefWidth="160"/>
+                                    <TableColumn fx:id="statusAllLabelColumn" text="Label" prefWidth="160"/>
+                                    <TableColumn fx:id="statusAllStatusColumn" text="Status" prefWidth="250"/>
+                                </columns>
+                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                            </TableView>
+                        </Tab>
+                        
+                        <Tab text="In Progress" closable="false">
+                            <TableView fx:id="inProgressTable" styleClass="data-table">
+                                <columns>
+                                    <TableColumn fx:id="progressNameColumn" text="Object" prefWidth="180"/>
+                                    <TableColumn fx:id="progressStatusColumn" text="Status" prefWidth="350"/>
+                                </columns>
+                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                            </TableView>
+                        </Tab>
+                        
+                        <Tab text="Completed" closable="false">
+                            <TableView fx:id="completedTable" styleClass="data-table">
+                                <columns>
+                                    <TableColumn fx:id="completedNameColumn" text="Object" prefWidth="160"/>
+                                    <TableColumn fx:id="completedRecordsColumn" text="Records" prefWidth="100"/>
+                                    <TableColumn fx:id="completedSizeColumn" text="Size" prefWidth="90"/>
+                                    <TableColumn fx:id="completedTimeColumn" text="Time" prefWidth="90"/>
+                                </columns>
+                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                            </TableView>
+                        </Tab>
+                        
+                        <Tab text="Errors" closable="false">
+                            <TableView fx:id="errorsTable" styleClass="data-table">
+                                <columns>
+                                    <TableColumn fx:id="errorNameColumn" text="Object" prefWidth="160"/>
+                                    <TableColumn fx:id="errorMessageColumn" text="Error" prefWidth="380"/>
+                                </columns>
+                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                            </TableView>
+                        </Tab>
+                    </TabPane>
+                </VBox>
+        
+                <!-- RIGHT: Configuration Panel -->
+                <ScrollPane fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;">
+                    <VBox spacing="16" styleClass="content-area">
+                        
+                        <!-- Destination Panel -->
+                        <VBox spacing="12" styleClass="panel">
+                            <Label text="Backup Destination" styleClass="panel-header"/>
+                            
+                            <HBox spacing="20" alignment="CENTER_LEFT">
+                                <RadioButton fx:id="csvRadioButton" text="CSV Files" selected="true" styleClass="form-radio">
+                                    <toggleGroup><ToggleGroup fx:id="backupTargetGroup"/></toggleGroup>
+                                </RadioButton>
+                                <RadioButton fx:id="databaseRadioButton" text="Database" 
+                                             toggleGroup="$backupTargetGroup" styleClass="form-radio"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Button fx:id="databaseSettingsButton" text="⚙ Manage" 
+                                        onAction="#handleDatabaseSettings" 
+                                        styleClass="btn btn-ghost btn-sm" disable="true"/>
+                            </HBox>
+                            
+                            <!-- Database Connection Selector -->
+                            <VBox fx:id="connectionSelectorBox" spacing="10" visible="false" managed="false">
+                                <HBox spacing="10" alignment="CENTER_LEFT">
+                                    <Label text="Connection:" styleClass="form-label"/>
+                                    <ComboBox fx:id="connectionCombo" promptText="Select a connection..." 
+                                             HBox.hgrow="ALWAYS" styleClass="form-combo"/>
+                                    <Button text="↻" onAction="#handleRefreshConnections" 
+                                           styleClass="btn btn-ghost btn-sm">
+                                        <tooltip><Tooltip text="Refresh connection list"/></tooltip>
+                                    </Button>
+                                </HBox>
+                                
+                                <HBox fx:id="connectionInfoBox" spacing="12" visible="false" managed="false" 
+                                      styleClass="callout callout-info">
+                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                                        <Label fx:id="connectionTypeLabel" text="Snowflake" styleClass="callout-title"/>
+                                        <Label fx:id="connectionDetailsLabel" text="Database.Schema" styleClass="callout-text"/>
+                                    </VBox>
+                                    <Label fx:id="connectionStatusIcon" text="●" style="-fx-text-fill: #3fb950; -fx-font-size: 18px;"/>
+                                </HBox>
+                            </VBox>
+                            
+                            <!-- CSV Output Folder -->
+                            <VBox fx:id="outputFolderBox" spacing="8">
+                                <Label text="Output Folder" styleClass="form-label"/>
+                                <HBox spacing="8">
+                                    <TextField fx:id="outputFolderField" HBox.hgrow="ALWAYS" 
+                                               styleClass="form-input" promptText="Select backup folder..."/>
+                                    <Button fx:id="browseButton" text="Browse" onAction="#handleBrowse" 
+                                           styleClass="btn btn-ghost"/>
+                                </HBox>
+                            </VBox>
+                        </VBox>
+                        
+                        <!-- Options Panel -->
+                        <VBox spacing="12" styleClass="panel">
+                            <Label text="Backup Options" styleClass="panel-header"/>
+                            
+                            <HBox spacing="12" alignment="CENTER_LEFT">
+                                <Label text="Record Limit:" styleClass="form-label"/>
+                                <TextField fx:id="recordLimitField" prefWidth="80" 
+                                           styleClass="form-input" text="0"/>
+                                <Label text="(0 = unlimited)" styleClass="form-hint"/>
+                            </HBox>
+                            
+                            <VBox spacing="8">
+                                <HBox spacing="8" alignment="CENTER_LEFT">
+                                    <CheckBox fx:id="incrementalBackupCheckbox" text="Incremental Backup" 
+                                              styleClass="form-checkbox"/>
+                                    <Label fx:id="lastBackupLabel" text="" styleClass="form-hint"/>
+                                </HBox>
+                                <Label text="Only backup records modified since last successful backup" 
+                                       styleClass="form-hint" style="-fx-padding: 0 0 0 24;"/>
+                            </VBox>
+                            
+                            <HBox spacing="8" alignment="CENTER_LEFT">
+                                <CheckBox fx:id="compressBackupCheckbox" text="Compress to ZIP" 
+                                          styleClass="form-checkbox"/>
+                                <Label text="(saves disk space)" styleClass="form-hint"/>
+                            </HBox>
+                            
+                            <HBox spacing="8" alignment="CENTER_LEFT">
+                                <CheckBox fx:id="preserveRelationshipsCheckbox" text="Preserve Relationships" 
+                                          styleClass="form-checkbox" selected="true"/>
+                                <Label text="(for restore)" styleClass="form-hint"/>
+                            </HBox>
+                        </VBox>
+                        
+                        <!-- Quick Restore Link -->
+                        <VBox spacing="8" styleClass="panel">
+                            <HBox spacing="10" alignment="CENTER_LEFT">
+                                <Label text="📥" style="-fx-font-size: 16px;"/>
+                                <Label text="Data Restoration" styleClass="panel-header" style="-fx-padding: 0;"/>
+                            </HBox>
+                            <Label text="Restore backup data from folders or databases back to Salesforce" 
+                                   styleClass="form-hint"/>
+                            <Button fx:id="openRestoreButton" text="Open Restore Screen →" onAction="#handleOpenRestore" 
+                                    styleClass="btn btn-ghost"/>
+                        </VBox>
+                        
+                        <!-- Progress Panel -->
+                        <VBox spacing="12" styleClass="panel">
+                            <HBox spacing="10" alignment="CENTER_LEFT">
+                                <Label fx:id="progressLabel" text="Ready to start backup" 
+                                       styleClass="panel-header" style="-fx-padding: 0;" HBox.hgrow="ALWAYS"/>
+                                <Label fx:id="progressPercentLabel" text="0%" 
+                                       style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: #58a6ff;"/>
+                            </HBox>
+                            <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="8" 
+                                         styleClass="progress-bar-accent" progress="0"/>
+                        </VBox>
+                        
+                        <!-- Action Buttons -->
+                        <HBox spacing="12" alignment="CENTER">
+                            <Button fx:id="startBackupButton" text="▶ Start Backup" onAction="#handleStartBackup" 
+                                    styleClass="btn btn-accent btn-lg" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                            <Button fx:id="stopBackupButton" text="Stop" onAction="#handleStopBackup" 
+                                    styleClass="btn btn-danger"/>
+                            <Button fx:id="exportResultsButton" text="Export" onAction="#handleExportResults" 
+                                    styleClass="btn btn-success" disable="true"/>
+                        </HBox>
+                        
+                        <!-- Activity Log -->
+                        <VBox spacing="8" styleClass="panel" VBox.vgrow="ALWAYS">
+                            <Label text="Activity Log" styleClass="panel-header"/>
+                            <TextArea fx:id="logArea" editable="false" wrapText="true" 
+                                      styleClass="log-area" VBox.vgrow="ALWAYS" prefHeight="150">
+                                <font><Font name="Consolas" size="11"/></font>
+                            </TextArea>
+                        </VBox>
+                        
+                    </VBox>
+                </ScrollPane>
+                
+            </SplitPane>
+        </VBox>
+    </center>
+</BorderPane>

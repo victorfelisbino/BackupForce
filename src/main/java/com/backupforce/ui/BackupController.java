@@ -92,7 +92,7 @@ public class BackupController {
     @FXML private TableColumn<SObjectItem, String> errorMessageColumn;
     
     @FXML private TabPane statusTabPane;
-    @FXML private Button backButton;
+    // Removed: backButton - only used by old backup.fxml
     
     @FXML private RadioButton csvRadioButton;
     @FXML private RadioButton databaseRadioButton;
@@ -112,6 +112,7 @@ public class BackupController {
     @FXML private TextField recordLimitField;
     @FXML private CheckBox incrementalBackupCheckbox;
     @FXML private CheckBox compressBackupCheckbox;
+    @FXML private CheckBox preserveRelationshipsCheckbox;
     @FXML private Label lastBackupLabel;
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
@@ -119,6 +120,8 @@ public class BackupController {
     @FXML private Button startBackupButton;
     @FXML private Button stopBackupButton;
     @FXML private Button exportResultsButton;
+    
+    // Removed: openRestoreButton - only used by old backup.fxml
     
     @FXML private ProgressBar progressBar;
     @FXML private Label progressLabel;
@@ -129,7 +132,7 @@ public class BackupController {
     @FXML private Label apiLimitsLabel;
     @FXML private TextField searchField;
     @FXML private Label selectionCountLabel;
-    @FXML private Button logoutButton;
+    // Removed: logoutButton - only used by old backup.fxml
 
     
     private LoginController.ConnectionInfo connectionInfo;
@@ -1048,26 +1051,37 @@ public class BackupController {
             outputFolderField.setText(selectedDir.getAbsolutePath());
         }
     }
+    
+    // ==================== Database Settings ====================
 
     @FXML
     private void handleDatabaseSettings() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/connections.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/database-settings.fxml"));
             Parent root = loader.load();
             
-            ConnectionsController controller = loader.getController();
-            controller.setConnectionInfo(connectionInfo);
-            controller.setReturnToBackup(true); // Flag to return to backup screen
+            DatabaseSettingsController controller = loader.getController();
             
-            Scene scene = new Scene(root, 820, 560);
-            Stage stage = (Stage) databaseSettingsButton.getScene().getWindow();
-            stage.setScene(scene);
-            stage.setResizable(false);
-            stage.centerOnScreen();
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/backupforce-modern.css").toExternalForm());
+            
+            Stage dialog = new Stage();
+            dialog.setTitle("Database Connection Settings");
+            dialog.setScene(scene);
+            dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            dialog.initOwner(databaseSettingsButton.getScene().getWindow());
+            dialog.setResizable(true);
+            dialog.setWidth(600);
+            dialog.setHeight(700);
+            
+            dialog.showAndWait();
+            
+            // Refresh database connection dropdown after dialog closes
+            loadSavedConnections();
             
         } catch (IOException e) {
-            logger.error("Error opening connections page", e);
-            showError("Failed to open connections: " + e.getMessage());
+            logger.error("Error opening database settings dialog", e);
+            showError("Failed to open database settings: " + e.getMessage());
         }
     }
 
@@ -1307,8 +1321,14 @@ public class BackupController {
             // Ignore invalid input, use 0 (no limit)
         }
         
+        // Check preserve relationships option
+        boolean preserveRelationships = preserveRelationshipsCheckbox != null && preserveRelationshipsCheckbox.isSelected();
+        if (preserveRelationships) {
+            logMessage("Relationship preservation enabled - will capture external IDs for restore");
+        }
+        
         // Start backup
-        currentBackupTask = new BackupTask(selectedObjects, outputFolder, displayFolder, dataSink, recordLimit);
+        currentBackupTask = new BackupTask(selectedObjects, outputFolder, displayFolder, dataSink, recordLimit, preserveRelationships);
         
         currentBackupTask.setOnSucceeded(event -> {
             Platform.runLater(() -> {
@@ -1569,15 +1589,17 @@ public class BackupController {
         private final String displayFolder;
         private final DataSink dataSink;
         private final int recordLimit;
+        private final boolean preserveRelationships;
         private volatile boolean cancelled = false;
         private ExecutorService executor;
 
-        public BackupTask(List<SObjectItem> objects, String outputFolder, String displayFolder, DataSink dataSink, int recordLimit) {
+        public BackupTask(List<SObjectItem> objects, String outputFolder, String displayFolder, DataSink dataSink, int recordLimit, boolean preserveRelationships) {
             this.objects = objects;
             this.outputFolder = outputFolder;
             this.displayFolder = displayFolder;
             this.dataSink = dataSink;
             this.recordLimit = recordLimit;
+            this.preserveRelationships = preserveRelationships;
         }
 
         @Override
@@ -1940,6 +1962,19 @@ public class BackupController {
                     Platform.runLater(() -> logMessage("WARNING: Compression failed: " + e.getMessage()));
                 }
             }
+            
+            // Generate relationship metadata for restore (only for CSV backups)
+            if (preserveRelationships && (dataSink == null || dataSink.getType().equals("CSV"))) {
+                try {
+                    Platform.runLater(() -> logMessage("Generating relationship metadata for restore..."));
+                    generateRelationshipMetadata(outputFolder, objects);
+                    Platform.runLater(() -> logMessage("✓ Relationship metadata saved"));
+                } catch (Exception e) {
+                    logger.warn("Failed to generate relationship metadata", e);
+                    Platform.runLater(() -> logMessage("WARNING: Relationship metadata generation failed: " + e.getMessage()));
+                }
+            }
+            
             final String displayOutput = finalOutputInfo;
             
             long totalTime = System.currentTimeMillis() - startTime;
@@ -2034,7 +2069,7 @@ public class BackupController {
     
     private void saveBackupStats(int objectCount, long rowCount, String destination) {
         try {
-            Preferences prefs = Preferences.userNodeForPackage(HomeController.class);
+            Preferences prefs = Preferences.userNodeForPackage(BackupController.class);
             
             // Format the timestamp
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, h:mm a"));
@@ -2123,6 +2158,55 @@ public class BackupController {
             ratio);
         
         return zipFile.getAbsolutePath();
+    }
+    
+    /**
+     * Generates relationship metadata file for data restoration.
+     * This captures external IDs and relationship mappings so data can be
+     * restored without relying on Salesforce IDs.
+     */
+    private void generateRelationshipMetadata(String outputFolder, List<SObjectItem> objects) {
+        try {
+            com.backupforce.restore.RelationshipManager relManager = new com.backupforce.restore.RelationshipManager(
+                connectionInfo.getInstanceUrl(),
+                connectionInfo.getSessionId(),
+                "62.0"
+            );
+            
+            // Get object names that were backed up
+            List<String> objectNames = objects.stream()
+                .map(SObjectItem::getName)
+                .collect(java.util.stream.Collectors.toList());
+            
+            // Generate and save relationship config
+            com.backupforce.restore.RelationshipManager.BackupRelationshipConfig config = 
+                relManager.generateBackupConfig(objectNames);
+            
+            // Add backup metadata
+            config.setBackupDate(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            config.setSourceOrg(connectionInfo.getUsername() + " @ " + connectionInfo.getInstanceUrl());
+            
+            relManager.saveRelationshipMetadata(outputFolder, config);
+            
+            // Log summary
+            int objectsWithRelationships = 0;
+            int totalRelationships = 0;
+            for (com.backupforce.restore.RelationshipManager.ObjectBackupConfig objConfig : config.getObjects().values()) {
+                if (!objConfig.getRelationshipMappings().isEmpty()) {
+                    objectsWithRelationships++;
+                    totalRelationships += objConfig.getRelationshipMappings().size();
+                }
+            }
+            
+            logger.info("Relationship metadata: {} objects with {} total relationship fields", 
+                objectsWithRelationships, totalRelationships);
+            
+            relManager.close();
+            
+        } catch (Exception e) {
+            logger.error("Failed to generate relationship metadata", e);
+            throw new RuntimeException("Failed to generate relationship metadata: " + e.getMessage(), e);
+        }
     }
 
     // Utility methods
@@ -2337,66 +2421,5 @@ public class BackupController {
         }
     }
     
-    @FXML
-    private void handleBack() {
-        logger.info("User navigating back to home");
-        
-        // Stop any running backup
-        if (currentBackupTask != null && !currentBackupTask.isDone()) {
-            handleStopBackup();
-        }
-        
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
-            Parent root = loader.load();
-            
-            HomeController controller = loader.getController();
-            controller.setConnectionInfo(connectionInfo);
-            
-            Scene scene = new Scene(root, 820, 560);
-            
-            Stage stage = (Stage) backButton.getScene().getWindow();
-            stage.setScene(scene);
-            stage.setResizable(false);
-            stage.centerOnScreen();
-            
-            logger.info("Returned to home screen");
-        } catch (IOException e) {
-            logger.error("Failed to load home screen", e);
-            showError("Failed to return to home: " + e.getMessage());
-        }
-    }
-    
-    @FXML
-    private void handleLogout() {
-        logger.info("User initiated logout");
-        
-        // Stop any running backup
-        if (currentBackupTask != null && !currentBackupTask.isDone()) {
-            handleStopBackup();
-        }
-        
-        // Close current window
-        Stage stage = (Stage) logoutButton.getScene().getWindow();
-        stage.close();
-        
-        // Open login window
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
-            Parent root = loader.load();
-            
-            Stage loginStage = new Stage();
-            loginStage.setTitle("BackupForce - Salesforce Backup Tool");
-            loginStage.setScene(new Scene(root, 600, 750));
-            loginStage.setResizable(true);
-            loginStage.setMinWidth(500);
-            loginStage.setMinHeight(650);
-            loginStage.show();
-            
-            logger.info("Returned to login screen");
-        } catch (IOException e) {
-            logger.error("Failed to load login screen", e);
-            showError("Failed to return to login: " + e.getMessage());
-        }
-    }
+    // Old navigation methods removed - navigation now handled by MainController sidebar
 }

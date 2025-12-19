@@ -41,19 +41,37 @@ Write-Host ""
 # Step 3: Create portable app-image with jpackage
 Write-Host "[3/4] Creating portable Windows app..." -ForegroundColor Yellow
 try {
-    # Remove old app-image if exists
-    if (Test-Path "target/BackupForce") {
-        Remove-Item -Recurse -Force "target/BackupForce"
+    # IMPORTANT: Use a SEPARATE directory for jpackage output to prevent recursive folder issues
+    # jpackage creates a folder named after the app (BackupForce) inside --dest
+    # Using --input target and --dest target caused infinite recursion (target/BackupForce/app/BackupForce/...)
+    
+    $distDir = "dist"
+    
+    # Clean the destination directory completely (prevents recursive folder issues)
+    if (Test-Path $distDir) {
+        Write-Host "      Cleaning previous build..." -ForegroundColor Gray
+        # Use .NET method with long path support for safety
+        [System.IO.Directory]::Delete("\\?\$((Get-Location).Path)\$distDir", $true) 2>$null
+        Remove-Item $distDir -Recurse -Force -ErrorAction SilentlyContinue
     }
+    New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+    
+    # Copy JAR to a clean input directory (separate from target to avoid jpackage picking up old outputs)
+    $inputDir = "build-temp"
+    if (Test-Path $inputDir) {
+        Remove-Item $inputDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $inputDir -Force | Out-Null
+    Copy-Item "target\BackupForce.jar" $inputDir -Force
     
     # For JavaFX apps, let jpackage use default JDK runtime (includes everything needed)
     # The fat JAR already includes JavaFX classes
-    jpackage --input target `
+    jpackage --input $inputDir `
              --name BackupForce `
              --main-jar BackupForce.jar `
              --main-class com.backupforce.Launcher `
              --type app-image `
-             --dest target `
+             --dest $distDir `
              --app-version 3.0.0 `
              --vendor "Victor Felisbino" `
              --description "Salesforce Backup Tool with Nature-Inspired UI" `
@@ -70,7 +88,7 @@ try {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "SUCCESS! Portable app created at:" -ForegroundColor Green
-Write-Host "target\BackupForce\" -ForegroundColor Cyan
+Write-Host "dist\BackupForce\" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Distribution Details:" -ForegroundColor Yellow
@@ -80,17 +98,18 @@ Write-Host "  - No Java required on user's machine" -ForegroundColor White
 Write-Host "  - Just copy folder and run!" -ForegroundColor White
 Write-Host "  - ZIP this folder for distribution" -ForegroundColor White
 Write-Host ""
-Write-Host "To run: target\BackupForce\BackupForce.exe" -ForegroundColor Cyan
+Write-Host "To run: dist\BackupForce\BackupForce.exe" -ForegroundColor Cyan
 Write-Host ""
 
 # Optionally create a ZIP file
 $createZip = Read-Host "Create ZIP file for distribution? (y/n)"
 if ($createZip -eq "y" -or $createZip -eq "Y") {
     Write-Host "Creating ZIP file..." -ForegroundColor Yellow
-    $zipPath = "target\BackupForce-2.0.0-portable.zip"
+    $zipPath = "releases\BackupForce-3.0.0-portable.zip"
+    New-Item -ItemType Directory -Path "releases" -Force | Out-Null
     if (Test-Path $zipPath) {
         Remove-Item $zipPath -Force
     }
-    Compress-Archive -Path "target\BackupForce\*" -DestinationPath $zipPath
+    Compress-Archive -Path "dist\BackupForce\*" -DestinationPath $zipPath
     Write-Host "ZIP created: $zipPath" -ForegroundColor Green
 }

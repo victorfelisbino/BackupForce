@@ -95,7 +95,7 @@ public class RestoreController {
     @FXML private Label targetOrgLabel;
     
     // Actions
-    @FXML private Button backButton;
+    // Removed: backButton - only used by old restore.fxml
     @FXML private Button startRestoreButton;
     @FXML private Button stopRestoreButton;
     
@@ -296,30 +296,7 @@ public class RestoreController {
         });
     }
     
-    @FXML
-    private void handleBack() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/home.fxml"));
-            Parent root = loader.load();
-            
-            HomeController controller = loader.getController();
-            if (connectionInfo != null) {
-                controller.setConnectionInfo(connectionInfo);
-            }
-            
-            Scene scene = new Scene(root, 1100, 750);
-            Stage stage = (Stage) backButton.getScene().getWindow();
-            stage.setScene(scene);
-            stage.setResizable(true);
-            stage.setMinWidth(950);
-            stage.setMinHeight(650);
-            stage.setMaximized(true);
-            
-        } catch (IOException e) {
-            logger.error("Error returning to home screen", e);
-            showError("Failed to return to home screen: " + e.getMessage());
-        }
-    }
+    // Old handleBack() removed - navigation now handled by MainController sidebar
     
     @FXML
     private void handleBrowseRestore() {

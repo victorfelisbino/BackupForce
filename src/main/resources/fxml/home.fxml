@@ -47,7 +47,7 @@
                 <Region prefHeight="16"/>
                 <Label text="SETTINGS" styleClass="nav-section-title"/>
                 
-                <HBox fx:id="connectionsNav" styleClass="nav-item" spacing="10" alignment="CENTER_LEFT"
+                <HBox styleClass="nav-item" spacing="10" alignment="CENTER_LEFT"
                       onMouseClicked="#handleDatabaseConnections" style="-fx-cursor: hand;">
                     <Label text="🔗" styleClass="nav-icon"/>
                     <Label text="Connections"/>
@@ -59,14 +59,22 @@
                     <Label text="Preferences"/>
                 </HBox>
                 
+                <HBox styleClass="nav-item" spacing="10" alignment="CENTER_LEFT"
+                      onMouseClicked="#handleAbout" style="-fx-cursor: hand;">
+                    <Label text="ℹ️" styleClass="nav-icon"/>
+                    <Label text="About"/>
+                </HBox>
+                
                 <Region VBox.vgrow="ALWAYS"/>
             </VBox>
             
-            <!-- User Panel (Footer) -->
+            <!-- User Panel (Footer) - Hidden MenuButton for controller reference -->
+            <MenuButton fx:id="settingsMenuButton" visible="false" managed="false"/>
+            
             <VBox styleClass="user-panel" spacing="8">
                 <HBox spacing="10" alignment="CENTER_LEFT">
                     <StackPane styleClass="user-avatar">
-                        <Label fx:id="userInitialLabel" text="U"/>
+                        <Label text="U"/>
                     </StackPane>
                     <VBox spacing="2" HBox.hgrow="ALWAYS">
                         <Label fx:id="usernameLabel" text="user@example.com" styleClass="user-name"/>
@@ -86,9 +94,13 @@
             <!-- Status Bar -->
             <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
                 <Region styleClass="status-dot status-dot-connected"/>
-                <Label fx:id="connectionStatusLabel" text="Connected to Salesforce" styleClass="status-text"/>
+                <Label fx:id="statusLabel" text="Connected to Salesforce" styleClass="status-text"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Label fx:id="apiLimitsLabel" text="API: --/-- (0%)" styleClass="api-counter"/>
+                <HBox spacing="16" alignment="CENTER_RIGHT">
+                    <Label fx:id="lastBackupLabel" text="Last backup: Never" styleClass="status-text"/>
+                    <Label text="•" styleClass="status-text"/>
+                    <Label fx:id="totalBackupsLabel" text="0 total backups" styleClass="status-text"/>
+                </HBox>
             </HBox>
             
             <!-- Scrollable Content Area -->
@@ -105,24 +117,24 @@
                     
                     <!-- Quick Stats Row -->
                     <HBox spacing="16">
-                        <VBox styleClass="backup-summary" spacing="4" HBox.hgrow="ALWAYS">
-                            <Label text="AVAILABLE OBJECTS" styleClass="backup-summary-title"/>
-                            <Label fx:id="objectsAvailableLabel" text="--" styleClass="backup-summary-value"/>
+                        <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                            <Label text="AVAILABLE OBJECTS" styleClass="stat-card-title"/>
+                            <Label fx:id="objectsAvailableLabel" text="--" styleClass="stat-card-value"/>
                         </VBox>
-                        <VBox styleClass="backup-summary" spacing="4" HBox.hgrow="ALWAYS">
-                            <Label text="LAST BACKUP" styleClass="backup-summary-title"/>
-                            <Label fx:id="lastBackupDateLabel" text="Never" styleClass="backup-summary-value" 
-                                   style="-fx-font-size: 18px;"/>
+                        <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                            <Label text="LAST BACKUP" styleClass="stat-card-title"/>
+                            <Label fx:id="lastDataBackupLabel" text="Never" 
+                                   styleClass="stat-card-value" style="-fx-font-size: 18px;"/>
                         </VBox>
-                        <VBox styleClass="backup-summary" spacing="4" HBox.hgrow="ALWAYS">
-                            <Label text="RECORDS BACKED UP" styleClass="backup-summary-title"/>
-                            <Label fx:id="lastBackupRowsLabel" text="--" styleClass="backup-summary-value"/>
+                        <VBox styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                            <Label text="RECORDS BACKED UP" styleClass="stat-card-title"/>
+                            <Label fx:id="lastBackupRowsLabel" text="--" styleClass="stat-card-value"/>
                         </VBox>
                     </HBox>
                     
                     <!-- Action Cards Section -->
                     <VBox spacing="16">
-                        <Label text="What would you like to do?" style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                        <Label text="What would you like to do?" styleClass="section-title"/>
                         
                         <HBox spacing="20">
                             <!-- Data Backup Card -->
@@ -138,20 +150,7 @@
                                                styleClass="card-description" wrapText="true"/>
                                     </VBox>
                                 </HBox>
-                                
-                                <VBox styleClass="card-stats" spacing="12">
-                                    <HBox spacing="24">
-                                        <VBox spacing="2">
-                                            <Label fx:id="backupObjectsLabel" text="--" styleClass="stat-value"/>
-                                            <Label text="Objects" styleClass="stat-label"/>
-                                        </VBox>
-                                        <VBox spacing="2">
-                                            <Label fx:id="backupRowsLabel" text="--" styleClass="stat-value"/>
-                                            <Label text="Last Rows" styleClass="stat-label"/>
-                                        </VBox>
-                                    </HBox>
-                                    <Label fx:id="lastDataBackupLabel" text="No backups yet" styleClass="card-badge"/>
-                                </VBox>
+                                <Label text="Click to start backup →" styleClass="card-action"/>
                             </VBox>
                             
                             <!-- Data Restore Card -->
@@ -167,53 +166,48 @@
                                                styleClass="card-description" wrapText="true"/>
                                     </VBox>
                                 </HBox>
-                                
-                                <VBox styleClass="card-stats" spacing="12">
-                                    <HBox spacing="24">
-                                        <VBox spacing="2">
-                                            <Label fx:id="restoreSourcesLabel" text="--" styleClass="stat-value"/>
-                                            <Label text="Sources" styleClass="stat-label"/>
-                                        </VBox>
-                                        <VBox spacing="2">
-                                            <Label fx:id="lastRestoreRowsLabel" text="--" styleClass="stat-value"/>
-                                            <Label text="Restored" styleClass="stat-label"/>
-                                        </VBox>
-                                    </HBox>
-                                    <Label fx:id="lastDataRestoreLabel" text="No restores yet" styleClass="card-badge"/>
-                                </VBox>
+                                <HBox spacing="16" alignment="CENTER_LEFT">
+                                    <VBox spacing="2">
+                                        <Label fx:id="restoreSourcesLabel" text="--" styleClass="stat-value"/>
+                                        <Label text="Sources" styleClass="stat-label"/>
+                                    </VBox>
+                                    <VBox spacing="2">
+                                        <Label fx:id="lastRestoreRowsLabel" text="--" styleClass="stat-value"/>
+                                        <Label text="Restored" styleClass="stat-label"/>
+                                    </VBox>
+                                </HBox>
+                                <Label fx:id="lastDataRestoreLabel" text="No restores yet" styleClass="card-badge"/>
                             </VBox>
                         </HBox>
                         
-                        <!-- Coming Soon Section -->
+                        <!-- Coming Soon Cards -->
                         <HBox spacing="20">
-                            <!-- Config Backup Card -->
-                            <VBox styleClass="action-card action-card-disabled" spacing="16" HBox.hgrow="ALWAYS">
+                            <VBox fx:id="configBackupCard" styleClass="action-card action-card-disabled" spacing="16" HBox.hgrow="ALWAYS">
                                 <HBox spacing="16" alignment="CENTER_LEFT">
-                                    <StackPane styleClass="card-icon card-icon-warning">
+                                    <StackPane styleClass="card-icon card-icon-muted">
                                         <Label text="⚙️"/>
                                     </StackPane>
                                     <VBox spacing="4" HBox.hgrow="ALWAYS">
                                         <Label text="Config Backup" styleClass="card-title"/>
-                                        <Label text="Backup picklists, record types, profiles, and more" 
+                                        <Label text="Backup picklists, record types, profiles" 
                                                styleClass="card-description" wrapText="true"/>
                                     </VBox>
                                 </HBox>
-                                <Label text="Coming Soon" styleClass="card-badge card-badge-coming-soon"/>
+                                <Label text="Coming Soon" styleClass="badge badge-muted"/>
                             </VBox>
                             
-                            <!-- Metadata Backup Card -->
-                            <VBox styleClass="action-card action-card-disabled" spacing="16" HBox.hgrow="ALWAYS">
+                            <VBox fx:id="metadataBackupCard" styleClass="action-card action-card-disabled" spacing="16" HBox.hgrow="ALWAYS">
                                 <HBox spacing="16" alignment="CENTER_LEFT">
-                                    <StackPane styleClass="card-icon card-icon-warning">
+                                    <StackPane styleClass="card-icon card-icon-muted">
                                         <Label text="📋"/>
                                     </StackPane>
                                     <VBox spacing="4" HBox.hgrow="ALWAYS">
                                         <Label text="Metadata Backup" styleClass="card-title"/>
-                                        <Label text="Backup Apex, triggers, flows, and custom metadata" 
+                                        <Label text="Backup Apex, triggers, flows, and metadata" 
                                                styleClass="card-description" wrapText="true"/>
                                     </VBox>
                                 </HBox>
-                                <Label text="Coming Soon" styleClass="card-badge card-badge-coming-soon"/>
+                                <Label text="Coming Soon" styleClass="badge badge-muted"/>
                             </VBox>
                         </HBox>
                     </VBox>
@@ -221,19 +215,17 @@
                     <!-- Database Connections Section -->
                     <VBox spacing="16">
                         <HBox alignment="CENTER_LEFT" spacing="16">
-                            <Label text="Database Connections" 
-                                   style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                            <Label text="Database Connections" styleClass="section-title"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Button text="+ Add Connection" onAction="#handleAddConnection" 
                                     styleClass="btn btn-accent btn-sm"/>
                         </HBox>
                         
                         <HBox fx:id="connectionsContainer" spacing="16">
-                            <!-- Connection cards will be added dynamically -->
                             <VBox styleClass="empty-state" spacing="12" HBox.hgrow="ALWAYS" 
                                   style="-fx-padding: 32; -fx-alignment: CENTER;">
                                 <Label text="🔗" styleClass="empty-state-icon"/>
-                                <Label text="No connections configured" styleClass="empty-state-title"/>
+                                <Label fx:id="noConnectionsLabel" text="No connections configured" styleClass="empty-state-title"/>
                                 <Label text="Add a database connection to backup directly to your data warehouse" 
                                        styleClass="empty-state-description" wrapText="true" textAlignment="CENTER"/>
                             </VBox>
