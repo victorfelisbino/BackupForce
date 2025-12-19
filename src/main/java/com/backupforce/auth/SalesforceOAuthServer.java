@@ -41,11 +41,34 @@ import java.util.concurrent.TimeUnit;
 public class SalesforceOAuthServer {
     private static final Logger logger = LoggerFactory.getLogger(SalesforceOAuthServer.class);
     
-    // Using Salesforce CLI's official Connected App - works on ALL Salesforce orgs!
-    // This is the same app used by 'sf org login web' command
-    private static final String CLIENT_ID = "PlatformCLI";
+    // Client ID loaded from oauth.properties, falls back to Salesforce CLI's app
+    private static final String CLIENT_ID = loadClientId();
     // Try multiple ports in case the default is blocked by firewall/antivirus
     private static final int[] FALLBACK_PORTS = {1717, 8888, 3000, 8080, 9090};
+    
+    /**
+     * Load OAuth client ID from properties file.
+     * Falls back to "PlatformCLI" (Salesforce CLI's app) if not configured.
+     */
+    private static String loadClientId() {
+        String clientId = "PlatformCLI"; // Default fallback
+        try {
+            java.util.Properties props = new java.util.Properties();
+            java.io.InputStream is = SalesforceOAuthServer.class.getResourceAsStream("/oauth.properties");
+            if (is != null) {
+                props.load(is);
+                is.close();
+                String configuredId = props.getProperty("oauth.client_id");
+                if (configuredId != null && !configuredId.isBlank() && !configuredId.equals("YOUR_CLIENT_ID_HERE")) {
+                    clientId = configuredId.trim();
+                    logger.info("Loaded custom OAuth client ID from oauth.properties");
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Could not load oauth.properties, using default client ID: {}", e.getMessage());
+        }
+        return clientId;
+    }
     
     // Default timeout (can be changed via setTimeout)
     private static final int DEFAULT_TIMEOUT_SECONDS = 180; // 3 minutes
@@ -194,22 +217,11 @@ public class SalesforceOAuthServer {
             logger.info("Opening browser for Salesforce login...");
             logger.info("Redirect URI: {}", activeRedirectUri);
             
-            // Open browser
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                try {
-                    Desktop.getDesktop().browse(new URI(authUrl));
-                    logger.info("✅ Browser opened successfully");
-                } catch (Exception e) {
-                    logger.error("❌ Failed to open browser: {}", e.getMessage());
-                    return new OAuthResult("Cannot open browser automatically.\n\n" +
-                                          "Please manually navigate to:\n" + authUrl + "\n\n" +
-                                          "Error: " + e.getMessage());
-                }
-            } else {
-                String errorMsg = "Desktop not supported - cannot open browser automatically.\n\n" +
-                                 "Please manually copy this URL to your browser:\n\n" + authUrl;
-                logger.error(errorMsg);
-                return new OAuthResult(errorMsg);
+            // Open browser - try multiple methods for reliability
+            boolean browserOpened = openBrowser(authUrl);
+            if (!browserOpened) {
+                return new OAuthResult("Cannot open browser automatically.\n\n" +
+                                      "Please manually navigate to:\n" + authUrl);
             }
             
             // Wait for callback (with configurable timeout)
@@ -248,6 +260,81 @@ public class SalesforceOAuthServer {
             // Stop server
             stopServer();
         }
+    }
+    
+    /**
+     * Open browser using multiple fallback methods for reliability.
+     * Some methods work better in certain environments (packaged app vs JAR).
+     */
+    private boolean openBrowser(String url) {
+        String os = System.getProperty("os.name").toLowerCase();
+        
+        // Method 1: Try Desktop.browse() first - most reliable for URLs with special chars
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            try {
+                logger.info("Trying Desktop.browse() to open browser...");
+                Desktop.getDesktop().browse(new URI(url));
+                logger.info("✅ Browser opened via Desktop.browse()");
+                return true;
+            } catch (Exception e) {
+                logger.warn("Desktop.browse() failed: {}", e.getMessage(), e);
+            }
+        }
+        
+        // Method 2: Try Windows rundll32 - handles URLs with & characters properly
+        if (os.contains("win")) {
+            try {
+                logger.info("Trying rundll32 to open browser...");
+                ProcessBuilder pb = new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url);
+                pb.start();
+                Thread.sleep(500);
+                logger.info("✅ Browser opened via rundll32");
+                return true;
+            } catch (Exception e) {
+                logger.warn("rundll32 failed: {}", e.getMessage(), e);
+            }
+        }
+        
+        // Method 3: Try PowerShell - properly escapes URLs
+        if (os.contains("win")) {
+            try {
+                logger.info("Trying PowerShell Start-Process to open browser...");
+                // Use -ArgumentList to properly pass URL with special characters
+                ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", 
+                    "Start-Process", "\"" + url.replace("\"", "`\"") + "\"");
+                pb.start();
+                Thread.sleep(500);
+                logger.info("✅ Browser opened via PowerShell");
+                return true;
+            } catch (Exception e) {
+                logger.warn("PowerShell Start-Process failed: {}", e.getMessage(), e);
+            }
+        }
+        
+        // Method 4: Try xdg-open for Linux
+        if (os.contains("nix") || os.contains("nux")) {
+            try {
+                new ProcessBuilder("xdg-open", url).start();
+                logger.info("✅ Browser opened via xdg-open");
+                return true;
+            } catch (Exception e) {
+                logger.warn("xdg-open failed: {}", e.getMessage());
+            }
+        }
+        
+        // Method 5: Try 'open' for macOS
+        if (os.contains("mac")) {
+            try {
+                new ProcessBuilder("open", url).start();
+                logger.info("✅ Browser opened via 'open' command");
+                return true;
+            } catch (Exception e) {
+                logger.warn("macOS 'open' failed: {}", e.getMessage());
+            }
+        }
+        
+        logger.error("❌ All browser opening methods failed");
+        return false;
     }
     
     /**

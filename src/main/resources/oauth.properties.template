@@ -1,0 +1,11 @@
+# OAuth Configuration Template
+# Copy this file to oauth.properties and fill in your Connected App credentials
+# oauth.properties is gitignored and will not be committed
+
+# Your Salesforce Connected App Consumer Key (Client ID)
+# Get this from: Setup → App Manager → Your Connected App → Manage Consumer Details
+oauth.client_id=YOUR_CLIENT_ID_HERE
+
+# Note: Leave as PlatformCLI to use Salesforce CLI's built-in Connected App
+# This works on all orgs without any setup required
+# oauth.client_id=PlatformCLI

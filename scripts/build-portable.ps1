@@ -54,10 +54,11 @@ try {
              --main-class com.backupforce.Launcher `
              --type app-image `
              --dest target `
-             --app-version 2.0.0 `
+             --app-version 3.0.0 `
              --vendor "Victor Felisbino" `
-             --description "Salesforce Backup Tool with Windows 11 UI" `
-             --java-options "-Dprism.order=sw" `
+             --description "Salesforce Backup Tool with Nature-Inspired UI" `
+             --java-options "-Xmx512m" `
+             --java-options "--enable-native-access=ALL-UNNAMED" `
              --java-options "--add-opens=java.base/java.lang=ALL-UNNAMED"
     if ($LASTEXITCODE -ne 0) { throw "jpackage failed" }
     Write-Host "      App image created!" -ForegroundColor Green
