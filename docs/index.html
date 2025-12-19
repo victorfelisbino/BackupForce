@@ -331,6 +331,12 @@
             max-width: 600px;
             margin: 0 auto 30px;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .tab-nav::-webkit-scrollbar {
+            display: none;
         }
 
         .tab-btn {
@@ -344,6 +350,7 @@
             cursor: pointer;
             transition: all 0.2s;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .tab-btn:hover {
@@ -786,12 +793,70 @@
 
             .tab-nav {
                 padding: 4px;
-                gap: 2px;
+                gap: 4px;
+                justify-content: flex-start;
+                max-width: 100%;
+                margin-left: 0;
+                margin-right: 0;
+                border-radius: 10px;
             }
 
             .tab-btn {
-                padding: 10px 14px;
-                font-size: 0.8rem;
+                padding: 10px 16px;
+                font-size: 0.85rem;
+                min-width: auto;
+            }
+
+            .content-tabs {
+                padding: 30px 15px 0;
+            }
+
+            .section-header {
+                margin-bottom: 20px;
+            }
+
+            .section-header h2 {
+                font-size: 1.4rem;
+            }
+
+            .section-header p {
+                font-size: 0.9rem;
+            }
+
+            .features-grid {
+                gap: 12px;
+            }
+
+            .feature-card {
+                padding: 20px;
+            }
+
+            .roadmap-item {
+                padding: 20px;
+            }
+
+            .roadmap-list {
+                grid-template-columns: 1fr;
+            }
+
+            .privacy-grid {
+                gap: 12px;
+            }
+
+            .privacy-card {
+                padding: 20px;
+            }
+
+            .why-free-grid {
+                gap: 12px;
+            }
+
+            .why-free-card {
+                padding: 20px;
+            }
+
+            .steps-grid {
+                gap: 16px;
             }
 
             .footer-content {
@@ -823,12 +888,9 @@
                 padding: 8px 15px;
             }
 
-            .section-header h2 {
-                font-size: 1.5rem;
-            }
-
-            .features-grid {
-                grid-template-columns: 1fr;
+            .tab-btn {
+                padding: 8px 12px;
+                font-size: 0.8rem;
             }
 
             .db-grid {
