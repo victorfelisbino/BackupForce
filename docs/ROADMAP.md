@@ -1,14 +1,20 @@
 # BackupForce Roadmap
 
-This document outlines the development roadmap for BackupForce's data restoration feature.
+This document outlines the development roadmap for BackupForce — the free, open-source Salesforce backup and recovery tool.
 
-**Last Updated:** December 18, 2025
+**Last Updated:** December 19, 2025
 
 ---
 
 ## 🎯 Overview
 
-The Data Restoration feature enables restoring backed-up Salesforce data (CSV files or database tables) back into a Salesforce org. This is a critical feature for disaster recovery, data migration, and sandbox refresh scenarios.
+BackupForce is designed to be the best **free alternative** to expensive Salesforce backup tools like OwnBackup ($6K+/year), Spanning, and Gearset. Our goal is to provide enterprise-grade backup and recovery features at zero cost, built by Salesforce admins for the community.
+
+### Key Differentiators
+- **100% Free** - No subscriptions, no per-user pricing, no storage limits
+- **Relationship-Aware** - Smart backup/restore that preserves data relationships
+- **Cross-Platform** - Native apps for Windows, macOS, and Linux (no Java required)
+- **Open Source** - Full transparency, community-driven development
 
 ---
 
@@ -25,6 +31,12 @@ The Data Restoration feature enables restoring backed-up Salesforce data (CSV fi
 | **Phase 7** | Cross-Org Data Transformation | ✅ Complete | High |
 | **Phase 8** | Duplicate Record Handling | ⏳ Planned | High |
 | **Phase 9** | Related Record Creation | ⏳ Planned | Medium |
+| **Phase 10** | Relationship-Aware Backup | 🔥 Next | High |
+| **Phase 11** | Cascade Delete | 🔥 Next | High |
+| **Phase 12** | Scheduled Automated Backups | ⏳ Planned | High |
+| **Phase 13** | CLI & Automation | ⏳ Planned | Medium |
+| **Phase 14** | Advanced Data Management | ⏳ Planned | Medium |
+| **Phase 15** | Enterprise Features | ⏳ Future | Low |
 
 ---
 
@@ -302,19 +314,234 @@ Create related child records automatically during parent import (e.g., create Op
 
 ---
 
-## 📅 Timeline
+## � Phase 10: Relationship-Aware Backup (Next)
+
+**User Pain Point:** *"If I set a limit on Account, but say to preserve relationships, it should know to look at relationship objects and also download those records."*
+
+When backing up with record limits, automatically include related records to maintain data integrity.
+
+### 10.1 Smart Relationship Detection
+- [ ] Analyze object relationships on backup start
+- [ ] Build relationship graph (parent → child mappings)
+- [ ] Identify lookup and master-detail relationships
+- [ ] Detect polymorphic relationships (WhoId, WhatId)
+
+### 10.2 Preserve Relationships Mode
+- [ ] "Preserve Relationships" checkbox in backup options
+- [ ] When enabled with record limit, auto-include related records
+- [ ] Query related child records for each parent
+- [ ] Example: Backup 100 Accounts → include all their Contacts, Opportunities, Cases
+
+### 10.3 Relationship Depth Configuration
+- [ ] Configure relationship depth (1, 2, 3 levels or unlimited)
+- [ ] Level 1: Direct children (Account → Contact)
+- [ ] Level 2: Grandchildren (Account → Opportunity → OpportunityLineItem)
+- [ ] Level 3+: Deep hierarchies
+
+### 10.4 Smart Query Building
+- [ ] Generate WHERE clauses based on parent IDs
+- [ ] Batch queries for large parent sets
+- [ ] Use Bulk API for large related record sets
+- [ ] Optimize query order for efficiency
+
+### 10.5 Backup Manifest
+- [ ] Generate manifest file listing all objects and counts
+- [ ] Record relationship mappings in manifest
+- [ ] Enable restoration in correct dependency order
+- [ ] Include source org metadata snapshot
+
+---
+
+## 🔥 Phase 11: Cascade Delete (Next)
+
+**User Pain Point:** *"I want to be able to delete [a record] and delete all related records accordingly."*
+
+Smart deletion of records with all their related children — like deleting an Account and all its Cases, Contacts, Opportunities, etc.
+
+### 11.1 Cascade Delete Detection
+- [ ] Analyze relationships for selected record(s)
+- [ ] Build complete dependency tree
+- [ ] Identify all child records across all objects
+- [ ] Handle circular relationships
+
+### 11.2 Preview Mode
+- [ ] Show what WILL be deleted before execution
+- [ ] Display record counts per object
+- [ ] Tree view of deletion hierarchy
+- [ ] Export preview to CSV for approval
+
+### 11.3 Delete Options
+- [ ] **Full Cascade** - Delete record and ALL related children
+- [ ] **Selective Cascade** - Choose which child objects to include
+- [ ] **Orphan Mode** - Delete only, don't cascade (for cleanup)
+- [ ] **Backup First** - Auto-backup before deletion (safety net)
+
+### 11.4 Deletion Execution
+- [ ] Delete in reverse dependency order (children first)
+- [ ] Use Bulk API 2.0 for efficiency
+- [ ] Progress tracking with record counts
+- [ ] Error handling with partial rollback option
+
+### 11.5 Query-Based Delete
+- [ ] Delete records matching a SOQL query
+- [ ] Example: Delete all Accounts WHERE Industry = 'Test'
+- [ ] Include all related records for each matched parent
+- [ ] Useful for data cleanup and testing
+
+### 11.6 Recycle Bin Integration
+- [ ] Option to hard delete (bypass recycle bin)
+- [ ] Empty recycle bin after deletion
+- [ ] Restore from recycle bin option
+
+---
+
+## ⏳ Phase 12: Scheduled Automated Backups (Planned)
+
+**User Pain Point:** *"Someone can write scripts to auto run data loader and dump the files onto a server"* — Let's make this easy without code!
+
+### 12.1 Scheduler UI
+- [ ] Backup schedule configuration screen
+- [ ] Daily, weekly, monthly schedule options
+- [ ] Time zone support
+- [ ] Multiple schedules per connection
+
+### 12.2 Schedule Triggers
+- [ ] Time-based scheduling (cron-like)
+- [ ] On-demand manual trigger
+- [ ] System startup trigger
+- [ ] Post-deployment trigger (via webhook)
+
+### 12.3 Background Service
+- [ ] Windows Task Scheduler integration
+- [ ] macOS launchd integration
+- [ ] Linux cron/systemd integration
+- [ ] Headless backup execution
+
+### 12.4 Incremental Backups
+- [ ] Track LastModifiedDate for each object
+- [ ] Only backup changed records since last run
+- [ ] Full vs incremental backup modes
+- [ ] Merge incremental into full periodically
+
+### 12.5 Notifications
+- [ ] Email notifications on completion/failure
+- [ ] Slack/Teams webhook integration
+- [ ] Desktop notifications
+- [ ] Backup log history
+
+### 12.6 Retention Policies
+- [ ] Keep last N backups
+- [ ] Delete backups older than X days
+- [ ] Archive to external storage (S3, Azure, GCS)
+- [ ] Compression for old backups
+
+---
+
+## ⏳ Phase 13: CLI & Automation (Planned)
+
+**User Pain Point:** *"SFDMU is the cheapest way to create restorable backups, but also the most unfriendly UX wise"*
+
+### 13.1 Command Line Interface
+- [ ] `backupforce backup` - Run backup from CLI
+- [ ] `backupforce restore` - Run restore from CLI
+- [ ] `backupforce delete` - Run cascade delete from CLI
+- [ ] Configuration via JSON/YAML files
+
+### 13.2 CI/CD Integration
+- [ ] GitHub Actions workflow examples
+- [ ] Azure DevOps pipeline support
+- [ ] Jenkins integration guide
+- [ ] Docker container image
+
+### 13.3 Scripting Support
+- [ ] PowerShell module
+- [ ] Bash scripts
+- [ ] Python SDK
+- [ ] Node.js package
+
+---
+
+## ⏳ Phase 14: Advanced Data Management (Planned)
+
+Based on common Salesforce pain points from the community.
+
+### 14.1 Field History Archiving
+- [ ] Export field history beyond 24-month limit
+- [ ] Track all historical changes
+- [ ] Rebuild field history timeline
+- [ ] Analytics on field change patterns
+
+### 14.2 Data Comparison
+- [ ] Compare backup to live org
+- [ ] Show added/modified/deleted records
+- [ ] Field-level diff view
+- [ ] Generate change report
+
+### 14.3 Data Masking
+- [ ] Mask sensitive data during export
+- [ ] Configurable masking rules per field
+- [ ] Faker-style data generation
+- [ ] GDPR/HIPAA compliance helpers
+
+### 14.4 Sandbox Seeding
+- [ ] Smart sandbox data population
+- [ ] Configurable data volume
+- [ ] Maintain relationships
+- [ ] Anonymize for non-production
+
+### 14.5 Contract Record Handling
+- [ ] Handle Contract status limitations
+- [ ] Special logic for activated contracts
+- [ ] Status field mapping during restore
+
+---
+
+## ⏳ Phase 15: Enterprise Features (Future)
+
+### 15.1 Metadata Backup
+- [ ] Full metadata export (classes, triggers, flows)
+- [ ] Version control integration (Git)
+- [ ] Metadata diff between backups
+- [ ] Deploy metadata from backup
+
+### 15.2 Multi-Org Management
+- [ ] Manage multiple Salesforce orgs
+- [ ] Org-to-org data sync
+- [ ] Central backup dashboard
+- [ ] Org comparison tools
+
+### 15.3 Audit & Compliance
+- [ ] Backup audit trail
+- [ ] SOC 2 compliance features
+- [ ] Encryption at rest
+- [ ] Access logging
 
 | Phase | Target |
 |-------|--------|
-| Phase 1 | ✅ December 2025 (Complete) |
-| Phase 2 | ✅ December 2025 (Complete) |
-| Phase 3 | ✅ December 2025 (Complete) |
-| Phase 4 | ✅ December 2025 (Complete) |
-| Phase 5 | ✅ December 2025 (Complete) |
-| Phase 6 | ✅ December 2025 (Complete) |
-| Phase 7 | ✅ December 2025 (Complete) |
-| Phase 8 | ⏳ January 2026 (Planned) |
-| Phase 9 | ⏳ January 2026 (Planned) |
+| Phase 1-7 | ✅ December 2025 (Complete) |
+| Phase 8-9 | ⏳ January 2026 |
+| **Phase 10** | 🔥 **January 2026** (Relationship-Aware Backup) |
+| **Phase 11** | 🔥 **January 2026** (Cascade Delete) |
+| Phase 12 | ⏳ February 2026 (Scheduled Backups) |
+| Phase 13 | ⏳ March 2026 (CLI) |
+| Phase 14-15 | ⏳ Q2 2026 (Advanced Features) |
+
+---
+
+## 🏆 Why BackupForce vs Paid Alternatives
+
+| Feature | BackupForce | OwnBackup | Spanning | Gearset |
+|---------|-------------|-----------|----------|---------|
+| **Price** | **$0** | $6K+/year | ~$432/year | ~$5K+/year |
+| Data Backup | ✅ | ✅ | ✅ | ✅ |
+| Data Restore | ✅ | ✅ | ✅ | ✅ |
+| Relationship-Aware | 🔥 Coming | Partial | Partial | Partial |
+| Cascade Delete | 🔥 Coming | ❌ | ❌ | ❌ |
+| Blob/Attachments | ✅ | ✅ | ✅ | ✅ |
+| Cross-Org Transform | ✅ | ✅ | ❌ | ✅ |
+| Open Source | ✅ | ❌ | ❌ | ❌ |
+| Self-Hosted | ✅ | ❌ | ❌ | ❌ |
+| No Java Required | ✅ | N/A | N/A | N/A |
 
 ---
 

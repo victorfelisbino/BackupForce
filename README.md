@@ -71,17 +71,35 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 
 See the full [Development Roadmap](docs/ROADMAP.md) for upcoming features.
 
+### Completed ✅
 | Feature | Status |
 |---------|--------|
 | Bulk API v2 Backup | ✅ Complete |
-| Database Export | ✅ Complete |
+| Database Export (Snowflake, PostgreSQL, SQL Server) | ✅ Complete |
 | Blob/Attachment Download | ✅ Complete |
-| **Data Restoration** | ✅ Complete |
-| └─ Core Restore | ✅ Complete |
-| └─ Database Source | ✅ Complete |
-| └─ Relationship Resolution | ✅ Complete |
-| └─ Dependency Ordering | ✅ Complete |
-| └─ Cross-Org Transformation | ✅ Complete |
+| Data Restoration with Bulk API v2 | ✅ Complete |
+| Relationship Resolution | ✅ Complete |
+| Dependency Ordering | ✅ Complete |
+| Cross-Org Transformation | ✅ Complete |
+| Multi-Platform Native Builds | ✅ Complete |
+
+### Coming Soon 🔥
+| Feature | Description |
+|---------|-------------|
+| **Relationship-Aware Backup** | Set a limit on Account, preserve relationships → auto-download related Contacts, Cases, Opportunities |
+| **Cascade Delete** | Delete an Account → automatically delete all related child records |
+| **Duplicate Handling** | Smart duplicate detection with merge/skip/update options |
+| **Related Record Creation** | Import Accounts → auto-create Opportunities with default values |
+
+### Planned ⏳
+| Feature | Description |
+|---------|-------------|
+| Scheduled Backups | Daily/weekly automated backups with notifications |
+| Incremental Backups | Only backup changed records since last run |
+| CLI Version | Command-line interface for CI/CD automation |
+| Field History Archiving | Export field history beyond 24-month limit |
+| Data Masking | GDPR/HIPAA compliant data anonymization |
+| Metadata Backup | Export classes, triggers, flows with Git integration |
 
 ---
 

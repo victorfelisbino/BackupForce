@@ -946,6 +946,7 @@
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
                 <li><a href="#databases">Databases</a></li>
+                <li><a href="#compare">Compare</a></li>
                 <li><a href="#roadmap">Roadmap</a></li>
                 <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub</a></li>
             </ul>
@@ -965,6 +966,7 @@
         <ul class="mobile-menu-links">
             <li><a href="#features" onclick="toggleMobileMenu()">Features</a></li>
             <li><a href="#databases" onclick="toggleMobileMenu()">Databases</a></li>
+            <li><a href="#compare" onclick="toggleMobileMenu()">Compare</a></li>
             <li><a href="#roadmap" onclick="toggleMobileMenu()">Roadmap</a></li>
             <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub</a></li>
         </ul>
@@ -1033,6 +1035,7 @@
             <div class="tab-nav">
                 <button class="tab-btn active" onclick="showTab('features')">✨ Features</button>
                 <button class="tab-btn" onclick="showTab('databases')">🗄️ Databases</button>
+                <button class="tab-btn" onclick="showTab('compare')">📊 Compare</button>
                 <button class="tab-btn" onclick="showTab('roadmap')">🗺️ Roadmap</button>
                 <button class="tab-btn" onclick="showTab('privacy')">🔒 Privacy</button>
             </div>
@@ -1165,6 +1168,128 @@
                 </div>
             </div>
 
+            <!-- Compare Tab -->
+            <div class="tab-content" id="tab-compare">
+                <div class="section-header">
+                    <h2>📊 Why BackupForce?</h2>
+                    <p>See how we compare to paid Salesforce backup solutions</p>
+                </div>
+                
+                <div style="overflow-x: auto; margin-bottom: 30px;">
+                    <table style="width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 12px; overflow: hidden; min-width: 600px;">
+                        <thead>
+                            <tr style="background: rgba(63, 185, 80, 0.15);">
+                                <th style="padding: 16px; text-align: left; border-bottom: 1px solid var(--border);">Feature</th>
+                                <th style="padding: 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent);">BackupForce</th>
+                                <th style="padding: 16px; text-align: center; border-bottom: 1px solid var(--border);">OwnBackup</th>
+                                <th style="padding: 16px; text-align: center; border-bottom: 1px solid var(--border);">Spanning</th>
+                                <th style="padding: 16px; text-align: center; border-bottom: 1px solid var(--border);">Gearset</th>
+                            </tr>
+                        </thead>
+                        <tbody style="color: var(--text-secondary);">
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">💰 <strong>Annual Cost</strong></td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent); font-weight: 700;">$0</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">$6,000+</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">~$432</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">$5,000+</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📤 Data Backup</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📥 Data Restore</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📎 Blob/Attachments</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🔄 Cross-Org Transform</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🔗 Relationship-Aware Backup</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent-orange);">🔥 Coming</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">Partial</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">Partial</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">Partial</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🗑️ Cascade Delete</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent-orange);">🔥 Coming</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">💻 Open Source</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🏠 Self-Hosted</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">❌</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 14px 16px;">☕ No Java Required</td>
+                                <td style="padding: 14px 16px; text-align: center;">✅</td>
+                                <td style="padding: 14px 16px; text-align: center;">N/A</td>
+                                <td style="padding: 14px 16px; text-align: center;">N/A</td>
+                                <td style="padding: 14px 16px; text-align: center;">N/A</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="why-free-grid">
+                    <div class="why-free-card">
+                        <div class="why-free-icon">💸</div>
+                        <h3>Save $6,000+/year</h3>
+                        <p>OwnBackup starts at $12K minimum. Spanning is ~$36/month per 10 users. BackupForce is free forever.</p>
+                    </div>
+                    <div class="why-free-card">
+                        <div class="why-free-icon">🏥</div>
+                        <h3>Perfect for Nonprofits</h3>
+                        <p>Small organizations with tight budgets deserve enterprise-grade backup. No more choosing between features and cost.</p>
+                    </div>
+                    <div class="why-free-card">
+                        <div class="why-free-icon">🔓</div>
+                        <h3>No Vendor Lock-in</h3>
+                        <p>Your data, your rules. Export to any database, modify the source code, or migrate whenever you want.</p>
+                    </div>
+                </div>
+
+                <div style="text-align: center; background: rgba(63, 185, 80, 0.1); border: 1px solid var(--accent); border-radius: 12px; padding: 24px; max-width: 600px; margin: 30px auto 0;">
+                    <p style="font-size: 1.1rem; margin-bottom: 12px;">
+                        <strong style="color: var(--accent);">"Exporting data is easy, it's the restoring that is the hard part."</strong>
+                    </p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        — Reddit /r/salesforce community<br>
+                        <em>BackupForce includes full restore with relationship resolution and cross-org transformation.</em>
+                    </p>
+                </div>
+            </div>
+
             <!-- Roadmap Tab -->
             <div class="tab-content" id="tab-roadmap">
                 <div class="section-header">
@@ -1175,49 +1300,87 @@
                     <div class="roadmap-item complete">
                         <div class="roadmap-header">
                             <span class="roadmap-badge complete">Complete</span>
-                            <h3>Full Backup System</h3>
+                            <h3>Full Backup & Restore System</h3>
                         </div>
                         <ul class="roadmap-list">
                             <li>Bulk API v2 for millions of records</li>
                             <li>Database export to all platforms</li>
                             <li>Blob & attachment downloads</li>
-                            <li>Multi-threaded processing</li>
+                            <li>Data restoration with dependency ordering</li>
+                            <li>Cross-org transformation</li>
+                            <li>Relationship resolution</li>
                         </ul>
                     </div>
                     <div class="roadmap-item complete">
                         <div class="roadmap-header">
-                            <span class="roadmap-badge complete">Complete</span>
-                            <h3>v3.0 Nature-Inspired Design</h3>
+                            <span class="roadmap-badge complete">v3.0.0</span>
+                            <h3>Multi-Platform Native Builds</h3>
                         </div>
                         <ul class="roadmap-list">
+                            <li>Windows, macOS & Linux executables</li>
+                            <li>No Java installation required</li>
                             <li>GitHub-inspired dark theme</li>
-                            <li>Mountain landscape background</li>
-                            <li>Custom title bar</li>
-                            <li>Native builds for Windows, macOS & Linux</li>
+                            <li>Nature landscape background</li>
                         </ul>
                     </div>
                     <div class="roadmap-item coming-soon">
                         <div class="roadmap-header">
-                            <span class="roadmap-badge coming-soon">v3.1</span>
-                            <h3>🔥 Data Restore UI</h3>
+                            <span class="roadmap-badge coming-soon">v3.1 - Coming Soon</span>
+                            <h3>🔥 Relationship-Aware Backup</h3>
                         </div>
                         <ul class="roadmap-list">
-                            <li>Restore from database</li>
-                            <li>Insert/Update/Upsert operations</li>
-                            <li>Relationship resolution</li>
-                            <li>Cross-org transformation</li>
+                            <li>Backup Account with limit → auto-include related Contacts, Cases</li>
+                            <li>Configure relationship depth (1-3 levels)</li>
+                            <li>Smart query building for parent-child data</li>
+                            <li>Backup manifest with relationship maps</li>
+                        </ul>
+                    </div>
+                    <div class="roadmap-item coming-soon">
+                        <div class="roadmap-header">
+                            <span class="roadmap-badge coming-soon">v3.1 - Coming Soon</span>
+                            <h3>🔥 Cascade Delete</h3>
+                        </div>
+                        <ul class="roadmap-list">
+                            <li>Delete record → auto-delete all related children</li>
+                            <li>Preview deletion before execution</li>
+                            <li>Query-based deletion with relationships</li>
+                            <li>Backup before delete safety option</li>
                         </ul>
                     </div>
                     <div class="roadmap-item planned">
                         <div class="roadmap-header">
                             <span class="roadmap-badge planned">Planned</span>
-                            <h3>Future Enhancements</h3>
+                            <h3>Scheduled & Automated Backups</h3>
                         </div>
                         <ul class="roadmap-list">
-                            <li>Scheduled automated backups</li>
-                            <li>Incremental backups</li>
-                            <li>CLI version for automation</li>
-                            <li>Mobile companion app</li>
+                            <li>Daily/weekly/monthly schedules</li>
+                            <li>Incremental backups (changed records only)</li>
+                            <li>Email/Slack notifications</li>
+                            <li>Retention policies</li>
+                        </ul>
+                    </div>
+                    <div class="roadmap-item planned">
+                        <div class="roadmap-header">
+                            <span class="roadmap-badge planned">Planned</span>
+                            <h3>CLI & Automation</h3>
+                        </div>
+                        <ul class="roadmap-list">
+                            <li>Command-line interface</li>
+                            <li>CI/CD pipeline integration</li>
+                            <li>Docker container image</li>
+                            <li>GitHub Actions support</li>
+                        </ul>
+                    </div>
+                    <div class="roadmap-item" style="border-left: 3px solid var(--text-secondary);">
+                        <div class="roadmap-header">
+                            <span class="roadmap-badge future">Future</span>
+                            <h3>Enterprise Features</h3>
+                        </div>
+                        <ul class="roadmap-list">
+                            <li>Field history archiving (beyond 24 months)</li>
+                            <li>Data masking for GDPR/HIPAA</li>
+                            <li>Metadata backup with Git integration</li>
+                            <li>Multi-org management</li>
                         </ul>
                     </div>
                 </div>
@@ -1359,7 +1522,7 @@
         // Handle anchor links for tabs
         window.addEventListener('load', () => {
             const hash = window.location.hash;
-            if (hash === '#features' || hash === '#databases' || hash === '#roadmap') {
+            if (hash === '#features' || hash === '#databases' || hash === '#compare' || hash === '#roadmap') {
                 const tabId = hash.substring(1);
                 const tabBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
                 if (tabBtn) {

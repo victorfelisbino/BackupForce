@@ -5,6 +5,48 @@ All notable changes to BackupForce will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-12-19
+
+### 🎉 Major Release - Multi-Platform & Native Builds
+
+This release brings BackupForce to all major platforms with native executables that require no Java installation!
+
+### Added
+
+#### Multi-Platform Native Builds
+- **Windows**: Native `.msi` installer and portable `.zip`
+- **macOS**: Native `.dmg` installer and portable `.zip`
+- **Linux**: Native `.deb`, `.rpm` packages and portable `.tar.gz`
+- **No Java Required**: Bundled JLink runtime for all platforms
+- **GitHub Actions**: Automated cross-platform builds on release
+
+#### Nature-Inspired Design (v3.0 Theme)
+- **GitHub-Inspired Dark Theme**: Sleek, modern interface
+- **Mountain Landscape Background**: Calming nature imagery
+- **Custom Title Bar**: Integrated window controls
+- **Semi-Transparent Panels**: Glass-like aesthetic
+
+#### OAuth Improvements
+- **Fixed**: OAuth browser not opening in jpackaged builds
+- **Added**: `jdk.httpserver` module to runtime for embedded HTTP server
+- **Fixed**: Native access warnings with `--enable-native-access=ALL-UNNAMED`
+
+### Changed
+- **Java Version**: Updated to Java 25 (Temurin-25.0.1+8)
+- **Build System**: JLink custom runtime with minimal modules
+- **Package Size**: Optimized portable builds (~50MB vs 200MB+ full JDK)
+
+### Fixed
+- OAuth callback server now works in native executables
+- Database Settings dialog "Location is not set" error resolved
+- All FXML files properly included in builds
+
+### Technical
+- 319+ unit tests passing
+- JLink modules: java.base, java.sql, java.desktop, java.naming, java.management, java.logging, java.xml, java.prefs, java.net.http, java.scripting, jdk.crypto.ec, jdk.unsupported, java.datatransfer, java.security.jgss, java.security.sasl, jdk.httpserver
+
+---
+
 ## [2.3.0] - 2025-12-18
 
 ### Added
