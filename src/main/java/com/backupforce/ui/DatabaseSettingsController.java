@@ -33,12 +33,16 @@ public class DatabaseSettingsController {
     
     private Map<String, TextField> fieldMap = new HashMap<>();
     private Map<String, ComboBox<String>> comboMap = new HashMap<>();
+    private Map<String, String> savedComboValues = new HashMap<>(); // Store combo values for restore after loading
     private CheckBox ssoCheckBox;
     private DatabaseConnectionInfo connectionInfo;
     private boolean saved = false;
     private Connection activeConnection = null; // Store authenticated connection for reuse
     
     public void initialize() {
+        // Clear any saved values from previous dialogs
+        savedComboValues.clear();
+        
         setupDatabaseTypes();
         databaseTypeCombo.setOnAction(e -> updateFieldsForDatabase());
         loadSavedCredentials();
@@ -64,6 +68,13 @@ public class DatabaseSettingsController {
         Map<String, String> savedValues = new HashMap<>();
         for (Map.Entry<String, TextField> entry : fieldMap.entrySet()) {
             savedValues.put(entry.getKey(), entry.getValue().getText());
+        }
+        // Also save combo box values
+        for (Map.Entry<String, ComboBox<String>> entry : comboMap.entrySet()) {
+            String value = entry.getValue().getValue();
+            if (value != null && !value.isEmpty()) {
+                savedComboValues.put(entry.getKey(), value);
+            }
         }
         
         settingsGrid.getChildren().clear();
@@ -163,6 +174,13 @@ public class DatabaseSettingsController {
                     hiddenField.setText(newVal);
                 });
                 fieldMap.put(fieldName, hiddenField);
+                
+                // Restore saved value to the combo box editor (shows as text until loaded)
+                if (savedComboValues.containsKey(fieldName)) {
+                    String savedValue = savedComboValues.get(fieldName);
+                    comboBox.getEditor().setText(savedValue);
+                    hiddenField.setText(savedValue);
+                }
             } else {
                 TextField textField;
                 if (fieldName.equals("Password")) {
@@ -277,6 +295,10 @@ public class DatabaseSettingsController {
                         String key = entry.getKey().toLowerCase();
                         String value = prefs.get(key, "");
                         if (!value.isEmpty()) {
+                            // Store in savedComboValues so it can be restored after loading from Snowflake
+                            savedComboValues.put(entry.getKey(), value);
+                            // Also set it in the editor so user sees it
+                            entry.getValue().getEditor().setText(value);
                             entry.getValue().setValue(value);
                         }
                     }
@@ -441,7 +463,14 @@ public class DatabaseSettingsController {
                 }
                 
                 comboBox.setItems(FXCollections.observableArrayList(items));
-                if (!items.isEmpty()) {
+                
+                // Check if there's a saved value to restore
+                String savedValue = savedComboValues.get(resourceType);
+                boolean valueRestored = false;
+                if (savedValue != null && !savedValue.isEmpty() && items.contains(savedValue)) {
+                    comboBox.getSelectionModel().select(savedValue);
+                    valueRestored = true;
+                } else if (!items.isEmpty()) {
                     // Select first non-create option
                     if (allowCreate && items.size() > 1) {
                         comboBox.getSelectionModel().select(1);
@@ -1020,15 +1049,36 @@ public class DatabaseSettingsController {
             if (fieldMap.containsKey("Account") && conn.getAccount() != null) {
                 fieldMap.get("Account").setText(conn.getAccount());
             }
-            if (fieldMap.containsKey("Warehouse") && conn.getWarehouse() != null) {
-                fieldMap.get("Warehouse").setText(conn.getWarehouse());
+            
+            // For Snowflake, set combo box values and save them for restoration after connecting
+            if (conn.getWarehouse() != null) {
+                savedComboValues.put("Warehouse", conn.getWarehouse());
+                if (comboMap.containsKey("Warehouse")) {
+                    comboMap.get("Warehouse").getEditor().setText(conn.getWarehouse());
+                }
+                if (fieldMap.containsKey("Warehouse")) {
+                    fieldMap.get("Warehouse").setText(conn.getWarehouse());
+                }
             }
-            if (fieldMap.containsKey("Database") && conn.getDatabase() != null) {
-                fieldMap.get("Database").setText(conn.getDatabase());
+            if (conn.getDatabase() != null) {
+                savedComboValues.put("Database", conn.getDatabase());
+                if (comboMap.containsKey("Database")) {
+                    comboMap.get("Database").getEditor().setText(conn.getDatabase());
+                }
+                if (fieldMap.containsKey("Database")) {
+                    fieldMap.get("Database").setText(conn.getDatabase());
+                }
             }
-            if (fieldMap.containsKey("Schema") && conn.getSchema() != null) {
-                fieldMap.get("Schema").setText(conn.getSchema());
+            if (conn.getSchema() != null) {
+                savedComboValues.put("Schema", conn.getSchema());
+                if (comboMap.containsKey("Schema")) {
+                    comboMap.get("Schema").getEditor().setText(conn.getSchema());
+                }
+                if (fieldMap.containsKey("Schema")) {
+                    fieldMap.get("Schema").setText(conn.getSchema());
+                }
             }
+            
             if (fieldMap.containsKey("Username") && conn.getUsername() != null) {
                 fieldMap.get("Username").setText(conn.getUsername());
             }

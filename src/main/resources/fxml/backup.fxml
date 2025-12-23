@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.collections.FXCollections?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import java.lang.String?>
 
 <BorderPane xmlns:fx="http://javafx.com/fxml" 
             fx:controller="com.backupforce.ui.BackupController"
@@ -251,6 +253,34 @@
                                           styleClass="form-checkbox" selected="true"/>
                                 <Label text="(for restore)" styleClass="form-hint"/>
                             </HBox>
+                            
+                            <!-- Relationship-Aware Backup Options -->
+                            <VBox spacing="8">
+                                <HBox spacing="8" alignment="CENTER_LEFT">
+                                    <CheckBox fx:id="includeRelatedRecordsCheckbox" text="Include Related Records" 
+                                              styleClass="form-checkbox"/>
+                                    <Label text="(when using record limit)" styleClass="form-hint"/>
+                                </HBox>
+                                <HBox spacing="8" alignment="CENTER_LEFT" style="-fx-padding: 0 0 0 24;">
+                                    <Label text="Depth:" styleClass="form-label"/>
+                                    <ComboBox fx:id="relationshipDepthCombo" prefWidth="120" styleClass="form-input" disable="true">
+                                        <items>
+                                            <FXCollections fx:factory="observableArrayList">
+                                                <String fx:value="1 - Direct children"/>
+                                                <String fx:value="2 - + Grandchildren"/>
+                                                <String fx:value="3 - Deep hierarchy"/>
+                                            </FXCollections>
+                                        </items>
+                                    </ComboBox>
+                                    <CheckBox fx:id="priorityObjectsOnlyCheckbox" text="Priority objects only" 
+                                              styleClass="form-checkbox" selected="true" disable="true"/>
+                                    <Button fx:id="previewRelationshipsButton" text="👁 Preview" 
+                                            onAction="#handlePreviewRelationships" styleClass="btn btn-ghost" 
+                                            style="-fx-font-size: 11px;" disable="true"/>
+                                </HBox>
+                                <Label text="Automatically include child records for backed-up parents" 
+                                       styleClass="form-hint" style="-fx-padding: 0 0 0 24;"/>
+                            </VBox>
                         </VBox>
                         
                         <!-- Quick Restore Link -->

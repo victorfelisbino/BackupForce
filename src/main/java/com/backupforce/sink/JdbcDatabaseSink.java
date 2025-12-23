@@ -25,6 +25,7 @@ public class JdbcDatabaseSink implements DataSink {
     private final String displayName;
     private Connection connection;
     private boolean recreateTables = false;  // Default: incremental mode
+    private final boolean externalConnection;  // If true, don't close the connection on disconnect
     
     public JdbcDatabaseSink(String jdbcUrl, Properties connectionProperties, 
                            DatabaseDialect dialect, String displayName) {
@@ -32,6 +33,21 @@ public class JdbcDatabaseSink implements DataSink {
         this.connectionProperties = connectionProperties;
         this.dialect = dialect;
         this.displayName = displayName;
+        this.externalConnection = false;
+    }
+    
+    /**
+     * Create a JdbcDatabaseSink with a pre-existing connection (e.g., from SSO cache).
+     * The connection will NOT be closed when disconnect() is called.
+     */
+    public JdbcDatabaseSink(Connection existingConnection, DatabaseDialect dialect, String displayName) {
+        this.jdbcUrl = null;
+        this.connectionProperties = null;
+        this.dialect = dialect;
+        this.displayName = displayName;
+        this.connection = existingConnection;
+        this.externalConnection = true;
+        logger.info("Using existing connection for database sink: {}", displayName);
     }
     
     @Override
@@ -49,9 +65,7 @@ public class JdbcDatabaseSink implements DataSink {
     
     @Override
     public void dropTable(String objectName) throws Exception {
-        if (connection == null || connection.isClosed()) {
-            connect();
-        }
+        ensureConnection();
         
         String tableName = dialect.sanitizeTableName(objectName);
         
@@ -67,8 +81,58 @@ public class JdbcDatabaseSink implements DataSink {
         }
     }
     
+    /**
+     * Ensure connection is valid, reconnecting if necessary.
+     * This prevents issues with stale connections during long-running backups.
+     */
+    private void ensureConnection() throws Exception {
+        if (connection == null) {
+            connect();
+            return;
+        }
+        
+        try {
+            // Check if connection is closed or invalid
+            if (connection.isClosed()) {
+                logger.warn("Connection is closed, reconnecting...");
+                connect();
+                return;
+            }
+            
+            // Validate connection with 10 second timeout
+            if (!connection.isValid(10)) {
+                logger.warn("Connection is no longer valid, reconnecting...");
+                if (!externalConnection) {
+                    try { connection.close(); } catch (Exception ignored) {}
+                }
+                connection = null;
+                connect();
+            }
+        } catch (SQLException e) {
+            logger.warn("Connection validation failed: {}, reconnecting...", e.getMessage());
+            if (!externalConnection) {
+                try { connection.close(); } catch (Exception ignored) {}
+            }
+            connection = null;
+            connect();
+        }
+    }
+    
     @Override
     public void connect() throws Exception {
+        // If we already have an external connection, just verify it's valid
+        if (externalConnection && connection != null) {
+            try {
+                if (connection.isValid(5)) {
+                    logger.info("Using existing connection for: {}", displayName);
+                    return;
+                }
+            } catch (SQLException e) {
+                logger.warn("External connection validation failed: {}", e.getMessage());
+            }
+            throw new Exception("External connection is no longer valid");
+        }
+        
         logger.info("Connecting to database: {}", displayName);
         connection = DriverManager.getConnection(jdbcUrl, connectionProperties);
         logger.info("Successfully connected to database");
@@ -76,13 +140,16 @@ public class JdbcDatabaseSink implements DataSink {
     
     @Override
     public void disconnect() {
-        if (connection != null) {
+        if (connection != null && !externalConnection) {
+            // Only close if we own the connection (not external)
             try {
                 connection.close();
                 logger.info("Disconnected from database");
             } catch (SQLException e) {
                 logger.error("Error disconnecting from database", e);
             }
+        } else if (externalConnection) {
+            logger.info("Keeping external connection open for: {}", displayName);
         }
     }
     
@@ -100,9 +167,7 @@ public class JdbcDatabaseSink implements DataSink {
     
     @Override
     public void prepareSink(String objectName, Field[] fields) throws Exception {
-        if (connection == null || connection.isClosed()) {
-            connect();
-        }
+        ensureConnection();
         
         String tableName = dialect.sanitizeTableName(objectName);
         
@@ -143,17 +208,38 @@ public class JdbcDatabaseSink implements DataSink {
         createTableSQL.append("\n)");
         
         logger.info("Creating table: {}", tableName);
+        
+        // Log connection details for debugging
+        try {
+            logger.info("Connection catalog: {}, schema: {}", connection.getCatalog(), connection.getSchema());
+        } catch (SQLException e) {
+            logger.debug("Could not get catalog/schema info: {}", e.getMessage());
+        }
+        
         try (Statement stmt = connection.createStatement()) {
+            logger.info("Executing CREATE TABLE SQL: {}", createTableSQL.toString().substring(0, Math.min(200, createTableSQL.length())));
             stmt.execute(createTableSQL.toString());
             logger.info("Table {} created successfully", tableName);
+            
+            // Explicitly commit if not in autocommit mode
+            if (!connection.getAutoCommit()) {
+                connection.commit();
+                logger.info("CREATE TABLE committed");
+            }
         }
     }
     
     @Override
     public int writeData(String objectName, Reader csvReader, String backupId, 
                         ProgressCallback progressCallback) throws Exception {
-        if (connection == null || connection.isClosed()) {
-            connect();
+        ensureConnection();
+        
+        // Log connection details
+        try {
+            logger.info("writeData for {}: catalog={}, schema={}, autoCommit={}", 
+                objectName, connection.getCatalog(), connection.getSchema(), connection.getAutoCommit());
+        } catch (SQLException e) {
+            logger.debug("Could not get connection details: {}", e.getMessage());
         }
         
         String tableName = dialect.sanitizeTableName(objectName);
@@ -322,6 +408,12 @@ public class JdbcDatabaseSink implements DataSink {
                 }
                 
                 logger.info("{}: Successfully loaded {} records to database", objectName, recordCount);
+                
+                // Explicitly commit to ensure data is persisted
+                if (!connection.getAutoCommit()) {
+                    connection.commit();
+                    logger.info("{}: Transaction committed", objectName);
+                }
             }
         }
         
@@ -391,8 +483,19 @@ public class JdbcDatabaseSink implements DataSink {
     
     private boolean tableExists(String tableName) throws SQLException {
         DatabaseMetaData meta = connection.getMetaData();
-        String schema = connectionProperties.getProperty("schema");
-        String database = connectionProperties.getProperty("db");
+        // Get schema/database from connectionProperties if available, otherwise from connection
+        String schema = null;
+        String database = null;
+        if (connectionProperties != null) {
+            schema = connectionProperties.getProperty("schema");
+            database = connectionProperties.getProperty("db");
+        }
+        if (schema == null) {
+            schema = connection.getSchema();
+        }
+        if (database == null) {
+            database = connection.getCatalog();
+        }
         
         try (ResultSet rs = meta.getTables(database, schema, tableName, new String[]{"TABLE"})) {
             return rs.next();
@@ -404,8 +507,19 @@ public class JdbcDatabaseSink implements DataSink {
      */
     private boolean columnExists(String tableName, String columnName) throws SQLException {
         DatabaseMetaData meta = connection.getMetaData();
-        String schema = connectionProperties.getProperty("schema");
-        String database = connectionProperties.getProperty("db");
+        // Get schema/database from connectionProperties if available, otherwise from connection
+        String schema = null;
+        String database = null;
+        if (connectionProperties != null) {
+            schema = connectionProperties.getProperty("schema");
+            database = connectionProperties.getProperty("db");
+        }
+        if (schema == null) {
+            schema = connection.getSchema();
+        }
+        if (database == null) {
+            database = connection.getCatalog();
+        }
         String sanitizedColumnName = dialect.sanitizeColumnName(columnName);
         
         try (ResultSet rs = meta.getColumns(database, schema, tableName, sanitizedColumnName)) {

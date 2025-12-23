@@ -14,7 +14,7 @@ on:
 env:
   JAVA_VERSION: '25'
   APP_NAME: 'BackupForce'
-  JLINK_MODULES: 'java.base,java.sql,java.desktop,java.naming,java.management,java.logging,java.xml,java.prefs,java.net.http,java.scripting,jdk.crypto.ec,jdk.unsupported,java.datatransfer,java.security.jgss,java.security.sasl,jdk.httpserver'
+  JLINK_MODULES: 'java.base,java.sql,java.desktop,java.naming,java.management,java.logging,java.xml,java.prefs,java.net.http,java.scripting,jdk.crypto.ec,jdk.unsupported,java.datatransfer,java.security.jgss,java.security.sasl,jdk.httpserver,java.rmi'
 
 jobs:
   # Build JAR (platform-independent)

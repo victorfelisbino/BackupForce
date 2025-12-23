@@ -35,6 +35,7 @@ public class MainController {
     @FXML private HBox navDashboard;
     @FXML private HBox navBackup;
     @FXML private HBox navRestore;
+    @FXML private HBox navSchedule;
     @FXML private HBox navConnections;
     @FXML private HBox navPreferences;
     @FXML private HBox navAbout;
@@ -53,6 +54,7 @@ public class MainController {
     private Node dashboardContent;
     private Node backupContent;
     private Node restoreContent;
+    private Node scheduleContent;
     private Node connectionsContent;
     private Node preferencesContent;
     
@@ -60,6 +62,7 @@ public class MainController {
     private DashboardContentController dashboardController;
     private BackupController backupController;
     private RestoreController restoreController;
+    private ScheduleController scheduleController;
     private ConnectionsContentController connectionsController;
     private PreferencesContentController preferencesController;
     
@@ -163,6 +166,26 @@ public class MainController {
         } catch (IOException e) {
             logger.error("Failed to load restore", e);
             showError("Failed to load restore: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Navigate to Schedule
+     */
+    @FXML
+    public void navigateToSchedule() {
+        setActiveNav(navSchedule);
+        try {
+            if (scheduleContent == null) {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/schedule-content.fxml"));
+                scheduleContent = loader.load();
+                scheduleController = loader.getController();
+            }
+            setContent(scheduleContent);
+            logger.info("Navigated to Schedules");
+        } catch (IOException e) {
+            logger.error("Failed to load schedules", e);
+            showError("Failed to load schedules: " + e.getMessage());
         }
     }
     

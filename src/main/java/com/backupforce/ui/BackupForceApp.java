@@ -2,8 +2,10 @@ package com.backupforce.ui;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.slf4j.Logger;
@@ -32,7 +34,17 @@ public class BackupForceApp extends Application {
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(550);
             primaryStage.setMinHeight(650);
-            primaryStage.setMaximized(true);
+            
+            // Get the visual bounds (screen area minus taskbar)
+            Rectangle2D visualBounds = Screen.getPrimary().getVisualBounds();
+            primaryStage.setX(visualBounds.getMinX());
+            primaryStage.setY(visualBounds.getMinY());
+            primaryStage.setWidth(visualBounds.getWidth());
+            primaryStage.setHeight(visualBounds.getHeight());
+            
+            // Tell AppController we're in "maximized" state (for toggle behavior)
+            appController.setMaximizedState(true, visualBounds);
+            
             primaryStage.show();
             
             logger.info("BackupForce application started");

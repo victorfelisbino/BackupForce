@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<StackPane xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.backupforce.ui.RelationshipPreviewController"
+           prefWidth="750" prefHeight="700"
+           stylesheets="@../css/backupforce-modern.css">
+
+    <!-- Main Content (behind loading overlay) -->
+    <VBox fx:id="mainContent" spacing="16" styleClass="dialog-container" visible="false">
+        <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+        
+        <!-- Header -->
+        <VBox spacing="8">
+            <Label text="🔗 Relationship-Aware Backup Preview" 
+                   style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="summaryLabel" text="Select related objects to include in backup" 
+                   style="-fx-text-fill: #8b949e;"/>
+        </VBox>
+        
+        <!-- Parent Objects Section (compact) -->
+        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="panel" style="-fx-background-color: #1c2128; -fx-padding: 12;">
+            <Label text="📦 Parent Objects:" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="parentObjectsLabel" text="" style="-fx-text-fill: #58a6ff;"/>
+        </HBox>
+        
+        <!-- Related Objects Tree -->
+        <VBox spacing="8" VBox.vgrow="ALWAYS">
+            <HBox spacing="12" alignment="CENTER_LEFT">
+                <Label text="🔗 Related Child Objects" 
+                       style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="selectAllBtn" text="✓ Select All" onAction="#handleSelectAll" 
+                        styleClass="btn btn-ghost" style="-fx-font-size: 11px;"/>
+                <Button fx:id="selectPriorityBtn" text="★ Priority Only" onAction="#handleSelectPriority" 
+                        styleClass="btn btn-ghost" style="-fx-font-size: 11px;"/>
+                <Button fx:id="deselectAllBtn" text="✗ Deselect All" onAction="#handleDeselectAll" 
+                        styleClass="btn btn-ghost" style="-fx-font-size: 11px;"/>
+            </HBox>
+            <TreeView fx:id="relationshipTree" VBox.vgrow="ALWAYS" styleClass="tree-view"/>
+            <Label text="★ = Priority object (Contact, Opportunity, Case, etc.) | Check/uncheck to include in backup" 
+                   style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+        </VBox>
+        
+        <!-- Selection Summary -->
+        <VBox spacing="8" styleClass="panel" style="-fx-background-color: #161b22; -fx-padding: 12;">
+            <HBox spacing="12" alignment="CENTER_LEFT">
+                <Label text="📊 Summary:" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                <Label fx:id="selectedCountLabel" text="0 objects selected" style="-fx-text-fill: #58a6ff; -fx-font-weight: 600;"/>
+                <Label text="•" style="-fx-text-fill: #484f58;"/>
+                <Label fx:id="totalRecordsLabel" text="0 total records" style="-fx-text-fill: #3fb950; -fx-font-weight: 600;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="apiCallsLabel" text="" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+            </HBox>
+        </VBox>
+        
+        <!-- Backup Options -->
+        <VBox spacing="8" styleClass="panel" style="-fx-padding: 12;">
+            <Label text="⚙️ Backup Options" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+            <HBox spacing="24">
+                <CheckBox fx:id="captureExternalIdsCheckbox" text="Capture External IDs" 
+                          styleClass="form-checkbox" selected="true"/>
+                <CheckBox fx:id="generateIdMappingCheckbox" text="Generate ID mapping" 
+                          styleClass="form-checkbox" selected="true"/>
+                <CheckBox fx:id="includeRecordTypesCheckbox" text="Include RecordTypes" 
+                          styleClass="form-checkbox" selected="true"/>
+            </HBox>
+        </VBox>
+        
+        <!-- Action Buttons -->
+        <HBox spacing="12" alignment="CENTER_RIGHT">
+            <Button fx:id="cancelBtn" text="Cancel" onAction="#handleCancel" 
+                    styleClass="btn btn-ghost" prefWidth="100"/>
+            <Button fx:id="startBackupBtn" text="▶ Confirm Selection" onAction="#handleStartBackup" 
+                    styleClass="btn btn-accent" prefWidth="180"/>
+        </HBox>
+    </VBox>
+    
+    <!-- Loading Overlay -->
+    <VBox fx:id="loadingOverlay" alignment="CENTER" spacing="20" 
+          style="-fx-background-color: rgba(13, 17, 23, 0.98);" visible="true">
+        <padding><Insets top="40" right="40" bottom="40" left="40"/></padding>
+        
+        <!-- Loading Header -->
+        <VBox alignment="CENTER" spacing="8">
+            <Label text="🔍 Analyzing Relationships" 
+                   style="-fx-font-size: 24px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="loadingStatusLabel" text="Initializing..." 
+                   style="-fx-font-size: 14px; -fx-text-fill: #8b949e;"/>
+        </VBox>
+        
+        <!-- Progress Bar -->
+        <VBox spacing="8" maxWidth="500" alignment="CENTER">
+            <ProgressBar fx:id="loadingProgressBar" prefWidth="500" prefHeight="8" progress="0"/>
+            <HBox spacing="20" alignment="CENTER">
+                <Label fx:id="progressPercentLabel" text="0%" 
+                       style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: #58a6ff;"/>
+                <Label fx:id="progressTimeLabel" text="" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #8b949e;"/>
+            </HBox>
+        </VBox>
+        
+        <!-- Current Object Being Analyzed -->
+        <VBox alignment="CENTER" spacing="4" style="-fx-padding: 20 0 0 0;">
+            <Label text="Currently analyzing:" style="-fx-text-fill: #8b949e; -fx-font-size: 12px;"/>
+            <Label fx:id="currentObjectLabel" text="..." 
+                   style="-fx-font-size: 16px; -fx-font-weight: 600; -fx-text-fill: #58a6ff;"/>
+        </VBox>
+        
+        <!-- Live Stats Panel -->
+        <HBox spacing="40" alignment="CENTER" style="-fx-padding: 20 0;">
+            <VBox alignment="CENTER" spacing="4">
+                <Label fx:id="objectsAnalyzedLabel" text="0" 
+                       style="-fx-font-size: 28px; -fx-font-weight: 700; -fx-text-fill: #3fb950;"/>
+                <Label text="Objects Analyzed" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+            </VBox>
+            <VBox alignment="CENTER" spacing="4">
+                <Label fx:id="relationshipsFoundLabel" text="0" 
+                       style="-fx-font-size: 28px; -fx-font-weight: 700; -fx-text-fill: #58a6ff;"/>
+                <Label text="Relationships Found" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+            </VBox>
+            <VBox alignment="CENTER" spacing="4">
+                <Label fx:id="apiCallsCountLabel" text="0" 
+                       style="-fx-font-size: 28px; -fx-font-weight: 700; -fx-text-fill: #d29922;"/>
+                <Label text="API Calls Made" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+            </VBox>
+        </HBox>
+        
+        <!-- Analysis Log -->
+        <VBox spacing="4" maxWidth="600" alignment="CENTER">
+            <Label text="📋 Analysis Log" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+            <TextArea fx:id="analysisLogArea" prefHeight="150" prefWidth="600" editable="false"
+                      style="-fx-control-inner-background: #161b22; -fx-text-fill: #8b949e; -fx-font-family: 'Consolas', monospace; -fx-font-size: 11px;"/>
+        </VBox>
+    </VBox>
+</StackPane>

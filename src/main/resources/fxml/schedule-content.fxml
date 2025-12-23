@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!-- Schedule Management Panel - for managing automated backups -->
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.ScheduleController"
+      spacing="0"
+      stylesheets="@../css/backupforce-modern.css">
+    
+    <!-- Page Header -->
+    <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
+        <Label text="Scheduled Backups" styleClass="page-header-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="schedulerStatusLabel" text="Scheduler stopped" styleClass="status-text"/>
+        <ToggleButton fx:id="schedulerToggle" text="Scheduler OFF" onAction="#handleToggleScheduler"
+                      styleClass="btn btn-sm"/>
+    </HBox>
+    
+    <!-- Toolbar -->
+    <HBox spacing="10" styleClass="toolbar-section" alignment="CENTER_LEFT">
+        <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+        
+        <Button fx:id="addButton" text="+ Add Schedule" onAction="#handleAddSchedule" 
+                styleClass="btn btn-primary"/>
+        <Button fx:id="editButton" text="Edit" onAction="#handleEditSchedule" 
+                styleClass="btn btn-ghost"/>
+        <Button fx:id="deleteButton" text="Delete" onAction="#handleDeleteSchedule" 
+                styleClass="btn btn-ghost"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="runNowButton" text="▶ Run Now" onAction="#handleRunNow" 
+                styleClass="btn btn-success"/>
+    </HBox>
+    
+    <!-- Schedules Table -->
+    <VBox VBox.vgrow="ALWAYS" styleClass="content-area">
+        <padding><Insets top="15" right="15" bottom="15" left="15"/></padding>
+        
+        <TableView fx:id="schedulesTable" VBox.vgrow="ALWAYS" styleClass="data-table">
+            <columns>
+                <TableColumn fx:id="enabledColumn" text="" prefWidth="50" minWidth="50" maxWidth="50"/>
+                <TableColumn fx:id="nameColumn" text="Schedule Name" prefWidth="180" minWidth="120"/>
+                <TableColumn fx:id="frequencyColumn" text="Frequency" prefWidth="200" minWidth="150"/>
+                <TableColumn fx:id="nextRunColumn" text="Next Run" prefWidth="180" minWidth="140"/>
+                <TableColumn fx:id="lastRunColumn" text="Last Run" prefWidth="140" minWidth="100"/>
+                <TableColumn fx:id="statusColumn" text="Status" prefWidth="120" minWidth="80"/>
+            </columns>
+            <columnResizePolicy>
+                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+            </columnResizePolicy>
+        </TableView>
+    </VBox>
+    
+    <!-- Info Footer -->
+    <HBox styleClass="footer-section" spacing="15" alignment="CENTER_LEFT">
+        <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+        <Label text="💡 Tip: Enable the scheduler to run backups automatically at the scheduled times." 
+               style="-fx-text-fill: #888888; -fx-font-size: 12px;"/>
+    </HBox>
+    
+</VBox>

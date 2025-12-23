@@ -1,9 +1,9 @@
 # BackupForce
 
 [![Download](https://img.shields.io/github/v/release/victorfelisbino/BackupForce?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases/latest)
-[![Total Downloads](https://img.shields.io/github/downloads/victorfelisbino/BackupForce/total?style=for-the-badge&color=brightgreen)](https://github.com/victorfelisbino/BackupForce/releases)
-[![License](https://img.shields.io/badge/License-Free-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
+[![Java](https://img.shields.io/badge/Java-21+-orange?style=for-the-badge)](https://openjdk.org/)
+[![Salesforce](https://img.shields.io/badge/Salesforce-Bulk%20API%20v2-00A1E0?style=for-the-badge)](https://developer.salesforce.com/)
 
 A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a beautiful **GitHub-inspired dark theme** with a calming nature background for stress-free data operations.
 
@@ -36,6 +36,7 @@ A powerful desktop application for backing up Salesforce data to CSV files or da
 - **Blob Downloads** - Automatically downloads Attachment.Body, ContentVersion.VersionData, Document.Body
 - **Record Limits** - Test exports with a limited number of records
 - **Multi-threaded** - Parallel processing for faster backups
+- **Relationship Preservation** - Maintains all lookup/master-detail relationships for restore
 
 ### Database Support
 | Database | Blob Storage | SSO Support | Status |
@@ -168,6 +169,107 @@ mvn javafx:run
 
 ---
 
+## 🔗 How Relationship Preservation Works
+
+BackupForce preserves all Salesforce relationships (lookups and master-detail) so you can restore data with referential integrity intact. Here's how it works:
+
+### What Gets Backed Up
+
+Every record includes:
+- **Salesforce ID** - The 18-character record ID (always included)
+- **All Lookup Fields** - Fields like `AccountId`, `ContactId`, `ParentId` that reference other records
+- **External ID Fields** - Custom fields marked as External ID (when available)
+- **Name/Unique Fields** - Fields that can uniquely identify records
+
+### Backup Output Files
+
+| File | Purpose |
+|------|---------|
+| `ObjectName.csv` | All record data including IDs and lookup references |
+| `_backup_manifest.json` | Metadata about relationships, restore order, and field info |
+| `_id_mapping.json` | Maps Salesforce IDs to external identifiers for cross-org restore |
+
+### Restore Scenarios
+
+#### Same Org Restore
+The simplest case - lookup field values (like `AccountId`) still point to existing records:
+1. Restore parent objects first (Account, User, etc.)
+2. Restore child objects (Contact, Opportunity, etc.)
+3. Lookup IDs work automatically since records exist
+
+#### Different Org / Sandbox Refresh
+When restoring to a different org, IDs won't match. BackupForce handles this:
+
+1. **With External IDs** (Best)
+   - Use Upsert operation with External ID field
+   - Records are matched by External ID, not Salesforce ID
+   - Lookup fields are resolved using parent External IDs
+
+2. **Without External IDs** (Still Works!)
+   - Restore parent objects first (following `restoreOrder` in manifest)
+   - Build an OldId → NewId mapping as records are inserted
+   - Update lookup fields in child records using the mapping
+   - BackupForce's restore feature handles this automatically
+
+### Example: Backing Up Account Hierarchy
+
+```
+Account (parent)
+  └── Contact (child, has AccountId lookup)
+      └── Case (grandchild, has ContactId lookup)
+```
+
+**During Backup:**
+- Account.csv: Contains Account IDs
+- Contact.csv: Contains ContactId AND the AccountId lookup value
+- Case.csv: Contains CaseId AND the ContactId lookup value
+- `_backup_manifest.json`: Documents the relationships and restore order
+
+**During Restore:**
+1. Insert Accounts → Get new Account IDs
+2. Map OldAccountId → NewAccountId
+3. Update Contact.csv lookup values
+4. Insert Contacts → Get new Contact IDs
+5. Map OldContactId → NewContactId
+6. Update Case.csv lookup values
+7. Insert Cases
+
+### Relationship-Aware Backup Option
+
+When enabled, BackupForce can automatically:
+1. **Discover child relationships** for your selected objects
+2. **Auto-include related records** with WHERE filters
+3. **Preserve the exact subset** of related data
+
+Example: Back up 100 Accounts → automatically includes only the Contacts, Cases, and Opportunities related to those specific 100 Accounts.
+
+### Manifest Example
+
+```json
+{
+  "metadata": {
+    "version": "2.0",
+    "backupType": "relationship-aware"
+  },
+  "restoreOrder": ["Account", "Contact", "Case", "Opportunity"],
+  "objects": {
+    "Contact": {
+      "relationshipFields": [
+        {
+          "fieldName": "AccountId",
+          "referenceTo": ["Account"]
+        }
+      ],
+      "externalIdFields": [
+        { "name": "External_ID__c", "type": "string" }
+      ]
+    }
+  }
+}
+```
+
+---
+
 ## 🗄️ Database Export
 
 ### Snowflake Configuration
@@ -223,7 +325,9 @@ java -Xmx4g -jar BackupForce.jar
 
 ## 📄 License
 
-Free to use. Created by Victor Felisbino.
+MIT License - see [LICENSE](LICENSE) for details.
+
+Created and maintained by Victor Felisbino.
 
 ---
 

@@ -5,6 +5,55 @@ All notable changes to BackupForce will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2025-12-22
+
+### 🎉 Relationship-Aware Backup & Scheduled Backups
+
+This release completes the data backup story with intelligent relationship handling and automated scheduling!
+
+### Added
+
+#### Relationship-Aware Backup (Phase 10)
+- **Relationship Preview Dialog**: Visual tree view showing all related objects before backup
+- **Smart Relationship Discovery**: Automatically discovers parent and child relationships
+- **Configurable Depth**: Control how many levels of related records to include (1-5)
+- **Priority Object Detection**: Identifies critical objects like Contacts, Opportunities
+- **Backup Manifest Generator**: Creates `_backup_manifest.json` with full relationship metadata
+- **ID Mapping File**: Generates `_id_mapping.json` for cross-org restore preparation
+- **Restore Order Calculation**: Determines correct insertion sequence based on dependencies
+- **External ID Detection**: Identifies external ID fields for upsert operations
+
+#### Scheduled Automated Backups (Phase 12)
+- **Backup Scheduler Service**: Background service for automated backups
+- **Multiple Frequencies**: Daily, Weekly (select days), Monthly (select day)
+- **Time Zone Support**: Schedule in your local time zone
+- **Schedule Manager**: Persistent storage of schedules in `~/.backupforce/schedules.json`
+- **Schedule UI**: Full management interface with table view
+- **Enable/Disable Schedules**: Toggle individual schedules on/off
+- **Run Now Button**: Manually trigger any scheduled backup
+- **Scheduler Toggle**: Global on/off for the scheduler service
+- **Next Run Preview**: See when each backup will next execute
+
+#### Enhanced Backup Options
+- **Snowflake Session Caching Fix**: Resolved session reuse issue for Snowflake destinations
+- **Incremental Backup**: Full support for change-data-capture based incremental backups
+- **Preserve Relationships Checkbox**: Easy toggle for relationship-aware backups
+- **Include Related Records Checkbox**: Quick enable for related object inclusion
+
+### Changed
+- Navigation sidebar now includes Schedules section with 🕐 icon
+- Backup screen includes relationship configuration options
+- Improved backup progress reporting with relationship context
+
+### Technical
+- 660 unit tests passing (341 new tests since v3.0.0)
+- New packages: `com.backupforce.scheduler`, `com.backupforce.relationship`
+- New classes: BackupSchedule, ScheduleManager, BackupSchedulerService, ScheduleController
+- New classes: BackupManifestGenerator, RelationshipAwareBackupService
+- Java 11+ compatible (uses `.collect(Collectors.toList())`)
+
+---
+
 ## [3.0.0] - 2025-12-19
 
 ### 🎉 Major Release - Multi-Platform & Native Builds

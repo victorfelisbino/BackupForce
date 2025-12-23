@@ -7,6 +7,14 @@ import com.backupforce.config.BackupHistory.BackupRun;
 import com.backupforce.config.BackupHistory.ObjectBackupResult;
 import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
+import com.backupforce.relationship.BackupManifestGenerator;
+import com.backupforce.relationship.BackupManifestGenerator.RelatedObjectInfo;
+import com.backupforce.relationship.ChildRelationshipAnalyzer;
+import com.backupforce.relationship.ChildRelationshipAnalyzer.*;
+import com.backupforce.relationship.RelationshipAwareBackupService;
+import com.backupforce.relationship.RelationshipAwareBackupService.*;
+import com.backupforce.ui.RelationshipPreviewController.RelationshipBackupConfig;
+import com.backupforce.ui.RelationshipPreviewController.SelectedRelatedObject;
 import com.backupforce.sink.DataSink;
 import com.backupforce.sink.DataSinkFactory;
 import com.backupforce.ui.DatabaseSettingsController.DatabaseConnectionInfo;
@@ -49,7 +57,10 @@ import java.util.prefs.Preferences;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class BackupController {
@@ -59,6 +70,12 @@ public class BackupController {
     private static final Set<String> LARGE_OBJECTS = new HashSet<>(Arrays.asList(
         "Attachment", "ContentVersion", "Document", "StaticResource"
     ));
+    
+    // Rate-limited logging to prevent UI thread saturation
+    private final ConcurrentLinkedQueue<String> pendingLogMessages = new ConcurrentLinkedQueue<>();
+    private ScheduledExecutorService logFlushScheduler;
+    private volatile long lastUiUpdate = 0;
+    private static final long UI_UPDATE_THROTTLE_MS = 100; // Throttle UI updates to max 10/sec per object
 
     // Selection Table (before backup)
     @FXML private TableView<SObjectItem> allObjectsTable;
@@ -110,9 +127,15 @@ public class BackupController {
     
     @FXML private TextField outputFolderField;
     @FXML private TextField recordLimitField;
+    @FXML private CheckBox customWhereCheckbox;
+    @FXML private TextArea customWhereField;
     @FXML private CheckBox incrementalBackupCheckbox;
     @FXML private CheckBox compressBackupCheckbox;
     @FXML private CheckBox preserveRelationshipsCheckbox;
+    @FXML private CheckBox includeRelatedRecordsCheckbox;
+    @FXML private ComboBox<String> relationshipDepthCombo;
+    @FXML private CheckBox priorityObjectsOnlyCheckbox;
+    @FXML private Button previewRelationshipsButton;
     @FXML private Label lastBackupLabel;
     @FXML private Button browseButton;
     @FXML private Button selectAllButton;
@@ -137,6 +160,7 @@ public class BackupController {
     
     private LoginController.ConnectionInfo connectionInfo;
     private DatabaseSettingsController.DatabaseConnectionInfo databaseConnectionInfo;
+    private SavedConnection currentSavedConnection;  // Track the currently applied saved connection for session caching
     private String backupType = "data"; // "data", "config", or "metadata"
     private ObservableList<SObjectItem> allObjects;
     private FilteredList<SObjectItem> filteredObjects;
@@ -146,6 +170,7 @@ public class BackupController {
     private BackupTask currentBackupTask;
     private Thread backupThread;
     private BackupRun currentBackupRun;
+    private RelationshipBackupConfig relationshipBackupConfig;
 
     @FXML
     public void initialize() {
@@ -191,6 +216,9 @@ public class BackupController {
                 updateLastBackupLabel();
             });
         }
+        
+        // Setup "Include Related Records" checkbox and depth selector
+        setupRelationshipAwareBackupControls();
         
         // Initialize selection counter
         updateSelectionCount();
@@ -509,6 +537,160 @@ public class BackupController {
         });
     }
     
+    /**
+     * Setup the "Include Related Records" checkbox and depth selector.
+     * When enabled, the backup will automatically include child objects
+     * (Contacts, Opportunities, etc.) for any backed-up parent records.
+     */
+    private void setupRelationshipAwareBackupControls() {
+        if (includeRelatedRecordsCheckbox == null) {
+            return; // UI elements not present in this FXML
+        }
+        
+        // Set default selection for depth combo
+        if (relationshipDepthCombo != null) {
+            relationshipDepthCombo.getSelectionModel().selectFirst();
+        }
+        
+        // Enable/disable depth and priority checkboxes based on main checkbox
+        includeRelatedRecordsCheckbox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (relationshipDepthCombo != null) {
+                relationshipDepthCombo.setDisable(!newVal);
+            }
+            if (priorityObjectsOnlyCheckbox != null) {
+                priorityObjectsOnlyCheckbox.setDisable(!newVal);
+            }
+            if (previewRelationshipsButton != null) {
+                previewRelationshipsButton.setDisable(!newVal);
+            }
+            
+            // Log the setting change
+            if (newVal) {
+                logger.info("Include Related Records enabled - will auto-backup child objects");
+            } else {
+                logger.info("Include Related Records disabled");
+            }
+        });
+        
+        // Also enable "Include Related Records" when a record limit is set
+        if (recordLimitField != null) {
+            recordLimitField.textProperty().addListener((obs, oldVal, newVal) -> {
+                try {
+                    int limit = Integer.parseInt(newVal.trim());
+                    if (limit > 0 && includeRelatedRecordsCheckbox != null && !includeRelatedRecordsCheckbox.isSelected()) {
+                        // Show hint that they might want to enable related records
+                        logger.debug("Record limit {} set - consider enabling 'Include Related Records'", limit);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Not a valid number, ignore
+                }
+            });
+        }
+    }
+    
+    /**
+     * Handle the "Preview" button click - show the relationship preview dialog.
+     */
+    @FXML
+    private void handlePreviewRelationships() {
+        logger.info("Preview Relationships button clicked");
+        
+        // DEBUG: Show visible confirmation that button was clicked
+        System.out.println("=== PREVIEW BUTTON CLICKED ===");
+        System.out.println("connectionInfo: " + (connectionInfo != null ? "SET" : "NULL"));
+        
+        if (connectionInfo == null) {
+            logger.warn("Preview clicked but not connected to Salesforce");
+            showError("Please connect to Salesforce first");
+            return;
+        }
+        
+        System.out.println("Instance URL: " + connectionInfo.getInstanceUrl());
+        
+        List<SObjectItem> selectedObjects = allObjects.stream()
+            .filter(SObjectItem::isSelected)
+            .filter(item -> !item.isDisabled())
+            .collect(Collectors.toList());
+        
+        logger.info("Selected objects for preview: {}", selectedObjects.size());
+        System.out.println("Selected objects count: " + selectedObjects.size());
+        
+        if (selectedObjects.isEmpty()) {
+            showError("Please select at least one object to preview relationships");
+            return;
+        }
+        
+        try {
+            logger.info("Loading relationship preview dialog...");
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/relationship-preview-dialog.fxml"));
+            Parent root = loader.load();
+            
+            RelationshipPreviewController controller = loader.getController();
+            
+            List<String> parentObjects = selectedObjects.stream()
+                .map(SObjectItem::getName)
+                .collect(Collectors.toList());
+            
+            controller.initializeWithData(
+                connectionInfo.getInstanceUrl(),
+                connectionInfo.getSessionId(),
+                "62.0",
+                parentObjects,
+                getRelationshipDepth(),
+                isPriorityObjectsOnly()
+            );
+            
+            Stage dialog = new Stage();
+            dialog.setTitle("Relationship-Aware Backup Preview");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(startBackupButton.getScene().getWindow());
+            
+            Scene scene = new Scene(root);
+            dialog.setScene(scene);
+            dialog.showAndWait();
+            
+            // Store the config if user confirmed
+            if (controller.isConfirmed()) {
+                this.relationshipBackupConfig = controller.getConfig();
+                logMessage("Relationship backup configured: " + 
+                    controller.getSelectedRelatedObjects().size() + " related objects selected");
+            }
+            
+        } catch (Exception e) {
+            logger.error("Failed to show relationship preview", e);
+            showError("Failed to load relationship preview: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets the relationship depth from the combo box selection.
+     * @return Depth value (1, 2, or 3)
+     */
+    private int getRelationshipDepth() {
+        if (relationshipDepthCombo == null || relationshipDepthCombo.getValue() == null) {
+            return 1; // Default to direct children only
+        }
+        String selected = relationshipDepthCombo.getValue();
+        if (selected.startsWith("1")) return 1;
+        if (selected.startsWith("2")) return 2;
+        if (selected.startsWith("3")) return 3;
+        return 1;
+    }
+    
+    /**
+     * Checks if only priority child objects should be included.
+     */
+    private boolean isPriorityObjectsOnly() {
+        return priorityObjectsOnlyCheckbox == null || priorityObjectsOnlyCheckbox.isSelected();
+    }
+    
+    /**
+     * Checks if related records should be included in the backup.
+     */
+    private boolean isIncludeRelatedRecords() {
+        return includeRelatedRecordsCheckbox != null && includeRelatedRecordsCheckbox.isSelected();
+    }
+    
     private void loadSavedConnections() {
         try {
             logger.info("Loading saved connections...");
@@ -663,8 +845,9 @@ public class BackupController {
             connectionStatusIcon.setStyle("-fx-font-size: 18px; -fx-text-fill: #e74c3c;");
             connectionDetailsLabel.setText("Connection failed - click to configure");
             
-            // Clear the database connection info since it's invalid
+            // Clear the database connection info and saved connection since it's invalid
             databaseConnectionInfo = null;
+            currentSavedConnection = null;
             
             // Show alert with option to configure
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -686,6 +869,9 @@ public class BackupController {
     
     private void applyValidatedConnection(SavedConnection connection) {
         try {
+            // Store the SavedConnection for session caching
+            this.currentSavedConnection = connection;
+            
             // Convert SavedConnection to DatabaseConnectionInfo
             Map<String, String> fields = new HashMap<>();
             
@@ -1090,6 +1276,25 @@ public class BackupController {
         logger.info("Creating DataSink from config. Database type: {}, Fields: {}", config.getDatabaseType(), fields.keySet());
         logger.info("Recreate tables option: {}", config.isRecreateTables());
         
+        // Check for cached session first to avoid re-authentication (especially for SSO)
+        java.sql.Connection cachedConnection = null;
+        if (currentSavedConnection != null) {
+            ConnectionManager.CachedSession cachedSession = ConnectionManager.getInstance()
+                .getCachedSession(currentSavedConnection.getId());
+            if (cachedSession != null) {
+                try {
+                    if (cachedSession.getConnection().isValid(5)) {
+                        cachedConnection = cachedSession.getConnection();
+                        logger.info("Using cached database session for: {} (ID: {})", 
+                            currentSavedConnection.getName(), currentSavedConnection.getId());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Cached session validation failed: {}", e.getMessage());
+                    ConnectionManager.getInstance().invalidateSession(currentSavedConnection.getId());
+                }
+            }
+        }
+        
         DataSink sink;
         switch (config.getDatabaseType()) {
             case "Snowflake":
@@ -1108,26 +1313,46 @@ public class BackupController {
                         ", Warehouse=" + warehouse + ", Database=" + database + ", Schema=" + schema);
                 }
                 
-                // For SSO, password can be null
-                sink = DataSinkFactory.createSnowflakeSink(account, warehouse, database, schema, username, password);
+                // Use cached connection if available, otherwise create new
+                if (cachedConnection != null) {
+                    sink = DataSinkFactory.createSnowflakeSinkWithExistingConnection(
+                        cachedConnection, database, schema, warehouse);
+                } else {
+                    // For SSO, password can be null - this will trigger browser auth
+                    sink = DataSinkFactory.createSnowflakeSink(account, warehouse, database, schema, username, password);
+                }
                 break;
             case "SQL Server":
-                sink = DataSinkFactory.createSqlServerSink(
-                    fields.get("Server"), 
-                    fields.get("Database"),
-                    fields.get("Username"), 
-                    fields.get("Password")
-                );
+                if (cachedConnection != null) {
+                    sink = DataSinkFactory.createSqlServerSinkWithExistingConnection(
+                        cachedConnection, fields.get("Server"), fields.get("Database"));
+                } else {
+                    sink = DataSinkFactory.createSqlServerSink(
+                        fields.get("Server"), 
+                        fields.get("Database"),
+                        fields.get("Username"), 
+                        fields.get("Password")
+                    );
+                }
                 break;
             case "PostgreSQL":
-                sink = DataSinkFactory.createPostgresSink(
-                    fields.get("Host"), 
-                    Integer.parseInt(fields.getOrDefault("Port", "5432")),
-                    fields.get("Database"), 
-                    fields.get("Schema"),
-                    fields.get("Username"), 
-                    fields.get("Password")
-                );
+                if (cachedConnection != null) {
+                    sink = DataSinkFactory.createPostgresSinkWithExistingConnection(
+                        cachedConnection, 
+                        fields.get("Host"),
+                        Integer.parseInt(fields.getOrDefault("Port", "5432")),
+                        fields.get("Database"), 
+                        fields.get("Schema"));
+                } else {
+                    sink = DataSinkFactory.createPostgresSink(
+                        fields.get("Host"), 
+                        Integer.parseInt(fields.getOrDefault("Port", "5432")),
+                        fields.get("Database"), 
+                        fields.get("Schema"),
+                        fields.get("Username"), 
+                        fields.get("Password")
+                    );
+                }
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported database type: " + config.getDatabaseType());
@@ -1136,6 +1361,16 @@ public class BackupController {
         // Set recreate tables option
         sink.setRecreateTables(config.isRecreateTables());
         return sink;
+    }
+
+    @FXML
+    private void handleCustomWhereToggle() {
+        if (customWhereField != null && customWhereCheckbox != null) {
+            customWhereField.setDisable(!customWhereCheckbox.isSelected());
+            if (!customWhereCheckbox.isSelected()) {
+                customWhereField.clear();
+            }
+        }
     }
 
     @FXML
@@ -1185,12 +1420,27 @@ public class BackupController {
 
     @FXML
     private void handleStartBackup() {
+        try {
+            handleStartBackupInternal();
+        } catch (Exception e) {
+            logger.error("Unexpected error starting backup", e);
+            showError("Failed to start backup: " + e.getMessage());
+        }
+    }
+    
+    private void handleStartBackupInternal() {
+        logger.info("=== handleStartBackupInternal() called ===");
+        System.out.println("=== handleStartBackupInternal() called ===");
+        
         List<SObjectItem> selectedObjects = allObjects.stream()
             .filter(SObjectItem::isSelected)
             .filter(item -> !item.isDisabled())
             .collect(Collectors.toList());
         
+        logger.info("Selected objects count: {}", selectedObjects.size());
+        
         if (selectedObjects.isEmpty()) {
+            logger.warn("No objects selected - aborting backup");
             showError("Please select at least one object to backup");
             return;
         }
@@ -1243,12 +1493,24 @@ public class BackupController {
             dataSink = DataSinkFactory.createCsvFileSink(outputFolder);
             displayFolder = outputFolder;
         } else {
+            logger.info("Database backup selected. databaseConnectionInfo: {}", 
+                databaseConnectionInfo != null ? databaseConnectionInfo.getDatabaseType() : "NULL");
+            
             if (databaseConnectionInfo == null) {
+                logger.warn("databaseConnectionInfo is null - cannot proceed with database backup");
                 showError("Please configure database settings first");
                 return;
             }
             
-            dataSink = createDataSinkFromConfig(databaseConnectionInfo);
+            try {
+                logger.info("Creating data sink from config...");
+                dataSink = createDataSinkFromConfig(databaseConnectionInfo);
+                logger.info("Data sink created successfully: {}", dataSink.getDisplayName());
+            } catch (Exception e) {
+                logger.error("Failed to create database sink", e);
+                showError("Failed to connect to database: " + e.getMessage());
+                return;
+            }
             // For database backup, create temp folder for CSV files from Bulk API
             outputFolder = System.getProperty("java.io.tmpdir") + File.separator + "backupforce_" + System.currentTimeMillis();
             File tempDir = new File(outputFolder);
@@ -1327,8 +1589,20 @@ public class BackupController {
             logMessage("Relationship preservation enabled - will capture external IDs for restore");
         }
         
+        // Check include related records option
+        boolean includeRelated = isIncludeRelatedRecords();
+        int relDepth = getRelationshipDepth();
+        boolean priorityOnly = isPriorityObjectsOnly();
+        
+        if (includeRelated && recordLimit > 0) {
+            logMessage("Include Related Records enabled (depth: " + relDepth + 
+                      ", priority only: " + priorityOnly + ")");
+            logMessage("After backing up selected objects, child records will be automatically included");
+        }
+        
         // Start backup
-        currentBackupTask = new BackupTask(selectedObjects, outputFolder, displayFolder, dataSink, recordLimit, preserveRelationships);
+        currentBackupTask = new BackupTask(selectedObjects, outputFolder, displayFolder, dataSink, 
+                                          recordLimit, preserveRelationships, includeRelated, relDepth, priorityOnly);
         
         currentBackupTask.setOnSucceeded(event -> {
             Platform.runLater(() -> {
@@ -1556,14 +1830,89 @@ public class BackupController {
         return sb.toString();
     }
 
+    /**
+     * Log message with batching to prevent UI thread saturation.
+     * Messages are queued and flushed to UI every 200ms.
+     */
     private void logMessage(String message) {
         logger.info(message);
-        Platform.runLater(() -> {
-            if (logArea != null) {
-                logArea.appendText(message + "\n");
-                logArea.setScrollTop(Double.MAX_VALUE);
-            }
+        pendingLogMessages.add(message);
+    }
+    
+    /**
+     * Start the log flush scheduler - call when backup starts
+     */
+    private void startLogFlushScheduler() {
+        if (logFlushScheduler != null && !logFlushScheduler.isShutdown()) {
+            return;
+        }
+        logFlushScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "LogFlushScheduler");
+            t.setDaemon(true);
+            return t;
         });
+        logFlushScheduler.scheduleAtFixedRate(this::flushLogMessages, 200, 200, TimeUnit.MILLISECONDS);
+    }
+    
+    /**
+     * Stop the log flush scheduler - call when backup ends
+     */
+    private void stopLogFlushScheduler() {
+        if (logFlushScheduler != null) {
+            logFlushScheduler.shutdown();
+            try {
+                logFlushScheduler.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            // Final flush
+            flushLogMessages();
+        }
+    }
+    
+    /**
+     * Flush pending log messages to UI (called on timer)
+     */
+    private void flushLogMessages() {
+        if (pendingLogMessages.isEmpty()) {
+            return;
+        }
+        
+        StringBuilder batch = new StringBuilder();
+        String msg;
+        int count = 0;
+        final int MAX_BATCH = 50; // Limit batch size to prevent very long strings
+        
+        while ((msg = pendingLogMessages.poll()) != null && count < MAX_BATCH) {
+            batch.append(msg).append("\n");
+            count++;
+        }
+        
+        if (batch.length() > 0) {
+            final String batchText = batch.toString();
+            Platform.runLater(() -> {
+                if (logArea != null) {
+                    logArea.appendText(batchText);
+                    // Only scroll occasionally, not every batch
+                    logArea.setScrollTop(Double.MAX_VALUE);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Create a throttled status callback that limits UI updates
+     */
+    private BulkV2Client.ProgressCallback createThrottledCallback(SObjectItem item) {
+        final long[] lastUpdate = {0};
+        return (status) -> {
+            long now = System.currentTimeMillis();
+            // Only update UI every 100ms per object
+            if (now - lastUpdate[0] >= UI_UPDATE_THROTTLE_MS) {
+                lastUpdate[0] = now;
+                Platform.runLater(() -> item.setStatus(status));
+            }
+        };
     }
 
     private void showError(String message) {
@@ -1590,16 +1939,24 @@ public class BackupController {
         private final DataSink dataSink;
         private final int recordLimit;
         private final boolean preserveRelationships;
+        private final boolean includeRelatedRecords;
+        private final int relationshipDepth;
+        private final boolean priorityObjectsOnly;
         private volatile boolean cancelled = false;
         private ExecutorService executor;
 
-        public BackupTask(List<SObjectItem> objects, String outputFolder, String displayFolder, DataSink dataSink, int recordLimit, boolean preserveRelationships) {
+        public BackupTask(List<SObjectItem> objects, String outputFolder, String displayFolder, 
+                         DataSink dataSink, int recordLimit, boolean preserveRelationships,
+                         boolean includeRelatedRecords, int relationshipDepth, boolean priorityObjectsOnly) {
             this.objects = objects;
             this.outputFolder = outputFolder;
             this.displayFolder = displayFolder;
             this.dataSink = dataSink;
             this.recordLimit = recordLimit;
             this.preserveRelationships = preserveRelationships;
+            this.includeRelatedRecords = includeRelatedRecords;
+            this.relationshipDepth = relationshipDepth;
+            this.priorityObjectsOnly = priorityObjectsOnly;
         }
 
         @Override
@@ -1626,8 +1983,11 @@ public class BackupController {
                 }
             }
             
-            logMessage("Starting parallel backup with 10 threads...");
+            logMessage("Starting parallel backup with 5 threads...");
             logMessage("");
+            
+            // Start the log flush scheduler for batched UI updates
+            startLogFlushScheduler();
             
             AtomicInteger completed = new AtomicInteger(0);
             AtomicInteger successful = new AtomicInteger(0);
@@ -1636,7 +1996,8 @@ public class BackupController {
             int totalObjects = objects.size();
             long startTime = System.currentTimeMillis();
             
-            executor = Executors.newFixedThreadPool(10);
+            // Use 5 threads to reduce memory pressure and UI event flooding
+            executor = Executors.newFixedThreadPool(5);
             
             for (SObjectItem item : objects) {
                 if (cancelled) {
@@ -1659,6 +2020,11 @@ public class BackupController {
                     
                     try {
                         Platform.runLater(() -> item.setStatus("Processing..."));
+                        
+                        // Check if this is a known problematic object
+                        if (com.backupforce.bulkv2.BulkV2Client.isProblematicObject(objectName)) {
+                            logMessage(String.format("[%s] ⚠ Known Bulk API limitation - may require special filters or fail", objectName));
+                        }
                         
                         long objectStart = System.currentTimeMillis();
                         
@@ -1728,6 +2094,26 @@ public class BackupController {
                             }
                         }
                         
+                        // Add custom WHERE clause if specified
+                        if (customWhereCheckbox != null && customWhereCheckbox.isSelected() 
+                                && customWhereField != null && customWhereField.getText() != null 
+                                && !customWhereField.getText().trim().isEmpty()) {
+                            String customWhere = customWhereField.getText().trim();
+                            // Remove leading WHERE if user included it
+                            if (customWhere.toUpperCase().startsWith("WHERE ")) {
+                                customWhere = customWhere.substring(6).trim();
+                            }
+                            
+                            if (whereClause != null) {
+                                // Combine incremental WHERE with custom WHERE
+                                whereClause = "(" + whereClause + ") AND (" + customWhere + ")";
+                                logMessage(String.format("[%s] Combined incremental + custom WHERE: %s", objectName, whereClause));
+                            } else {
+                                whereClause = customWhere;
+                                logMessage(String.format("[%s] Custom WHERE clause: %s", objectName, whereClause));
+                            }
+                        }
+                        
                         // Step 1: Query object using Bulk API (writes CSV file)
                         // Pass selected fields if configured (null = all fields)
                         Set<String> selectedFields = item.getSelectedFields();
@@ -1736,10 +2122,9 @@ public class BackupController {
                                 objectName, selectedFields.size()));
                         }
                         
-                        bulkClient.queryObject(objectName, outputFolder, whereClause, recordLimit, selectedFields, (status) -> {
-                            // Update status in real-time
-                            Platform.runLater(() -> item.setStatus(status));
-                        });
+                        // Use throttled callback to prevent UI thread saturation
+                        BulkV2Client.ProgressCallback throttledCallback = createThrottledCallback(item);
+                        bulkClient.queryObject(objectName, outputFolder, whereClause, recordLimit, selectedFields, throttledCallback);
                         
                         // Step 1.5: Download blobs for objects with blob fields
                         // Download for both CSV and database backups - store files in _blobs folder
@@ -1748,9 +2133,7 @@ public class BackupController {
                         if (blobField != null) {
                             try {
                                 Platform.runLater(() -> item.setStatus("Downloading blob files..."));
-                                int blobCount = bulkClient.downloadBlobs(objectName, outputFolder, blobField, recordLimit, (status) -> {
-                                    Platform.runLater(() -> item.setStatus(status));
-                                });
+                                int blobCount = bulkClient.downloadBlobs(objectName, outputFolder, blobField, recordLimit, throttledCallback);
                                 if (blobCount > 0) {
                                     logMessage(String.format("[%s] Downloaded %,d blob files", objectName, blobCount));
                                 }
@@ -1762,7 +2145,11 @@ public class BackupController {
                         }
                         
                         // Step 2: If using database sink, write to database
+                        logger.info("DataSink check for {}: dataSink={}, type={}", 
+                            objectName, dataSink != null ? dataSink.getDisplayName() : "null",
+                            dataSink != null ? dataSink.getType() : "N/A");
                         if (dataSink != null && !dataSink.getType().equals("CSV")) {
+                            logMessage(String.format("[%s] Writing to %s...", objectName, dataSink.getDisplayName()));
                             Platform.runLater(() -> item.setStatus("Writing to database..."));
                             
                             File csvFile = new File(outputFolder, objectName + ".csv");
@@ -1772,9 +2159,16 @@ public class BackupController {
                                     // The JdbcDatabaseSink will auto-create tables from CSV headers
                                     String backupId = String.valueOf(System.currentTimeMillis());
                                     
-                                    int recordsWritten = dataSink.writeData(objectName, reader, backupId, (status) -> {
-                                        Platform.runLater(() -> item.setStatus(status));
-                                    });
+                                    // Create throttled callback for database writes (different interface)
+                                    final long[] lastDbUpdate = {0};
+                                    DataSink.ProgressCallback dbCallback = (status) -> {
+                                        long now = System.currentTimeMillis();
+                                        if (now - lastDbUpdate[0] >= UI_UPDATE_THROTTLE_MS) {
+                                            lastDbUpdate[0] = now;
+                                            Platform.runLater(() -> item.setStatus(status));
+                                        }
+                                    };
+                                    int recordsWritten = dataSink.writeData(objectName, reader, backupId, dbCallback);
                                     
                                     // Get CSV record count for comparison (count records properly using CSVParser)
                                     int csvRecords = 0;
@@ -1872,18 +2266,96 @@ public class BackupController {
                         logMessage("✗ FAILED: " + objectName + " - OUT OF MEMORY");
                         logMessage("  → Try increasing heap size: java -Xmx4g -jar BackupForce.jar");
                         logger.error("Out of memory backing up " + objectName, oom);
+                        
+                        // Force garbage collection after OOM to try to recover
+                        System.gc();
+                        
                     } catch (Exception e) {
                         String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                         
-                        // Check if object is unsupported (not a real failure)
-                        if (errorMsg.contains("not supported by the Bulk API") || 
-                            errorMsg.contains("INVALIDENTITY")) {
+                        // Check if this is a connection pool error that we can recover from
+                        if (errorMsg.contains("Connection pool shut down") || 
+                            errorMsg.contains("Pool closed") ||
+                            errorMsg.contains("shut down")) {
+                            // Try to reconnect and retry this object
+                            logMessage("⚠ Connection pool error on " + objectName + " - reconnecting and retrying...");
+                            Platform.runLater(() -> item.setStatus("Reconnecting..."));
+                            
+                            try {
+                                // Force the BulkV2Client to reconnect
+                                bulkClient.forceReconnect();
+                                
+                                // Brief pause after reconnect
+                                Thread.sleep(500);
+                                
+                                // Retry the query
+                                BulkV2Client.ProgressCallback retryCallback = createThrottledCallback(item);
+                                bulkClient.queryObject(objectName, outputFolder, null, 0, null, retryCallback);
+                                
+                                successful.incrementAndGet();
+                                Platform.runLater(() -> item.setStatus("✓ Completed (retry)"));
+                                logMessage("[" + objectName + "] ✓ Completed after reconnect");
+                                
+                            } catch (Exception retryEx) {
+                                // Retry failed - mark as failed but don't stop the whole backup
+                                failed.incrementAndGet();
+                                String retryError = retryEx.getMessage() != null ? retryEx.getMessage() : retryEx.getClass().getSimpleName();
+                                Platform.runLater(() -> {
+                                    item.setStatus("✗ Failed (retry)");
+                                    item.setErrorMessage("Retry failed: " + retryError);
+                                });
+                                logMessage("✗ FAILED: " + objectName + " - retry also failed: " + retryError);
+                                logger.error("Retry failed for " + objectName, retryEx);
+                            }
+                        } else if (errorMsg.contains("not supported by the Bulk API") || 
+                            errorMsg.contains("INVALIDENTITY") ||
+                            errorMsg.contains("Object not supported by Bulk API")) {
                             // Don't count as failed - it's just not supported
                             Platform.runLater(() -> {
                                 item.setStatus("⊘ Not Supported");
                                 item.setErrorMessage("Object not supported by Bulk API");
                             });
                             logMessage("⊘ SKIPPED: " + objectName + " - Not supported by Bulk API");
+                        } else if (errorMsg.contains("Implementation restriction") || 
+                                   errorMsg.contains("requires a filter")) {
+                            // Object requires specific filter - not a real failure
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ Requires Filter");
+                                item.setErrorMessage("Object requires specific WHERE filter");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - Requires specific filter (use WHERE clause)");
+                        } else if (errorMsg.contains("EXCEEDED_ID_LIMIT") || 
+                                   errorMsg.contains("does not support queryMore")) {
+                            // Object doesn't support pagination
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ No Pagination");
+                                item.setErrorMessage("Object doesn't support Bulk API pagination");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - Doesn't support Bulk API pagination");
+                        } else if (errorMsg.contains("EXTERNAL_OBJECT_EXCEPTION") || 
+                                   errorMsg.contains("Transient queries")) {
+                            // External object not supported
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ External Object");
+                                item.setErrorMessage("External objects not supported");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - External object (not supported)");
+                        } else if (errorMsg.contains("Cannot serialize") || 
+                                   errorMsg.contains("CSV format")) {
+                            // CSV serialization issue
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ CSV Error");
+                                item.setErrorMessage("Cannot export to CSV format");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - Cannot serialize to CSV");
+                        } else if (errorMsg.contains("MALFORMED_QUERY") && 
+                                   errorMsg.contains("reified column")) {
+                            // Metadata object requiring reified filter
+                            Platform.runLater(() -> {
+                                item.setStatus("⊘ Metadata Object");
+                                item.setErrorMessage("Metadata object requires special filter");
+                            });
+                            logMessage("⊘ SKIPPED: " + objectName + " - Metadata object (requires special filter)");
                         } else {
                             // Actual failure
                             failed.incrementAndGet();
@@ -1917,8 +2389,12 @@ public class BackupController {
                         
                         Platform.runLater(() -> {
                             progressBar.setProgress(progress);
-                            progressLabel.setText(String.format("Progress: %d/%d (%d successful, %d failed) - %.1f%%",
-                                completedCount, totalObjects, successful.get(), failed.get(), progress * 100));
+                            progressLabel.setText(String.format("Progress: %d/%d (%d successful, %d failed)",
+                                completedCount, totalObjects, successful.get(), failed.get()));
+                            // Update the percentage label
+                            if (progressPercentLabel != null) {
+                                progressPercentLabel.setText(String.format("%.0f%%", progress * 100));
+                            }
                         });
                         
                         // Status bar shows progress, only log milestones
@@ -1933,6 +2409,12 @@ public class BackupController {
             
             executor.shutdown();
             executor.awaitTermination(1, TimeUnit.HOURS);
+            
+            // ==================== RELATIONSHIP-AWARE BACKUP ====================
+            // After backing up parent objects, fetch related child records
+            if (includeRelatedRecords && recordLimit > 0 && !cancelled) {
+                processRelatedRecordsBackup(bulkClient, outputFolder, totalRecords, successful, failed);
+            }
             
             bulkClient.close();
             
@@ -2025,7 +2507,355 @@ public class BackupController {
                 }
             });
             
+            // Stop the log flush scheduler
+            stopLogFlushScheduler();
+            
             return null;
+        }
+        
+        /**
+         * Process relationship-aware backup: after backing up parent objects,
+         * automatically fetch and backup related child records.
+         */
+        private void processRelatedRecordsBackup(BulkV2Client bulkClient, String outputFolder,
+                                                 AtomicLong totalRecords, AtomicInteger successful, 
+                                                 AtomicInteger failed) {
+            try {
+                Platform.runLater(() -> {
+                    logMessage("");
+                    logMessage("=".repeat(60));
+                    logMessage("RELATIONSHIP-AWARE BACKUP: Fetching related child records...");
+                    logMessage("=".repeat(60));
+                });
+                
+                RelationshipAwareBackupService relService = new RelationshipAwareBackupService(
+                    connectionInfo.getInstanceUrl(),
+                    connectionInfo.getSessionId(),
+                    "62.0",
+                    relationshipDepth,
+                    priorityObjectsOnly
+                );
+                
+                // Check if we have user-selected configuration from the preview dialog
+                boolean useUserConfig = relationshipBackupConfig != null && 
+                    relationshipBackupConfig.getSelectedObjects() != null &&
+                    !relationshipBackupConfig.getSelectedObjects().isEmpty();
+                
+                if (useUserConfig) {
+                    Platform.runLater(() -> logMessage("Using user-selected related objects from preview (" + 
+                        relationshipBackupConfig.getSelectedObjects().size() + " objects)"));
+                }
+                
+                // Track objects we've already processed to avoid duplicates
+                Set<String> processedObjects = new HashSet<>();
+                for (SObjectItem item : objects) {
+                    processedObjects.add(item.getName());
+                }
+                
+                // Process each backed-up parent object
+                List<RelatedBackupTask> pendingTasks = new ArrayList<>();
+                
+                for (SObjectItem parentItem : objects) {
+                    if (cancelled) break;
+                    
+                    String parentObject = parentItem.getName();
+                    
+                    // Check if this object actually has records in the backup
+                    java.nio.file.Path csvPath = java.nio.file.Paths.get(outputFolder, parentObject + ".csv");
+                    if (!java.nio.file.Files.exists(csvPath)) {
+                        continue;
+                    }
+                    
+                    // Extract parent IDs from the CSV for WHERE clause building
+                    Set<String> parentIds = relService.extractIdsFromBackup(parentObject, outputFolder);
+                    if (parentIds.isEmpty()) {
+                        Platform.runLater(() -> logMessage("No records found in " + parentObject + " backup"));
+                        continue;
+                    }
+                    
+                    Platform.runLater(() -> logMessage("Analyzing relationships for: " + parentObject));
+                    
+                    if (useUserConfig) {
+                        // Use user-selected objects directly - build tasks from selection
+                        logger.info("Processing parent object: {} with {} parent IDs", parentObject, parentIds.size());
+                        
+                        // Group selected objects by child object name to consolidate multiple lookup fields
+                        // e.g., Contact via AccountId AND Contact via Secondary_Account__c -> single query with OR
+                        Map<String, List<String>> childToParentFields = new LinkedHashMap<>();
+                        Map<String, Integer> childToDepth = new HashMap<>();
+                        
+                        for (RelationshipPreviewController.SelectedRelatedObject selected : 
+                                relationshipBackupConfig.getSelectedObjects()) {
+                            
+                            // Only process children of this parent object
+                            if (!selected.getParentObject().equals(parentObject)) {
+                                continue;
+                            }
+                            
+                            // Group by child object name
+                            String childName = selected.getObjectName();
+                            childToParentFields
+                                .computeIfAbsent(childName, k -> new ArrayList<>())
+                                .add(selected.getParentField());
+                            childToDepth.put(childName, selected.getDepth());
+                        }
+                        
+                        // Now create ONE task per child object with combined WHERE clause
+                        for (Map.Entry<String, List<String>> entry : childToParentFields.entrySet()) {
+                            String childName = entry.getKey();
+                            List<String> parentFields = entry.getValue();
+                            
+                            // Skip if already processed
+                            if (processedObjects.contains(childName)) {
+                                logger.info("Skipping {} - already processed", childName);
+                                continue;
+                            }
+                            
+                            // Build WHERE clause with all parent fields OR'd together
+                            String whereClause = relService.buildWhereClauseMultiField(parentFields, parentIds);
+                            logger.info("Building task for {} with {} fields {} and WHERE: {}", 
+                                childName, parentFields.size(), parentFields,
+                                whereClause != null ? whereClause.substring(0, Math.min(200, whereClause.length())) : "null");
+                            
+                            RelatedBackupTask task = new RelatedBackupTask(
+                                childName,
+                                String.join(",", parentFields), // Store all fields for reference
+                                parentObject,
+                                whereClause,
+                                childToDepth.get(childName)
+                            );
+                            
+                            pendingTasks.add(task);
+                        }
+                    } else {
+                        // Auto-discover relationships
+                        List<RelatedBackupTask> childTasks = relService.onParentBackupComplete(parentObject, outputFolder);
+                        
+                        for (RelatedBackupTask task : childTasks) {
+                            if (!processedObjects.contains(task.getObjectName())) {
+                                pendingTasks.add(task);
+                            }
+                        }
+                    }
+                }
+                
+                if (pendingTasks.isEmpty()) {
+                    Platform.runLater(() -> logMessage("No related child objects found to backup"));
+                    relService.close();
+                    return;
+                }
+                
+                Platform.runLater(() -> logMessage("Found " + pendingTasks.size() + " related objects to backup"));
+                
+                // Process each related backup task
+                int relatedCount = 0;
+                for (RelatedBackupTask task : pendingTasks) {
+                    if (cancelled) break;
+                    
+                    // Skip duplicates
+                    if (processedObjects.contains(task.getObjectName())) {
+                        continue;
+                    }
+                    processedObjects.add(task.getObjectName());
+                    
+                    String childObject = task.getObjectName();
+                    String whereClause = task.getWhereClause();
+                    
+                    final String logWhereClause = whereClause != null && whereClause.length() > 100 
+                        ? whereClause.substring(0, 100) + "..." : whereClause;
+                    Platform.runLater(() -> {
+                        logMessage(String.format("  ↳ Backing up %s (related to %s via %s)...",
+                            childObject, task.getParentObject(), task.getParentField()));
+                        logMessage(String.format("    WHERE: %s", logWhereClause));
+                    });
+                    
+                    try {
+                        // Create a display item for the child object
+                        SObjectItem childItem = new SObjectItem(childObject, childObject + " (related)");
+                        Platform.runLater(() -> {
+                            allObjects.add(childItem);
+                            childItem.setStatus("⟳ Backing up...");
+                        });
+                        
+                        long itemStart = System.currentTimeMillis();
+                        
+                        // Query the child object with WHERE clause to filter by parent IDs
+                        // Use throttled callback
+                        BulkV2Client.ProgressCallback childCallback = createThrottledCallback(childItem);
+                        bulkClient.queryObject(childObject, outputFolder, whereClause, 0, null, childCallback);
+                        
+                        // Read record count from result file
+                        java.nio.file.Path resultPath = java.nio.file.Paths.get(outputFolder, childObject + ".csv");
+                        if (java.nio.file.Files.exists(resultPath)) {
+                            long lineCount = java.nio.file.Files.lines(resultPath).count() - 1; // Subtract header
+                            long fileSize = java.nio.file.Files.size(resultPath);
+                            long duration = System.currentTimeMillis() - itemStart;
+                            
+                            totalRecords.addAndGet(lineCount);
+                            relatedCount++;
+                            successful.incrementAndGet();
+                            
+                            final long fLineCount = lineCount;
+                            Platform.runLater(() -> {
+                                childItem.setStatus("✓ Completed");
+                                childItem.setRecordCount(String.format("%,d", fLineCount));
+                                childItem.setFileSize(formatFileSize(fileSize));
+                                childItem.setDuration(formatDuration(duration));
+                                logMessage(String.format("    ✓ %s: %,d records", childObject, fLineCount));
+                            });
+                        }
+                        
+                        task.setCompleted(true);
+                        
+                    } catch (Exception e) {
+                        failed.incrementAndGet();
+                        Platform.runLater(() -> logMessage("    ✗ " + childObject + ": " + e.getMessage()));
+                        logger.warn("Failed to backup related object: " + childObject, e);
+                    }
+                }
+                
+                final int fRelatedCount = relatedCount;
+                Platform.runLater(() -> {
+                    logMessage("");
+                    logMessage("Relationship-aware backup completed: " + fRelatedCount + " related objects backed up");
+                });
+                
+                // Generate comprehensive manifest for restore/migration
+                generateComprehensiveManifest(outputFolder, objects, pendingTasks);
+                
+                relService.close();
+                
+            } catch (Exception e) {
+                logger.error("Error in relationship-aware backup", e);
+                Platform.runLater(() -> logMessage("WARNING: Relationship backup failed: " + e.getMessage()));
+            }
+        }
+        
+        /**
+         * Generate a comprehensive manifest file for restore/migration support.
+         * This manifest contains everything needed to restore data to a different org.
+         */
+        private void generateComprehensiveManifest(String outputFolder, List<SObjectItem> parents,
+                                                   List<RelatedBackupTask> relatedTasks) {
+            try {
+                BackupManifestGenerator manifestGen = new BackupManifestGenerator(
+                    connectionInfo.getInstanceUrl(),
+                    connectionInfo.getSessionId(),
+                    "62.0"
+                );
+                
+                // Determine options from config or defaults
+                boolean captureExternalIds = true;
+                boolean captureFieldMetadata = true; // Always capture field metadata
+                boolean generateIdMappingOpt = true;
+                boolean includeRecordTypes = true;
+                
+                if (relationshipBackupConfig != null) {
+                    captureExternalIds = relationshipBackupConfig.isCaptureExternalIds();
+                    generateIdMappingOpt = relationshipBackupConfig.isGenerateIdMapping();
+                    includeRecordTypes = relationshipBackupConfig.isIncludeRecordTypes();
+                }
+                
+                // Configure the manifest generator
+                manifestGen.setCaptureExternalIds(captureExternalIds);
+                manifestGen.setCaptureFieldMetadata(captureFieldMetadata);
+                manifestGen.setGenerateIdMapping(generateIdMappingOpt);
+                manifestGen.setIncludeRecordTypes(includeRecordTypes);
+                
+                // Build list of objects to include in manifest
+                List<String> allBackedUpObjects = new ArrayList<>();
+                List<String> parentObjectNames = new ArrayList<>();
+                for (SObjectItem parent : parents) {
+                    allBackedUpObjects.add(parent.getName());
+                    parentObjectNames.add(parent.getName());
+                }
+                
+                // Related objects with their parent info
+                List<RelatedObjectInfo> relatedObjectInfos = new ArrayList<>();
+                for (RelatedBackupTask task : relatedTasks) {
+                    if (task.isCompleted()) {
+                        allBackedUpObjects.add(task.getObjectName());
+                        relatedObjectInfos.add(new RelatedObjectInfo(
+                            task.getObjectName(),
+                            task.getParentObject(), 
+                            task.getParentField(),
+                            task.getDepth(),
+                            false // priority is not tracked in RelatedBackupTask
+                        ));
+                    }
+                }
+                
+                Platform.runLater(() -> logMessage("Generating comprehensive backup manifest..."));
+                
+                // Generate the main manifest
+                manifestGen.generateManifest(
+                    outputFolder,
+                    allBackedUpObjects,
+                    parentObjectNames,
+                    relatedObjectInfos
+                );
+                
+                manifestGen.close();
+                
+                Platform.runLater(() -> logMessage("✓ Comprehensive backup manifest saved"));
+                
+            } catch (Exception e) {
+                logger.warn("Failed to generate comprehensive manifest", e);
+                // Fall back to simple manifest
+                generateRelationshipManifest(outputFolder, parents, relatedTasks);
+            }
+        }
+        
+        /**
+         * Generate a simple manifest file documenting the relationship-aware backup.
+         * (Fallback if comprehensive manifest fails)
+         */
+        private void generateRelationshipManifest(String outputFolder, List<SObjectItem> parents,
+                                                  List<RelatedBackupTask> relatedTasks) {
+            try {
+                java.nio.file.Path manifestPath = java.nio.file.Paths.get(outputFolder, "_relationship_manifest.json");
+                
+                com.google.gson.JsonObject manifest = new com.google.gson.JsonObject();
+                manifest.addProperty("generatedAt", java.time.Instant.now().toString());
+                manifest.addProperty("backupType", "relationship-aware");
+                manifest.addProperty("relationshipDepth", relationshipDepth);
+                manifest.addProperty("priorityObjectsOnly", priorityObjectsOnly);
+                
+                // Parent objects
+                com.google.gson.JsonArray parentsArray = new com.google.gson.JsonArray();
+                for (SObjectItem parent : parents) {
+                    parentsArray.add(parent.getName());
+                }
+                manifest.add("parentObjects", parentsArray);
+                
+                // Related objects with their parent info
+                com.google.gson.JsonArray relatedArray = new com.google.gson.JsonArray();
+                for (RelatedBackupTask task : relatedTasks) {
+                    if (task.isCompleted()) {
+                        com.google.gson.JsonObject relObj = new com.google.gson.JsonObject();
+                        relObj.addProperty("object", task.getObjectName());
+                        relObj.addProperty("parentObject", task.getParentObject());
+                        relObj.addProperty("parentField", task.getParentField());
+                        relObj.addProperty("depth", task.getDepth());
+                        relatedArray.add(relObj);
+                    }
+                }
+                manifest.add("relatedObjects", relatedArray);
+                
+                // Restore instructions
+                com.google.gson.JsonObject restoreInfo = new com.google.gson.JsonObject();
+                restoreInfo.addProperty("restoreOrder", "Parent objects first, then related objects");
+                restoreInfo.addProperty("note", "Related objects were filtered to only include records linked to backed-up parents");
+                manifest.add("restoreInstructions", restoreInfo);
+                
+                com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+                java.nio.file.Files.writeString(manifestPath, gson.toJson(manifest));
+                
+                Platform.runLater(() -> logMessage("✓ Relationship manifest saved"));
+                
+            } catch (Exception e) {
+                logger.warn("Failed to generate relationship manifest", e);
+            }
         }
 
         @Override

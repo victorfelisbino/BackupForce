@@ -31,10 +31,10 @@ BackupForce is designed to be the best **free alternative** to expensive Salesfo
 | **Phase 7** | Cross-Org Data Transformation | ✅ Complete | High |
 | **Phase 8** | Duplicate Record Handling | ⏳ Planned | High |
 | **Phase 9** | Related Record Creation | ⏳ Planned | Medium |
-| **Phase 10** | Relationship-Aware Backup | 🔥 Next | High |
-| **Phase 11** | Cascade Delete | 🔥 Next | High |
-| **Phase 12** | Scheduled Automated Backups | ⏳ Planned | High |
-| **Phase 13** | CLI & Automation | ⏳ Planned | Medium |
+| **Phase 10** | Relationship-Aware Backup | ✅ Complete | High |
+| **Phase 11** | Cascade Delete | ⏳ Planned | High |
+| **Phase 12** | Scheduled Automated Backups | ✅ Complete | High |
+| **Phase 13** | CLI & Automation | 🔥 Next | Medium |
 | **Phase 14** | Advanced Data Management | ⏳ Planned | Medium |
 | **Phase 15** | Enterprise Features | ⏳ Future | Low |
 
@@ -395,39 +395,40 @@ Smart deletion of records with all their related children — like deleting an A
 
 ---
 
-## ⏳ Phase 12: Scheduled Automated Backups (Planned)
+## ✅ Phase 12: Scheduled Automated Backups (Completed)
 
 **User Pain Point:** *"Someone can write scripts to auto run data loader and dump the files onto a server"* — Let's make this easy without code!
 
 ### 12.1 Scheduler UI
-- [ ] Backup schedule configuration screen
-- [ ] Daily, weekly, monthly schedule options
-- [ ] Time zone support
-- [ ] Multiple schedules per connection
+- [x] Backup schedule configuration screen
+- [x] Daily, weekly, monthly schedule options
+- [x] Time zone support
+- [x] Multiple schedules per connection
 
 ### 12.2 Schedule Triggers
-- [ ] Time-based scheduling (cron-like)
-- [ ] On-demand manual trigger
+- [x] Time-based scheduling (cron-like)
+- [x] On-demand manual trigger
 - [ ] System startup trigger
 - [ ] Post-deployment trigger (via webhook)
 
 ### 12.3 Background Service
+- [x] In-app scheduler with ScheduledExecutorService
 - [ ] Windows Task Scheduler integration
 - [ ] macOS launchd integration
 - [ ] Linux cron/systemd integration
 - [ ] Headless backup execution
 
 ### 12.4 Incremental Backups
-- [ ] Track LastModifiedDate for each object
-- [ ] Only backup changed records since last run
-- [ ] Full vs incremental backup modes
+- [x] Track LastModifiedDate for each object
+- [x] Only backup changed records since last run
+- [x] Full vs incremental backup modes
 - [ ] Merge incremental into full periodically
 
 ### 12.5 Notifications
 - [ ] Email notifications on completion/failure
 - [ ] Slack/Teams webhook integration
 - [ ] Desktop notifications
-- [ ] Backup log history
+- [x] Backup log history
 
 ### 12.6 Retention Policies
 - [ ] Keep last N backups

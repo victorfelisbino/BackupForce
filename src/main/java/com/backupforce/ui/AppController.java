@@ -5,11 +5,13 @@ import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.slf4j.Logger;
@@ -33,12 +35,16 @@ public class AppController {
     private LoginContentController loginController;
     private MainController mainController;
     
-    // For window dragging
+    // For window dragging and maximize handling
     private Stage stage;
     private double xOffset = 0;
     private double yOffset = 0;
-    private boolean isMaximized = true;
+    private boolean isMaximized = false;
     private double prevX, prevY, prevWidth, prevHeight;
+    
+    // Default restored window size
+    private static final double DEFAULT_WIDTH = 1200;
+    private static final double DEFAULT_HEIGHT = 800;
     
     @FXML
     public void initialize() {
@@ -51,7 +57,20 @@ public class AppController {
      */
     public void setStage(Stage stage) {
         this.stage = stage;
-        this.isMaximized = stage.isMaximized();
+    }
+    
+    /**
+     * Set the maximized state (called from BackupForceApp after initial sizing)
+     */
+    public void setMaximizedState(boolean maximized, Rectangle2D visualBounds) {
+        this.isMaximized = maximized;
+        if (!maximized) {
+            // Set default previous values for restore
+            prevWidth = DEFAULT_WIDTH;
+            prevHeight = DEFAULT_HEIGHT;
+            prevX = (visualBounds.getWidth() - DEFAULT_WIDTH) / 2 + visualBounds.getMinX();
+            prevY = (visualBounds.getHeight() - DEFAULT_HEIGHT) / 2 + visualBounds.getMinY();
+        }
     }
     
     // ===== Custom Title Bar Handlers =====
@@ -70,11 +89,12 @@ public class AppController {
             // If maximized, restore first then drag
             if (isMaximized) {
                 isMaximized = false;
-                stage.setMaximized(false);
                 // Adjust position so window appears under mouse
-                stage.setWidth(prevWidth > 0 ? prevWidth : 1200);
-                stage.setHeight(prevHeight > 0 ? prevHeight : 800);
-                xOffset = stage.getWidth() / 2;
+                double newWidth = prevWidth > 0 ? prevWidth : DEFAULT_WIDTH;
+                double newHeight = prevHeight > 0 ? prevHeight : DEFAULT_HEIGHT;
+                stage.setWidth(newWidth);
+                stage.setHeight(newHeight);
+                xOffset = newWidth / 2;
             }
             stage.setX(event.getScreenX() - xOffset);
             stage.setY(event.getScreenY() - yOffset);
@@ -91,23 +111,32 @@ public class AppController {
     @FXML
     private void handleMaximize() {
         if (stage != null) {
+            Rectangle2D visualBounds = Screen.getPrimary().getVisualBounds();
+            
             if (isMaximized) {
-                // Restore to previous size
-                stage.setMaximized(false);
-                if (prevWidth > 0 && prevHeight > 0) {
-                    stage.setX(prevX);
-                    stage.setY(prevY);
-                    stage.setWidth(prevWidth);
-                    stage.setHeight(prevHeight);
+                // Restore to previous size (centered if no previous position)
+                if (prevWidth <= 0 || prevHeight <= 0) {
+                    prevWidth = DEFAULT_WIDTH;
+                    prevHeight = DEFAULT_HEIGHT;
+                    prevX = (visualBounds.getWidth() - DEFAULT_WIDTH) / 2 + visualBounds.getMinX();
+                    prevY = (visualBounds.getHeight() - DEFAULT_HEIGHT) / 2 + visualBounds.getMinY();
                 }
+                stage.setX(prevX);
+                stage.setY(prevY);
+                stage.setWidth(prevWidth);
+                stage.setHeight(prevHeight);
                 isMaximized = false;
             } else {
-                // Save current size and maximize
+                // Save current size and maximize to visual bounds (respects taskbar)
                 prevX = stage.getX();
                 prevY = stage.getY();
                 prevWidth = stage.getWidth();
                 prevHeight = stage.getHeight();
-                stage.setMaximized(true);
+                
+                stage.setX(visualBounds.getMinX());
+                stage.setY(visualBounds.getMinY());
+                stage.setWidth(visualBounds.getWidth());
+                stage.setHeight(visualBounds.getHeight());
                 isMaximized = true;
             }
         }

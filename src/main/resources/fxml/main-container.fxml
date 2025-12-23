@@ -44,6 +44,12 @@
                     <Label text="Data Restore"/>
                 </HBox>
                 
+                <HBox fx:id="navSchedule" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToSchedule">
+                    <Label text="🕐" styleClass="nav-icon"/>
+                    <Label text="Schedules"/>
+                </HBox>
+                
                 <Region prefHeight="16"/>
                 <Label text="SETTINGS" styleClass="nav-section-title"/>
                 

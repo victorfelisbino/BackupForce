@@ -6,13 +6,19 @@ import com.google.gson.JsonParser;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,22 +26,256 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class BulkV2Client implements AutoCloseable {
+    
+    /**
+     * Objects that have known Bulk API limitations and require special handling or should be skipped.
+     * These objects may require filters, don't support queryMore, or have other restrictions.
+     */
+    private static final Set<String> KNOWN_PROBLEMATIC_OBJECTS = new HashSet<>(Arrays.asList(
+        // Objects requiring specific filters
+        "ActivityMetric",           // Requires specific object/record filter
+        "ActivityMetricRollup",     // Requires specific object/record filter
+        "ContentDocumentLink",      // Requires filter on ContentDocumentId or LinkedEntityId
+        "ContentFolderItem",        // Requires filter on Id or ParentContentFolderId
+        "ContentFolderMember",      // Requires filter on Id, ChildRecordId, or ParentContentFolderId
+        "EventWhoRelation",         // Not supported by Bulk API
+        "TaskWhoRelation",          // Not supported by Bulk API
+        "TopicAssignment",          // Often has restrictions
+        
+        // Metadata objects requiring reified column filters
+        "ApexTypeImplementor",      // Requires InterfaceName,IsConcrete filter
+        "AppTabMember",             // Requires AppDefinitionId,TabDefinitionId filter
+        "ColorDefinition",          // Requires TabDefinitionId,Context filter
+        "FlowTestView",             // Requires FlowDefinitionViewId,DurableId filter
+        "FlowVariableView",         // Requires FlowVersionViewId,DurableId filter
+        "FlowVersionView",          // Requires FlowDefinitionViewId,DurableId filter
+        
+        // Objects that don't support queryMore/pagination
+        "AuraDefinitionInfo",       // EXCEEDED_ID_LIMIT - needs LIMIT
+        "DataType",                 // EXCEEDED_ID_LIMIT - needs LIMIT
+        
+        // External/special objects
+        "DatacloudAddress",         // External object - transient queries not supported
+        "DatacloudCompany",         // External object
+        "DatacloudContact",         // External object
+        "DatacloudDandBCompany",    // External object
+        "FlexQueueItem",            // Requires queryType field expression
+        
+        // Objects with CSV serialization issues
+        "EntityDefinition",         // Cannot serialize RecordTypesSupported in CSV
+        "EntityParticle",           // Similar serialization issues
+        "FieldDefinition",          // Similar serialization issues
+        "RelationshipDomain",       // Similar serialization issues
+        "RelationshipInfo",         // Similar serialization issues
+        
+        // Objects not supported by Bulk API
+        "FieldSecurityClassification", // Not supported by Bulk API
+        
+        // Statistics objects
+        "DataStatistics"            // Often fails during batch processing
+    ));
+    
+    /**
+     * Check if an object is known to have Bulk API issues
+     */
+    public static boolean isProblematicObject(String objectName) {
+        return KNOWN_PROBLEMATIC_OBJECTS.contains(objectName);
+    }
+    
+    /**
+     * Objects that contain large binary data and may cause out-of-memory errors.
+     * These require special handling (streaming, increased heap, or smaller batches).
+     */
+    private static final Set<String> LARGE_BINARY_OBJECTS = new HashSet<>(Arrays.asList(
+        "Attachment",           // Binary file content
+        "ContentVersion",       // Binary document content
+        "Document",             // Binary document content
+        "ContentBody",          // Large body content
+        "StaticResource",       // Static resource files
+        "EmailMessage",         // Can contain large attachments
+        "FeedItem",            // Can contain large body content
+        "EmailTemplate"        // Can contain large HTML body
+    ));
+    
+    /**
+     * Check if an object contains large binary data that may cause memory issues
+     */
+    public static boolean isLargeBinaryObject(String objectName) {
+        return LARGE_BINARY_OBJECTS.contains(objectName);
+    }
+    
+    /**
+     * Get warning message for large binary objects
+     */
+    public static String getLargeBinaryObjectWarning(String objectName) {
+        if (LARGE_BINARY_OBJECTS.contains(objectName)) {
+            return objectName + " contains binary data and may require significant memory. Consider backing up with increased heap size (-Xmx4g).";
+        }
+        return null;
+    }
+    
+    /**
+     * Get warning message for a problematic object
+     */
+    public static String getProblematicObjectWarning(String objectName) {
+        if (KNOWN_PROBLEMATIC_OBJECTS.contains(objectName)) {
+            return objectName + " has known Bulk API limitations and may fail or return incomplete results.";
+        }
+        return null;
+    }
     private static final Logger logger = LoggerFactory.getLogger(BulkV2Client.class);
     
     private final String instanceUrl;
     private final String accessToken;
     private final String apiVersion;
-    private final CloseableHttpClient httpClient;
+    private CloseableHttpClient httpClient;
+    private PoolingHttpClientConnectionManager connectionManager;
+    private volatile boolean clientShutdown = false;
+    private final Object clientLock = new Object();
 
     public BulkV2Client(String instanceUrl, String accessToken, String apiVersion) {
         this.instanceUrl = instanceUrl;
         this.accessToken = accessToken;
         this.apiVersion = apiVersion;
-        this.httpClient = HttpClients.createDefault();
+        
+        initializeHttpClient();
+        
+        logger.info("HTTP client initialized with extended timeouts for long-running backup operations");
     }
+    
+    /**
+     * Initialize or reinitialize the HTTP client with connection pool settings.
+     * This is called on startup and can be called again to recover from pool shutdown.
+     */
+    private void initializeHttpClient() {
+        synchronized (clientLock) {
+            // Close existing client if present
+            if (httpClient != null) {
+                try {
+                    httpClient.close();
+                } catch (Exception ignored) {}
+            }
+            if (connectionManager != null) {
+                try {
+                    connectionManager.close();
+                } catch (Exception ignored) {}
+            }
+            
+            // Configure connection pool with long timeouts for backup operations
+            this.connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(ConnectionConfig.custom()
+                    .setConnectTimeout(Timeout.ofMinutes(5))
+                    .setSocketTimeout(Timeout.ofMinutes(30))  // Long timeout for large downloads
+                    .setTimeToLive(TimeValue.ofHours(2))      // Keep connections alive for 2 hours
+                    .setValidateAfterInactivity(TimeValue.ofSeconds(30))  // Validate stale connections
+                    .build())
+                .setMaxConnTotal(20)      // Max total connections
+                .setMaxConnPerRoute(10)   // Max connections per host
+                .build();
+            
+            // Configure request timeouts
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectionRequestTimeout(Timeout.ofMinutes(5))
+                .setResponseTimeout(Timeout.ofMinutes(30))
+                .build();
+            
+            this.httpClient = HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(requestConfig)
+                .evictExpiredConnections()
+                .evictIdleConnections(TimeValue.ofMinutes(5))
+                .build();
+            
+            this.clientShutdown = false;
+            logger.info("HTTP connection pool initialized/reinitialized");
+        }
+    }
+    
+    /**
+     * Ensure HTTP client is available. If the connection pool was shut down
+     * (e.g., due to OOM or other errors), recreate it.
+     */
+    private void ensureHttpClient() {
+        if (clientShutdown) {
+            synchronized (clientLock) {
+                if (clientShutdown) {
+                    logger.warn("HTTP connection pool was shut down, recreating...");
+                    initializeHttpClient();
+                }
+            }
+        }
+    }
+    
+    /**
+     * Force reconnection of the HTTP client. Call this after detecting
+     * connection pool errors to ensure subsequent requests will work.
+     */
+    public void forceReconnect() {
+        logger.info("Forcing HTTP client reconnection...");
+        synchronized (clientLock) {
+            initializeHttpClient();
+        }
+        logger.info("HTTP client reconnected successfully");
+    }
+    
+    /**
+     * Mark the client as shutdown (called when we detect pool shutdown errors)
+     */
+    private void markClientShutdown() {
+        clientShutdown = true;
+    }
+    
+    /**
+     * Check if an exception indicates the connection pool is shut down
+     */
+    private boolean isPoolShutdownError(Exception e) {
+        String message = e.getMessage();
+        if (message != null) {
+            return message.contains("Connection pool shut down") ||
+                   message.contains("Pool closed") ||
+                   message.contains("shut down");
+        }
+        return false;
+    }
+    
+    /**
+     * Execute an HTTP request with automatic recovery from pool shutdown.
+     * If the connection pool was shut down (e.g., due to OOM), recreate it and retry.
+     */
+    private <T> T executeWithRecovery(HttpRequestExecutor<T> executor) throws IOException, ParseException {
+        int maxRetries = 2;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ensureHttpClient();
+                return executor.execute(httpClient);
+            } catch (IOException e) {
+                if (isPoolShutdownError(e) && attempt < maxRetries) {
+                    logger.warn("Connection pool shut down detected, recreating HTTP client (attempt {}/{})", attempt, maxRetries);
+                    markClientShutdown();
+                    ensureHttpClient();
+                    // retry on next iteration
+                } else {
+                    throw e;
+                }
+            }
+        }
+        throw new IOException("Failed to execute HTTP request after " + maxRetries + " attempts");
+    }
+    
+    /**
+     * Functional interface for HTTP request execution
+     */
+    @FunctionalInterface
+    private interface HttpRequestExecutor<T> {
+        T execute(CloseableHttpClient client) throws IOException, ParseException;
+    }
+
+    // Configure connection pool with long timeouts for backup operations
+    // (initialization moved to initializeHttpClient method above)
 
     // Functional interface for progress updates
     @FunctionalInterface
@@ -144,32 +384,34 @@ public class BulkV2Client implements AutoCloseable {
         post.setHeader("Content-Type", "application/json");
         post.setEntity(new StringEntity(jobRequest.toString(), ContentType.APPLICATION_JSON));
         
-        try (ClassicHttpResponse response = httpClient.executeOpen(null, post, null)) {
-            String responseBody = EntityUtils.toString(response.getEntity());
-            
-            if (response.getCode() >= 400) {
-                // Parse error details for better logging
-                String errorMsg = responseBody;
-                try {
-                    JsonParser.parseString(responseBody);
-                    // If it's JSON, use as-is, otherwise it's already a string
-                } catch (Exception ignored) {
+        return executeWithRecovery(client -> {
+            try (ClassicHttpResponse response = client.executeOpen(null, post, null)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                
+                if (response.getCode() >= 400) {
+                    // Parse error details for better logging
+                    String errorMsg = responseBody;
+                    try {
+                        JsonParser.parseString(responseBody);
+                        // If it's JSON, use as-is, otherwise it's already a string
+                    } catch (Exception ignored) {
+                    }
+                    
+                    // Check for common unsupported object errors
+                    if (errorMsg.contains("not supported by the Bulk API") || 
+                        errorMsg.contains("INVALIDENTITY") ||
+                        errorMsg.contains("compound data not supported")) {
+                        logger.debug("{}: Object not supported by Bulk API", objectName);
+                    } else {
+                        logger.error("{}: Failed to create job: {}", objectName, errorMsg);
+                    }
+                    throw new IOException("Failed to create query job: " + errorMsg);
                 }
                 
-                // Check for common unsupported object errors
-                if (errorMsg.contains("not supported by the Bulk API") || 
-                    errorMsg.contains("INVALIDENTITY") ||
-                    errorMsg.contains("compound data not supported")) {
-                    logger.debug("{}: Object not supported by Bulk API", objectName);
-                } else {
-                    logger.error("{}: Failed to create job: {}", objectName, errorMsg);
-                }
-                throw new IOException("Failed to create query job: " + errorMsg);
+                JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
+                return responseJson.get("id").getAsString();
             }
-            
-            JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
-            return responseJson.get("id").getAsString();
-        }
+        });
     }
     
     private String getObjectFields(String objectName) throws IOException, ParseException {
@@ -178,65 +420,67 @@ public class BulkV2Client implements AutoCloseable {
         HttpGet get = new HttpGet(url);
         get.setHeader("Authorization", "Bearer " + accessToken);
         
-        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
-            String responseBody = EntityUtils.toString(response.getEntity());
-            JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
-            
-            if (response.getCode() >= 400) {
-                logger.error("Failed to describe object {}: {}", objectName, responseBody);
-                throw new IOException("Failed to describe object: " + responseBody);
-            }
-            
-            JsonArray fields = responseJson.getAsJsonArray("fields");
-            StringBuilder fieldNames = new StringBuilder();
-            int skippedCount = 0;
-            boolean hasBlobFields = false;
-            String idField = "Id";
-            String blobField = null;
-            
-            for (int i = 0; i < fields.size(); i++) {
-                JsonObject field = fields.get(i).getAsJsonObject();
-                String fieldName = field.get("name").getAsString();
-                String fieldType = field.has("type") ? field.get("type").getAsString() : "";
+        return executeWithRecovery(client -> {
+            try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
                 
-                // Skip compound fields that can't be queried in Bulk API
-                if (fieldType.equals("address") || fieldType.equals("location")) {
-                    logger.debug("{}: Skipping compound field: {}", objectName, fieldName);
-                    skippedCount++;
-                    continue;
+                if (response.getCode() >= 400) {
+                    logger.error("Failed to describe object {}: {}", objectName, responseBody);
+                    throw new IOException("Failed to describe object: " + responseBody);
                 }
                 
-                // Track blob fields but skip them from the main query
-                if (fieldType.equals("base64")) {
-                    logger.debug("{}: Found blob field: {} (will download separately)", objectName, fieldName);
-                    hasBlobFields = true;
-                    blobField = fieldName;
-                    skippedCount++;
-                    continue;
+                JsonArray fields = responseJson.getAsJsonArray("fields");
+                StringBuilder fieldNames = new StringBuilder();
+                int skippedCount = 0;
+                boolean hasBlobFields = false;
+                String idField = "Id";
+                String blobField = null;
+                
+                for (int i = 0; i < fields.size(); i++) {
+                    JsonObject field = fields.get(i).getAsJsonObject();
+                    String fieldName = field.get("name").getAsString();
+                    String fieldType = field.has("type") ? field.get("type").getAsString() : "";
+                    
+                    // Skip compound fields that can't be queried in Bulk API
+                    if (fieldType.equals("address") || fieldType.equals("location")) {
+                        logger.debug("{}: Skipping compound field: {}", objectName, fieldName);
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    // Track blob fields but skip them from the main query
+                    if (fieldType.equals("base64")) {
+                        logger.debug("{}: Found blob field: {} (will download separately)", objectName, fieldName);
+                        hasBlobFields = true;
+                        blobField = fieldName;
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    if (fieldNames.length() > 0) {
+                        fieldNames.append(", ");
+                    }
+                    fieldNames.append(fieldName);
                 }
                 
-                if (fieldNames.length() > 0) {
-                    fieldNames.append(", ");
+                if (skippedCount > 0) {
+                    logger.info("{}: Skipped {} unsupported field(s) (compound/blob types)", objectName, skippedCount);
                 }
-                fieldNames.append(fieldName);
+                
+                if (hasBlobFields) {
+                    logger.info("{}: This object has blob field(s). Blob data will be downloaded separately.", objectName);
+                    // Store metadata for later blob download
+                    storeBlobMetadata(objectName, blobField);
+                }
+                
+                if (fieldNames.length() == 0) {
+                    throw new IOException("No queryable fields found for object");
+                }
+                
+                return fieldNames.toString();
             }
-            
-            if (skippedCount > 0) {
-                logger.info("{}: Skipped {} unsupported field(s) (compound/blob types)", objectName, skippedCount);
-            }
-            
-            if (hasBlobFields) {
-                logger.info("{}: This object has blob field(s). Blob data will be downloaded separately.", objectName);
-                // Store metadata for later blob download
-                storeBlobMetadata(objectName, blobField);
-            }
-            
-            if (fieldNames.length() == 0) {
-                throw new IOException("No queryable fields found for object");
-            }
-            
-            return fieldNames.toString();
-        }
+        });
     }
     
     private void storeBlobMetadata(String objectName, String blobField) {
@@ -255,28 +499,32 @@ public class BulkV2Client implements AutoCloseable {
             HttpGet get = new HttpGet(url);
             get.setHeader("Authorization", "Bearer " + accessToken);
             
-            try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
-                String responseBody = EntityUtils.toString(response.getEntity());
-                JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
-                
-                state = responseJson.get("state").getAsString();
-                
-                // Get progress information
-                if (progressCallback != null && responseJson.has("numberRecordsProcessed")) {
-                    int recordsProcessed = responseJson.get("numberRecordsProcessed").getAsInt();
-                    if (recordsProcessed > 0) {
-                        progressCallback.update(String.format("Processing (%,d records)...", recordsProcessed));
+            String currentState = executeWithRecovery(client -> {
+                try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    JsonObject responseJson = JsonParser.parseString(responseBody).getAsJsonObject();
+                    
+                    String st = responseJson.get("state").getAsString();
+                    
+                    // Get progress information
+                    if (progressCallback != null && responseJson.has("numberRecordsProcessed")) {
+                        int recordsProcessed = responseJson.get("numberRecordsProcessed").getAsInt();
+                        if (recordsProcessed > 0) {
+                            progressCallback.update(String.format("Processing (%,d records)...", recordsProcessed));
+                        }
                     }
+                    
+                    logger.debug("{}: Job state: {}", objectName, st);
+                    
+                    if (st.equals("Failed") || st.equals("Aborted")) {
+                        String errorMessage = responseJson.has("errorMessage") ? 
+                            responseJson.get("errorMessage").getAsString() : "Unknown error";
+                        throw new IOException("Job failed: " + errorMessage);
+                    }
+                    return st;
                 }
-                
-                logger.debug("{}: Job state: {}", objectName, state);
-                
-                if (state.equals("Failed") || state.equals("Aborted")) {
-                    String errorMessage = responseJson.has("errorMessage") ? 
-                        responseJson.get("errorMessage").getAsString() : "Unknown error";
-                    throw new IOException("Job failed: " + errorMessage);
-                }
-            }
+            });
+            state = currentState;
             
             if (!state.equals("JobComplete")) {
                 TimeUnit.SECONDS.sleep(1);
@@ -289,33 +537,81 @@ public class BulkV2Client implements AutoCloseable {
         }
     }
 
-    private void downloadResults(String jobId, String objectName, String outputFolder) throws IOException {
-        String url = String.format("%s/services/data/v%s/jobs/query/%s/results", instanceUrl, apiVersion, jobId);
-        
-        HttpGet get = new HttpGet(url);
-        get.setHeader("Authorization", "Bearer " + accessToken);
-        get.setHeader("Accept", "text/csv");
+    private void downloadResults(String jobId, String objectName, String outputFolder) throws IOException, ParseException {
+        String baseUrl = String.format("%s/services/data/v%s/jobs/query/%s/results", instanceUrl, apiVersion, jobId);
         
         Path outputPath = Paths.get(outputFolder, objectName + ".csv");
         Files.createDirectories(outputPath.getParent());
         
-        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null);
-             InputStream inputStream = response.getEntity().getContent();
-             FileOutputStream outputStream = new FileOutputStream(outputPath.toFile())) {
-            
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            long totalBytes = 0;
-            
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
-                totalBytes += bytesRead;
+        long totalBytes = 0;
+        boolean isFirstChunk = true;
+        String locator = null;
+        int chunkCount = 0;
+        
+        // Bulk API v2 uses Sforce-Locator header for pagination
+        // Keep fetching until we get all results
+        do {
+            String url = baseUrl;
+            if (locator != null) {
+                url = baseUrl + "?locator=" + locator;
             }
             
-            logger.info("{}: Downloaded {} bytes to {}", objectName, totalBytes, outputPath);
-        }
+            HttpGet get = new HttpGet(url);
+            get.setHeader("Authorization", "Bearer " + accessToken);
+            get.setHeader("Accept", "text/csv");
+            
+            final boolean appendMode = !isFirstChunk;
+            final String finalUrl = url;
+            
+            String[] result = executeWithRecovery(client -> {
+                try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                    // Check for locator in response header for next page
+                    String nextLocator = null;
+                    if (response.containsHeader("Sforce-Locator")) {
+                        String locatorValue = response.getFirstHeader("Sforce-Locator").getValue();
+                        // "null" string means no more data
+                        if (locatorValue != null && !locatorValue.equals("null") && !locatorValue.isEmpty()) {
+                            nextLocator = locatorValue;
+                        }
+                    }
+                    
+                    long bytesWritten = 0;
+                    try (InputStream inputStream = response.getEntity().getContent();
+                         FileOutputStream outputStream = new FileOutputStream(outputPath.toFile(), appendMode)) {
+                        
+                        java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream));
+                        java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.OutputStreamWriter(outputStream));
+                        
+                        String line;
+                        boolean firstLineOfChunk = true;
+                        while ((line = reader.readLine()) != null) {
+                            // Skip header line for subsequent chunks (avoid duplicate headers)
+                            if (appendMode && firstLineOfChunk) {
+                                firstLineOfChunk = false;
+                                continue;
+                            }
+                            firstLineOfChunk = false;
+                            
+                            writer.write(line);
+                            writer.newLine();
+                            bytesWritten += line.length() + 1;
+                        }
+                        writer.flush();
+                    }
+                    
+                    return new String[] { nextLocator, String.valueOf(bytesWritten) };
+                }
+            });
+            
+            locator = result[0];
+            totalBytes += Long.parseLong(result[1]);
+            chunkCount++;
+            isFirstChunk = false;
+        } while (locator != null);
+        
+        logger.info("{}: Downloaded {} bytes in {} chunk(s) to {}", objectName, totalBytes, chunkCount, outputPath);
     }
-    
+
     /**
      * Download blob content for objects with base64 fields
      * This uses the REST API to download individual blobs after the metadata CSV is created
@@ -477,13 +773,15 @@ public class BulkV2Client implements AutoCloseable {
             HttpGet get = new HttpGet(url);
             get.setHeader("Authorization", "Bearer " + accessToken);
             
-            try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
-                if (response.getCode() >= 400) {
-                    return null;
+            return executeWithRecovery(client -> {
+                try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                    if (response.getCode() >= 400) {
+                        return null;
+                    }
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    return JsonParser.parseString(responseBody).getAsJsonObject();
                 }
-                String responseBody = EntityUtils.toString(response.getEntity());
-                return JsonParser.parseString(responseBody).getAsJsonObject();
-            }
+            });
         } catch (Exception e) {
             logger.debug("Failed to get metadata for {}/{}: {}", objectName, recordId, e.getMessage());
             return null;
@@ -737,27 +1035,31 @@ public class BulkV2Client implements AutoCloseable {
         HttpGet get = new HttpGet(url);
         get.setHeader("Authorization", "Bearer " + accessToken);
         
-        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
-            if (response.getCode() >= 400) {
-                logger.warn("Failed to download blob from {}: HTTP {}", url, response.getCode());
-                return false;
-            }
-            
-            try (InputStream inputStream = response.getEntity().getContent();
-                 FileOutputStream outputStream = new FileOutputStream(outputPath.toFile())) {
-                
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                long totalBytes = 0;
-                
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                    totalBytes += bytesRead;
+        try {
+            return executeWithRecovery(client -> {
+                try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                    if (response.getCode() >= 400) {
+                        logger.warn("Failed to download blob from {}: HTTP {}", url, response.getCode());
+                        return false;
+                    }
+                    
+                    try (InputStream inputStream = response.getEntity().getContent();
+                         FileOutputStream outputStream = new FileOutputStream(outputPath.toFile())) {
+                        
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+                        long totalBytes = 0;
+                        
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                            totalBytes += bytesRead;
+                        }
+                        
+                        logger.debug("Downloaded {} bytes to {}", totalBytes, outputPath.getFileName());
+                        return true;
+                    }
                 }
-                
-                logger.debug("Downloaded {} bytes to {}", totalBytes, outputPath.getFileName());
-                return true;
-            }
+            });
         } catch (Exception e) {
             logger.warn("Exception downloading blob from {}: {}", url, e.getMessage());
             // Clean up partial file if it exists
@@ -778,47 +1080,49 @@ public class BulkV2Client implements AutoCloseable {
         get.setHeader("Authorization", "Bearer " + accessToken);
         get.setHeader("Accept", "application/json");
         
-        try (ClassicHttpResponse response = httpClient.executeOpen(null, get, null)) {
-            int statusCode = response.getCode();
-            if (statusCode != 200) {
-                logger.warn("Failed to get API limits, status: {}", statusCode);
-                return null;
+        return executeWithRecovery(client -> {
+            try (ClassicHttpResponse response = client.executeOpen(null, get, null)) {
+                int statusCode = response.getCode();
+                if (statusCode != 200) {
+                    logger.warn("Failed to get API limits, status: {}", statusCode);
+                    return null;
+                }
+                
+                String responseBody = EntityUtils.toString(response.getEntity());
+                JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
+                
+                ApiLimits limits = new ApiLimits();
+                
+                // Daily API Requests
+                if (json.has("DailyApiRequests")) {
+                    JsonObject dailyApi = json.getAsJsonObject("DailyApiRequests");
+                    limits.dailyApiRequestsUsed = dailyApi.get("Remaining").getAsLong();
+                    limits.dailyApiRequestsMax = dailyApi.get("Max").getAsLong();
+                    // Salesforce returns "Remaining", so calculate used
+                    limits.dailyApiRequestsUsed = limits.dailyApiRequestsMax - limits.dailyApiRequestsUsed;
+                }
+                
+                // Daily Bulk API 2.0 Requests
+                if (json.has("DailyBulkV2QueryFileStorageMB")) {
+                    JsonObject bulkStorage = json.getAsJsonObject("DailyBulkV2QueryFileStorageMB");
+                    limits.bulkApiStorageUsedMB = bulkStorage.get("Max").getAsLong() - bulkStorage.get("Remaining").getAsLong();
+                    limits.bulkApiStorageMaxMB = bulkStorage.get("Max").getAsLong();
+                }
+                
+                // Daily Bulk API Jobs
+                if (json.has("DailyBulkV2QueryJobs")) {
+                    JsonObject bulkJobs = json.getAsJsonObject("DailyBulkV2QueryJobs");
+                    limits.bulkApiJobsUsed = bulkJobs.get("Max").getAsLong() - bulkJobs.get("Remaining").getAsLong();
+                    limits.bulkApiJobsMax = bulkJobs.get("Max").getAsLong();
+                }
+                
+                logger.debug("API Limits - Daily: {}/{}, Bulk Jobs: {}/{}", 
+                    limits.dailyApiRequestsUsed, limits.dailyApiRequestsMax,
+                    limits.bulkApiJobsUsed, limits.bulkApiJobsMax);
+                
+                return limits;
             }
-            
-            String responseBody = EntityUtils.toString(response.getEntity());
-            JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
-            
-            ApiLimits limits = new ApiLimits();
-            
-            // Daily API Requests
-            if (json.has("DailyApiRequests")) {
-                JsonObject dailyApi = json.getAsJsonObject("DailyApiRequests");
-                limits.dailyApiRequestsUsed = dailyApi.get("Remaining").getAsLong();
-                limits.dailyApiRequestsMax = dailyApi.get("Max").getAsLong();
-                // Salesforce returns "Remaining", so calculate used
-                limits.dailyApiRequestsUsed = limits.dailyApiRequestsMax - limits.dailyApiRequestsUsed;
-            }
-            
-            // Daily Bulk API 2.0 Requests
-            if (json.has("DailyBulkV2QueryFileStorageMB")) {
-                JsonObject bulkStorage = json.getAsJsonObject("DailyBulkV2QueryFileStorageMB");
-                limits.bulkApiStorageUsedMB = bulkStorage.get("Max").getAsLong() - bulkStorage.get("Remaining").getAsLong();
-                limits.bulkApiStorageMaxMB = bulkStorage.get("Max").getAsLong();
-            }
-            
-            // Daily Bulk API Jobs
-            if (json.has("DailyBulkV2QueryJobs")) {
-                JsonObject bulkJobs = json.getAsJsonObject("DailyBulkV2QueryJobs");
-                limits.bulkApiJobsUsed = bulkJobs.get("Max").getAsLong() - bulkJobs.get("Remaining").getAsLong();
-                limits.bulkApiJobsMax = bulkJobs.get("Max").getAsLong();
-            }
-            
-            logger.debug("API Limits - Daily: {}/{}, Bulk Jobs: {}/{}", 
-                limits.dailyApiRequestsUsed, limits.dailyApiRequestsMax,
-                limits.bulkApiJobsUsed, limits.bulkApiJobsMax);
-            
-            return limits;
-        }
+        });
     }
     
     /**

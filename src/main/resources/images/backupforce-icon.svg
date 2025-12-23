@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for sky background -->
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1f35;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2d3a5a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a6491;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for mountains -->
+    <linearGradient id="mountainGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3d5a80;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#293241;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="mountainGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5c7a99;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3d5a80;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for database cylinders -->
+    <linearGradient id="dbGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4aa;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#00f5c4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00d4aa;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#skyGradient)" stroke="#00d4aa" stroke-width="4"/>
+  
+  <!-- Stars -->
+  <circle cx="60" cy="50" r="2" fill="#ffffff" opacity="0.8"/>
+  <circle cx="180" cy="40" r="1.5" fill="#ffffff" opacity="0.6"/>
+  <circle cx="200" cy="70" r="2" fill="#ffffff" opacity="0.7"/>
+  <circle cx="45" cy="80" r="1" fill="#ffffff" opacity="0.5"/>
+  <circle cx="150" cy="55" r="1.5" fill="#ffffff" opacity="0.6"/>
+  
+  <!-- Back mountain (darker) -->
+  <path d="M 30 180 L 90 90 L 130 140 L 170 85 L 230 180 Z" 
+        fill="url(#mountainGradient1)" opacity="0.8"/>
+  
+  <!-- Snow caps on back mountain -->
+  <path d="M 90 90 L 80 110 L 100 110 Z" fill="#e0e8f0" opacity="0.7"/>
+  <path d="M 170 85 L 158 108 L 182 108 Z" fill="#e0e8f0" opacity="0.7"/>
+  
+  <!-- Front mountain (lighter) -->
+  <path d="M 10 200 L 70 120 L 110 160 L 128 130 L 150 155 L 190 115 L 250 200 Z" 
+        fill="url(#mountainGradient2)"/>
+  
+  <!-- Snow caps on front mountain -->
+  <path d="M 70 120 L 58 145 L 82 145 Z" fill="#ffffff" opacity="0.9"/>
+  <path d="M 128 130 L 118 150 L 138 150 Z" fill="#ffffff" opacity="0.9"/>
+  <path d="M 190 115 L 178 142 L 202 142 Z" fill="#ffffff" opacity="0.9"/>
+  
+  <!-- Database stack (3 cylinders) - positioned in front of mountains -->
+  <g filter="url(#glow)">
+    <!-- Bottom cylinder -->
+    <ellipse cx="128" cy="220" rx="45" ry="12" fill="#008866"/>
+    <rect x="83" y="195" width="90" height="25" fill="url(#dbGradient)"/>
+    <ellipse cx="128" cy="195" rx="45" ry="12" fill="#00f5c4"/>
+    
+    <!-- Middle cylinder -->
+    <ellipse cx="128" cy="195" rx="45" ry="12" fill="#008866"/>
+    <rect x="83" y="170" width="90" height="25" fill="url(#dbGradient)"/>
+    <ellipse cx="128" cy="170" rx="45" ry="12" fill="#00f5c4"/>
+    
+    <!-- Top cylinder -->
+    <ellipse cx="128" cy="170" rx="45" ry="12" fill="#008866"/>
+    <rect x="83" y="145" width="90" height="25" fill="url(#dbGradient)"/>
+    <ellipse cx="128" cy="145" rx="45" ry="12" fill="#00f5c4"/>
+    
+    <!-- Database lines -->
+    <line x1="88" y1="158" x2="168" y2="158" stroke="#008866" stroke-width="1.5" opacity="0.6"/>
+    <line x1="88" y1="183" x2="168" y2="183" stroke="#008866" stroke-width="1.5" opacity="0.6"/>
+    <line x1="88" y1="208" x2="168" y2="208" stroke="#008866" stroke-width="1.5" opacity="0.6"/>
+  </g>
+  
+  <!-- Sync/backup arrow (circular arrow around database) -->
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.9">
+    <!-- Right arrow going up -->
+    <path d="M 180 190 C 195 175 195 160 180 145"/>
+    <polygon points="178,140 185,148 175,150" fill="#ffffff" stroke="none"/>
+    
+    <!-- Left arrow going down -->
+    <path d="M 76 155 C 61 170 61 185 76 200"/>
+    <polygon points="78,205 71,197 81,195" fill="#ffffff" stroke="none"/>
+  </g>
+  
+  <!-- Lightning bolt accent (for "Force") -->
+  <g fill="#ffd700" opacity="0.9">
+    <path d="M 128 40 L 120 70 L 132 70 L 125 95 L 145 60 L 133 60 L 140 40 Z"/>
+  </g>
+</svg>

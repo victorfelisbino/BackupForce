@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.collections.FXCollections?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import java.lang.String?>
 
 <!-- Backup Content Panel - loaded into MainController's content area -->
 <VBox xmlns:fx="http://javafx.com/fxml" 
@@ -167,6 +169,20 @@
                         <Label text="(0 = unlimited)" styleClass="form-hint"/>
                     </HBox>
                     
+                    <!-- Custom WHERE Clause -->
+                    <VBox spacing="6">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <CheckBox fx:id="customWhereCheckbox" text="Custom WHERE Clause" 
+                                      styleClass="form-checkbox" onAction="#handleCustomWhereToggle"/>
+                            <Label text="(SOQL filter)" styleClass="form-hint"/>
+                        </HBox>
+                        <TextArea fx:id="customWhereField" prefRowCount="2" prefWidth="400"
+                                  styleClass="form-input" promptText="e.g., AccountNumber != null AND CreatedDate > 2024-01-01T00:00:00Z"
+                                  disable="true" wrapText="true" style="-fx-font-family: monospace; -fx-font-size: 11px;"/>
+                        <Label text="Enter WHERE clause without 'WHERE' keyword. Applied to all selected objects (ignored if field doesn't exist)." 
+                               styleClass="form-hint" style="-fx-padding: 0 0 0 24; -fx-wrap-text: true;"/>
+                    </VBox>
+                    
                     <VBox spacing="8">
                         <HBox spacing="8" alignment="CENTER_LEFT">
                             <CheckBox fx:id="incrementalBackupCheckbox" text="Incremental Backup" 
@@ -185,9 +201,37 @@
                     
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <CheckBox fx:id="preserveRelationshipsCheckbox" text="Preserve Relationships" 
-                                  styleClass="form-checkbox" selected="true"/>
+                                  styleClass="form-checkbox"/>
                         <Label text="(for restore)" styleClass="form-hint"/>
                     </HBox>
+                    
+                    <!-- Relationship-Aware Backup Options -->
+                    <VBox spacing="8">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <CheckBox fx:id="includeRelatedRecordsCheckbox" text="Include Related Records" 
+                                      styleClass="form-checkbox"/>
+                            <Label text="(when using record limit)" styleClass="form-hint"/>
+                        </HBox>
+                        <HBox spacing="8" alignment="CENTER_LEFT" style="-fx-padding: 0 0 0 24;">
+                            <Label text="Depth:" styleClass="form-label"/>
+                            <ComboBox fx:id="relationshipDepthCombo" prefWidth="120" styleClass="form-input" disable="true">
+                                <items>
+                                    <FXCollections fx:factory="observableArrayList">
+                                        <String fx:value="1 - Direct children"/>
+                                        <String fx:value="2 - + Grandchildren"/>
+                                        <String fx:value="3 - Deep hierarchy"/>
+                                    </FXCollections>
+                                </items>
+                            </ComboBox>
+                            <CheckBox fx:id="priorityObjectsOnlyCheckbox" text="Priority objects only" 
+                                      styleClass="form-checkbox" disable="true"/>
+                            <Button fx:id="previewRelationshipsButton" text="👁 Preview" 
+                                    onAction="#handlePreviewRelationships" styleClass="btn btn-ghost" 
+                                    style="-fx-font-size: 11px;" disable="true"/>
+                        </HBox>
+                        <Label text="Automatically include child records (Contacts, Opportunities, etc.) for backed-up parents" 
+                               styleClass="form-hint" style="-fx-padding: 0 0 0 24;"/>
+                    </VBox>
                 </VBox>
                 
                 <!-- Progress Panel -->

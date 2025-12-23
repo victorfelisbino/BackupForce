@@ -786,6 +786,10 @@
 }
 
 .check-box .mark {
+    -fx-background-color: transparent;
+}
+
+.check-box:selected .mark {
     -fx-background-color: white;
 }
 
@@ -1380,6 +1384,15 @@
 .form-input:focused {
     -fx-border-color: #58a6ff;
     -fx-border-width: 2;
+}
+
+/* TextArea content styling */
+.form-input .content {
+    -fx-background-color: #0d1117;
+}
+
+.form-input .text {
+    -fx-fill: #e6edf3;
 }
 
 .form-combo {
