@@ -8,7 +8,7 @@ This document outlines the development roadmap for BackupForce — the free, ope
 
 ## 🎯 Overview
 
-BackupForce is designed to be the best **free alternative** to expensive Salesforce backup tools like OwnBackup ($6K+/year), Spanning, and Gearset. Our goal is to provide enterprise-grade backup and recovery features at zero cost, built by Salesforce admins for the community.
+BackupForce is an open-source Salesforce backup and recovery tool. Our goal is to provide enterprise-grade backup and recovery features, built by Salesforce admins for the community.
 
 ### Key Differentiators
 - **100% Free** - No subscriptions, no per-user pricing, no storage limits
@@ -526,23 +526,6 @@ Based on common Salesforce pain points from the community.
 | Phase 12 | ⏳ February 2026 (Scheduled Backups) |
 | Phase 13 | ⏳ March 2026 (CLI) |
 | Phase 14-15 | ⏳ Q2 2026 (Advanced Features) |
-
----
-
-## 🏆 Why BackupForce vs Paid Alternatives
-
-| Feature | BackupForce | OwnBackup | Spanning | Gearset |
-|---------|-------------|-----------|----------|---------|
-| **Price** | **$0** | $6K+/year | ~$432/year | ~$5K+/year |
-| Data Backup | ✅ | ✅ | ✅ | ✅ |
-| Data Restore | ✅ | ✅ | ✅ | ✅ |
-| Relationship-Aware | 🔥 Coming | Partial | Partial | Partial |
-| Cascade Delete | 🔥 Coming | ❌ | ❌ | ❌ |
-| Blob/Attachments | ✅ | ✅ | ✅ | ✅ |
-| Cross-Org Transform | ✅ | ✅ | ❌ | ✅ |
-| Open Source | ✅ | ❌ | ❌ | ❌ |
-| Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| No Java Required | ✅ | N/A | N/A | N/A |
 
 ---
 
