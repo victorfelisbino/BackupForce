@@ -3,30 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BackupForce - Free Salesforce Backup Tool</title>
-    <meta name="description" content="100% FREE Salesforce backup tool. Export data to CSV, Snowflake, PostgreSQL, or SQL Server. Download blobs and attachments automatically. No subscription, no limits.">
+    <title>BackupForce - Salesforce Backup Tool</title>
+    <meta name="description" content="Desktop application for backing up and restoring Salesforce data using Bulk API v2. Export to CSV, Snowflake, PostgreSQL, or SQL Server.">
     <meta name="theme-color" content="#0d1117">
-    <meta property="og:title" content="BackupForce - Free Salesforce Backup Tool">
-    <meta property="og:description" content="Export millions of Salesforce records for free. CSV, databases, attachments - all included.">
-    <meta property="og:type" content="website">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #0d1117;
             --bg-secondary: #161b22;
-            --bg-card: rgba(33, 38, 45, 0.9);
-            --bg-card-hover: rgba(48, 54, 61, 0.95);
+            --bg-card: #21262d;
             --text-primary: #f0f6fc;
             --text-secondary: #8b949e;
-            --accent: #3fb950;
-            --accent-hover: #56d364;
-            --accent-blue: #58a6ff;
-            --accent-purple: #a371f7;
-            --accent-orange: #f0883e;
-            --border: rgba(48, 54, 61, 0.7);
-            --glow: rgba(63, 185, 80, 0.4);
+            --accent: #58a6ff;
+            --accent-green: #3fb950;
+            --border: #30363d;
+            --code-bg: #161b22;
         }
 
         * {
@@ -35,1467 +28,434 @@
             box-sizing: border-box;
         }
 
-        html {
-            scroll-behavior: smooth;
-        }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* Background */
-        .nature-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                linear-gradient(180deg, rgba(13, 17, 23, 0.8) 0%, rgba(13, 17, 23, 0.5) 40%, rgba(13, 17, 23, 0.7) 70%, rgba(13, 17, 23, 0.98) 100%),
-                url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80') center/cover no-repeat fixed;
-            z-index: -1;
         }
 
         .container {
-            max-width: 1100px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
         }
 
-        /* Top Banner */
-        .free-banner {
-            background: linear-gradient(90deg, var(--accent), #2ea043);
-            color: var(--bg-primary);
-            text-align: center;
-            padding: 10px 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .free-banner::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: shimmer 3s infinite;
-        }
-
-        @keyframes shimmer {
-            100% { left: 100%; }
-        }
-
-        /* Navigation */
-        nav {
-            background: rgba(13, 17, 23, 0.9);
-            backdrop-filter: blur(12px);
+        /* Header */
+        header {
             border-bottom: 1px solid var(--border);
-            padding: 12px 0;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
+            padding: 16px 0;
         }
 
-        nav .container {
+        header .container {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .logo {
-            font-size: 1.4rem;
-            font-weight: 800;
+            font-size: 1.25rem;
+            font-weight: 700;
             color: var(--text-primary);
             text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 24px;
-            list-style: none;
-        }
-
-        .nav-links a {
+        nav a {
             color: var(--text-secondary);
             text-decoration: none;
-            font-weight: 500;
+            margin-left: 24px;
             font-size: 0.9rem;
-            transition: color 0.2s;
         }
 
-        .nav-links a:hover {
+        nav a:hover {
             color: var(--accent);
         }
 
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 5px;
+        /* Main Content */
+        main {
+            padding: 48px 0;
         }
 
-        .mobile-menu {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(13, 17, 23, 0.98);
-            z-index: 2000;
-            padding: 20px;
-        }
-
-        .mobile-menu.active {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .mobile-menu-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-        }
-
-        .mobile-menu-close {
-            background: none;
-            border: none;
-            color: var(--text-primary);
+        h1 {
             font-size: 2rem;
-            cursor: pointer;
+            margin-bottom: 16px;
         }
 
-        .mobile-menu-links {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 32px;
         }
 
-        .mobile-menu-links a {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-size: 1.3rem;
-            font-weight: 600;
-            display: block;
-            padding: 15px 0;
+        h2 {
+            font-size: 1.25rem;
+            margin: 48px 0 16px;
+            padding-bottom: 8px;
             border-bottom: 1px solid var(--border);
         }
 
-        /* Hero Section */
-        .hero {
-            text-align: center;
-            padding: 60px 20px 50px;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(63, 185, 80, 0.15);
-            border: 1px solid var(--accent);
-            color: var(--accent);
-            padding: 6px 14px;
-            border-radius: 50px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-
-        .hero h1 {
-            font-size: clamp(2rem, 6vw, 3.5rem);
-            font-weight: 800;
-            margin-bottom: 16px;
-            background: linear-gradient(135deg, #ffffff 0%, var(--accent) 50%, var(--accent-blue) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.1;
-        }
-
-        .hero-subtitle {
-            font-size: clamp(1rem, 2.5vw, 1.2rem);
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto 24px;
-        }
-
-        .hero-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 30px;
-        }
-
-        .btn-primary {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: var(--accent);
-            color: var(--bg-primary);
-            padding: 14px 28px;
-            border-radius: 10px;
-            text-decoration: none;
+        h3 {
             font-size: 1rem;
-            font-weight: 700;
-            transition: all 0.3s;
-            box-shadow: 0 4px 20px var(--glow);
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-hover);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.1);
+            margin: 24px 0 12px;
             color: var(--text-primary);
-            padding: 14px 28px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-size: 1rem;
-            font-weight: 600;
-            border: 1px solid var(--border);
-            transition: all 0.3s;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: var(--accent);
+        p {
+            margin-bottom: 16px;
+            color: var(--text-secondary);
         }
 
-        .hero-stats {
+        /* Download Section */
+        .downloads {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            max-width: 600px;
-            margin: 0 auto;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin: 24px 0;
         }
 
-        .stat {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--accent);
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-        }
-
-        /* Tabs Navigation for Content */
-        .content-tabs {
-            padding: 40px 20px 0;
-        }
-
-        .tab-nav {
-            display: flex;
-            justify-content: center;
-            gap: 4px;
-            background: rgba(22, 27, 34, 0.8);
-            padding: 6px;
-            border-radius: 12px;
-            max-width: 600px;
-            margin: 0 auto 30px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-
-        .tab-nav::-webkit-scrollbar {
-            display: none;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 12px 20px;
+        .download-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .tab-btn:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .tab-btn.active {
-            background: var(--accent);
-            color: var(--bg-primary);
-        }
-
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Features Tab */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            margin-bottom: 40px;
-        }
-
-        .feature-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            transition: all 0.3s;
-        }
-
-        .feature-card:hover {
-            border-color: var(--accent);
-            transform: translateY(-3px);
-        }
-
-        .feature-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .feature-icon {
-            font-size: 1.5rem;
-        }
-
-        .feature-card h3 {
-            font-size: 1rem;
-            color: var(--text-primary);
-        }
-
-        .feature-card p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        /* Databases Tab */
-        .db-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            max-width: 800px;
-            margin: 0 auto 30px;
-        }
-
-        .db-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .db-card:hover {
-            border-color: var(--accent-blue);
-            transform: translateY(-3px);
-        }
-
-        .db-icon {
-            font-size: 2.5rem;
-            margin-bottom: 12px;
-        }
-
-        .db-card h4 {
-            font-size: 1.1rem;
-            margin-bottom: 6px;
-        }
-
-        .db-card span {
-            color: var(--accent);
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        /* Steps Section */
-        .steps-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-            max-width: 900px;
-            margin: 0 auto 30px;
-        }
-
-        .step-card {
-            text-align: center;
             padding: 20px;
+            text-align: center;
         }
 
-        .step-number {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
-            color: var(--bg-primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            font-weight: 800;
-            margin: 0 auto 16px;
-        }
-
-        .step-card h4 {
-            font-size: 1rem;
+        .download-card h4 {
             margin-bottom: 8px;
         }
 
-        .step-card p {
-            color: var(--text-secondary);
+        .download-card a {
+            color: var(--accent);
+            text-decoration: none;
             font-size: 0.9rem;
         }
 
-        /* Roadmap Tab */
-        .roadmap-grid {
-            display: grid;
-            gap: 16px;
-            max-width: 800px;
-            margin: 0 auto;
+        .download-card a:hover {
+            text-decoration: underline;
         }
 
-        .roadmap-item {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 24px;
-            border: 1px solid var(--border);
-        }
-
-        .roadmap-item.complete { border-left: 3px solid var(--accent); }
-        .roadmap-item.coming-soon { border-left: 3px solid var(--accent-orange); }
-        .roadmap-item.planned { border-left: 3px solid var(--accent-purple); }
-
-        .roadmap-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-
-        .roadmap-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .roadmap-badge.complete { background: var(--accent); color: var(--bg-primary); }
-        .roadmap-badge.coming-soon { background: var(--accent-orange); color: var(--bg-primary); }
-        .roadmap-badge.planned { background: var(--accent-purple); color: var(--bg-primary); }
-        .roadmap-badge.future { background: var(--border); color: var(--text-primary); }
-
-        .roadmap-item h3 {
-            font-size: 1.1rem;
-        }
-
-        .roadmap-list {
-            list-style: none;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 8px;
-        }
-
-        .roadmap-list li {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .roadmap-list li::before {
-            content: '✓';
-            color: var(--accent);
-            font-weight: bold;
-        }
-
-        .roadmap-item.coming-soon .roadmap-list li::before,
-        .roadmap-item.planned .roadmap-list li::before,
-        .roadmap-item.future .roadmap-list li::before {
-            content: '○';
-            color: var(--text-secondary);
-        }
-
-        /* Privacy Section */
-        .privacy-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            max-width: 800px;
-            margin: 0 auto 24px;
-        }
-
-        .privacy-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .privacy-icon {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
-
-        .privacy-card h4 {
-            font-size: 1rem;
-            margin-bottom: 8px;
-        }
-
-        .privacy-card p {
-            color: var(--text-secondary);
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
             font-size: 0.9rem;
         }
 
-        /* Why Free Section */
-        .why-free-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .why-free-card {
-            background: var(--bg-card);
+        th, td {
+            padding: 12px;
+            text-align: left;
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
         }
 
-        .why-free-icon {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
-
-        .why-free-card h3 {
-            font-size: 1rem;
-            margin-bottom: 8px;
-            color: var(--accent);
-        }
-
-        .why-free-card p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        /* Section Headers */
-        .section-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .section-header h2 {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
-        }
-
-        .section-header p {
-            color: var(--text-secondary);
-            max-width: 500px;
-            margin: 0 auto;
-        }
-
-        /* CTA Section */
-        .cta {
-            padding: 60px 20px;
-            text-align: center;
-            background: linear-gradient(180deg, transparent, rgba(63, 185, 80, 0.08));
-        }
-
-        .cta h2 {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
-
-        .cta p {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            margin-bottom: 24px;
-        }
-
-        .cta-features {
-            display: flex;
-            justify-content: center;
-            gap: 24px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-        }
-
-        .cta-feature {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--accent);
+        th {
+            background: var(--bg-secondary);
             font-weight: 600;
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        /* Code */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+
+        /* Feature List */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .feature {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .feature h4 {
             font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .feature p {
+            font-size: 0.85rem;
+            margin: 0;
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        /* Links */
+        a {
+            color: var(--accent);
         }
 
         /* Footer */
         footer {
-            background: rgba(13, 17, 23, 0.95);
             border-top: 1px solid var(--border);
-            padding: 40px 20px;
-        }
-
-        .footer-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 40px;
-            max-width: 900px;
-            margin: 0 auto 30px;
-        }
-
-        .footer-brand h3 {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-        }
-
-        .footer-brand p {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-
-        .footer-links h4 {
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-        }
-
-        .footer-links ul {
-            list-style: none;
-        }
-
-        .footer-links li {
-            margin-bottom: 10px;
-        }
-
-        .footer-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: color 0.2s;
-        }
-
-        .footer-links a:hover {
-            color: var(--accent);
-        }
-
-        .footer-bottom {
+            padding: 24px 0;
+            margin-top: 48px;
             text-align: center;
-            padding-top: 24px;
-            border-top: 1px solid var(--border);
-        }
-
-        .footer-bottom p {
             color: var(--text-secondary);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
         }
 
-        .footer-bottom a {
-            color: var(--accent-blue);
-            text-decoration: none;
-        }
-
-        .disclaimer {
-            margin-top: 12px;
-            font-size: 0.7rem;
-            color: #6e7681;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        /* Responsive Design */
+        /* Responsive */
         @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-
-            .mobile-menu-btn {
-                display: block;
-            }
-
-            .hero {
-                padding: 40px 20px 30px;
-            }
-
-            .hero-stats {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 16px;
-            }
-
-            .stat-value {
-                font-size: 1.5rem;
-            }
-
-            .preview-tabs {
-                gap: 6px;
-            }
-
-            .preview-tab {
-                padding: 8px 14px;
-                font-size: 0.8rem;
-            }
-
-            .tab-nav {
-                display: none;
-            }
-
-            .tab-content {
-                display: block !important;
-                margin-bottom: 50px;
-                padding-bottom: 30px;
-                border-bottom: 1px solid var(--border);
-            }
-
-            .tab-content:last-child {
-                border-bottom: none;
-                margin-bottom: 0;
-            }
-
-            .content-tabs {
-                padding: 30px 15px 0;
-            }
-
-            .section-header {
-                margin-bottom: 20px;
-            }
-
-            .section-header h2 {
-                font-size: 1.4rem;
-            }
-
-            .section-header p {
-                font-size: 0.9rem;
-            }
-
-            .features-grid {
-                gap: 12px;
-            }
-
-            .feature-card {
-                padding: 20px;
-            }
-
-            .roadmap-item {
-                padding: 20px;
-            }
-
-            .roadmap-list {
+            .downloads {
                 grid-template-columns: 1fr;
             }
-
-            .privacy-grid {
-                gap: 12px;
-            }
-
-            .privacy-card {
-                padding: 20px;
-            }
-
-            .why-free-grid {
-                gap: 12px;
-            }
-
-            .why-free-card {
-                padding: 20px;
-            }
-
-            .steps-grid {
-                gap: 16px;
-            }
-
-            .footer-content {
-                grid-template-columns: 1fr;
-                gap: 30px;
-                text-align: center;
-            }
-
-            .hero-buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn-primary, .btn-secondary {
-                width: 100%;
-                max-width: 280px;
-                justify-content: center;
-            }
-
-            .cta-features {
-                flex-direction: column;
-                gap: 12px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .free-banner {
-                font-size: 0.8rem;
-                padding: 8px 15px;
-            }
-
-            .db-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .steps-grid {
+            .features {
                 grid-template-columns: 1fr;
             }
-        }
-
-        /* Scroll to Top Button */
-        .scroll-top {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 44px;
-            height: 44px;
-            background: var(--accent);
-            color: var(--bg-primary);
-            border: none;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            cursor: pointer;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-            z-index: 999;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .scroll-top.visible {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .scroll-top:hover {
-            background: var(--accent-hover);
-            transform: translateY(-2px);
+            nav a {
+                margin-left: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="nature-bg"></div>
-
-    <!-- Free Banner -->
-    <div class="free-banner">
-        🎉 100% FREE — No subscriptions, no limits, no credit card. Forever free!
-    </div>
-
-    <!-- Navigation -->
-    <nav>
+    <header>
         <div class="container">
-            <a href="#" class="logo">
-                <div class="logo-icon">⚡</div>
-                BackupForce
-            </a>
-            <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#databases">Databases</a></li>
-                <li><a href="#compare">Compare</a></li>
-                <li><a href="#roadmap">Roadmap</a></li>
-                <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub</a></li>
+            <a href="#" class="logo">BackupForce</a>
+            <nav>
+                <a href="#downloads">Downloads</a>
+                <a href="#architecture">Architecture</a>
+                <a href="#features">Features</a>
+                <a href="https://github.com/victorfelisbino/BackupForce">GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>BackupForce</h1>
+            <p class="subtitle">Desktop application for backing up and restoring Salesforce data using Bulk API v2. Supports CSV export and direct database integration.</p>
+
+            <h2 id="downloads">Downloads</h2>
+            <p>Pre-built releases with bundled Java runtime. No additional software required.</p>
+            
+            <div class="downloads">
+                <div class="download-card">
+                    <h4>Windows</h4>
+                    <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">BackupForce-portable.zip</a>
+                </div>
+                <div class="download-card">
+                    <h4>macOS</h4>
+                    <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">BackupForce.dmg</a>
+                </div>
+                <div class="download-card">
+                    <h4>Linux</h4>
+                    <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">backupforce.tar.gz</a>
+                </div>
+            </div>
+
+            <h2 id="architecture">Architecture</h2>
+            <div class="architecture">┌─────────────────────────────────────────────────────────────┐
+│                        BackupForce                           │
+├─────────────────────────────────────────────────────────────┤
+│  UI Layer (JavaFX)                                           │
+│  ├── FXML Controllers                                        │
+│  └── CSS Theming                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Service Layer                                               │
+│  ├── BackupService (5 parallel workers)                      │
+│  ├── RestoreService (relationship resolution)                │
+│  └── TransformationService (cross-org mapping)               │
+├─────────────────────────────────────────────────────────────┤
+│  API Layer                                                   │
+│  ├── BulkV2Client (Bulk API v2 + connection recovery)        │
+│  ├── SalesforceClient (REST API for metadata)                │
+│  └── OAuthManager (OAuth 2.0)                                │
+├─────────────────────────────────────────────────────────────┤
+│  Storage Layer                                               │
+│  ├── CsvExporter                                             │
+│  ├── DatabaseExporter (Snowflake, PostgreSQL, SQL Server)    │
+│  └── BlobDownloader                                          │
+└─────────────────────────────────────────────────────────────┘</div>
+
+            <h3>Key Components</h3>
+            <table>
+                <tr>
+                    <th>Component</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>BulkV2Client</code></td>
+                    <td>HTTP client with connection pool recovery and version tracking</td>
+                </tr>
+                <tr>
+                    <td><code>BackupService</code></td>
+                    <td>Multi-threaded orchestration with 5 parallel workers</td>
+                </tr>
+                <tr>
+                    <td><code>RestoreService</code></td>
+                    <td>Insert/Update/Upsert with OldId → NewId mapping</td>
+                </tr>
+                <tr>
+                    <td><code>TransformationService</code></td>
+                    <td>Cross-org RecordType, picklist, and user mapping</td>
+                </tr>
+            </table>
+
+            <h2 id="features">Features</h2>
+            
+            <h3>Backup</h3>
+            <div class="features">
+                <div class="feature">
+                    <h4>Bulk API v2</h4>
+                    <p>Efficient export for large datasets (millions of records)</p>
+                </div>
+                <div class="feature">
+                    <h4>Field Selection</h4>
+                    <p>Select specific fields per object</p>
+                </div>
+                <div class="feature">
+                    <h4>Blob Export</h4>
+                    <p>Attachment.Body, ContentVersion.VersionData, Document.Body</p>
+                </div>
+                <div class="feature">
+                    <h4>Parallel Processing</h4>
+                    <p>5 concurrent worker threads</p>
+                </div>
+            </div>
+
+            <h3>Database Integration</h3>
+            <table>
+                <tr>
+                    <th>Database</th>
+                    <th>Blob Storage</th>
+                    <th>SSO</th>
+                </tr>
+                <tr>
+                    <td>Snowflake</td>
+                    <td><code>BINARY(8MB)</code></td>
+                    <td>Externalbrowser</td>
+                </tr>
+                <tr>
+                    <td>PostgreSQL</td>
+                    <td><code>BYTEA</code></td>
+                    <td>—</td>
+                </tr>
+                <tr>
+                    <td>SQL Server</td>
+                    <td><code>VARBINARY(MAX)</code></td>
+                    <td>—</td>
+                </tr>
+                <tr>
+                    <td>CSV</td>
+                    <td>File + path column</td>
+                    <td>—</td>
+                </tr>
+            </table>
+
+            <h3>Restore</h3>
+            <div class="features">
+                <div class="feature">
+                    <h4>Relationship Resolution</h4>
+                    <p>Automatically resolves lookup references during restore</p>
+                </div>
+                <div class="feature">
+                    <h4>Dependency Ordering</h4>
+                    <p>Restores parent objects before children</p>
+                </div>
+                <div class="feature">
+                    <h4>Cross-Org Transformation</h4>
+                    <p>Maps metadata between different orgs</p>
+                </div>
+                <div class="feature">
+                    <h4>Dry Run</h4>
+                    <p>Preview transformations before execution</p>
+                </div>
+            </div>
+
+            <h2>Backup Output</h2>
+            <table>
+                <tr>
+                    <th>File</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td><code>ObjectName.csv</code></td>
+                    <td>Record data with IDs and lookup references</td>
+                </tr>
+                <tr>
+                    <td><code>_backup_manifest.json</code></td>
+                    <td>Relationship metadata and restore order</td>
+                </tr>
+                <tr>
+                    <td><code>_id_mapping.json</code></td>
+                    <td>ID to external identifier mappings</td>
+                </tr>
+            </table>
+
+            <h2>Requirements</h2>
+            <h3>Pre-built Releases</h3>
+            <p>Windows 10/11, macOS 11+, or Linux (Ubuntu 20.04+, RHEL 8+)</p>
+            
+            <h3>Building from Source</h3>
+            <p>Java 21+, Maven 3.9+</p>
+            <pre><code>git clone https://github.com/victorfelisbino/BackupForce.git
+cd BackupForce
+mvn javafx:run</code></pre>
+
+            <h2>Configuration</h2>
+            <h3>Memory</h3>
+            <p>Default: 4GB heap. Adjust for large objects:</p>
+            <pre><code>java -Xmx8g -jar BackupForce.jar</code></pre>
+
+            <h3>OAuth</h3>
+            <p>Configure Connected App in Salesforce Setup. See <a href="OAUTH_SETUP.md">OAUTH_SETUP.md</a>.</p>
+
+            <h2>Documentation</h2>
+            <ul style="color: var(--text-secondary); margin-left: 20px;">
+                <li><a href="OAUTH_SETUP.md">OAuth Setup</a> - Configure Salesforce Connected App</li>
+                <li><a href="BUILD_EXECUTABLE.md">Build Guide</a> - Create native executables</li>
+                <li><a href="ROADMAP.md">Roadmap</a> - Planned features</li>
+                <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub Repository</a></li>
             </ul>
-            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
         </div>
-    </nav>
+    </main>
 
-    <!-- Mobile Menu -->
-    <div class="mobile-menu" id="mobileMenu">
-        <div class="mobile-menu-header">
-            <a href="#" class="logo">
-                <div class="logo-icon">⚡</div>
-                BackupForce
-            </a>
-            <button class="mobile-menu-close" onclick="toggleMobileMenu()">×</button>
-        </div>
-        <ul class="mobile-menu-links">
-            <li><a href="#features" onclick="toggleMobileMenu()">Features</a></li>
-            <li><a href="#databases" onclick="toggleMobileMenu()">Databases</a></li>
-            <li><a href="#compare" onclick="toggleMobileMenu()">Compare</a></li>
-            <li><a href="#roadmap" onclick="toggleMobileMenu()">Roadmap</a></li>
-            <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub</a></li>
-        </ul>
-    </div>
-
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="hero-badge">
-                <span>✨</span> v3.0.0 — Windows, macOS & Linux
-            </div>
-            <h1>Backup Your Salesforce<br>Data for Free</h1>
-            <p class="hero-subtitle">Export millions of records to CSV or databases. Beautiful interface, zero cost.</p>
-            
-            <div class="hero-buttons">
-                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="btn-primary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
-                    </svg>
-                    Download Free
-                </a>
-                <a href="https://github.com/victorfelisbino/BackupForce" class="btn-secondary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/>
-                    </svg>
-                    View on GitHub
-                </a>
-            </div>
-            
-            <div class="platform-downloads" style="display: flex; gap: 20px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
-                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest/download/BackupForce-3.0.0-windows-portable.zip" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; transition: color 0.2s;">
-                    <span style="font-size: 1.1rem;">🪟</span> Windows
-                </a>
-                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest/download/BackupForce-3.0.0.dmg" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; transition: color 0.2s;">
-                    <span style="font-size: 1.1rem;">🍎</span> macOS
-                </a>
-                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest/download/backupforce_3.0.0_amd64.deb" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; transition: color 0.2s;">
-                    <span style="font-size: 1.1rem;">🐧</span> Linux
-                </a>
-            </div>
-
-            <div class="hero-stats">
-                <div class="stat">
-                    <div class="stat-value">$0</div>
-                    <div class="stat-label">Cost Forever</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value">530+</div>
-                    <div class="stat-label">Tests</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value">∞</div>
-                    <div class="stat-label">Records</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value">0</div>
-                    <div class="stat-label">Java Needed</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Main Content Tabs -->
-    <section class="content-tabs">
-        <div class="container">
-            <div class="tab-nav">
-                <button class="tab-btn active" onclick="showTab('features')">✨ Features</button>
-                <button class="tab-btn" onclick="showTab('databases')">🗄️ Databases</button>
-                <button class="tab-btn" onclick="showTab('compare')">📊 Compare</button>
-                <button class="tab-btn" onclick="showTab('roadmap')">🗺️ Roadmap</button>
-                <button class="tab-btn" onclick="showTab('privacy')">🔒 Privacy</button>
-            </div>
-
-            <!-- Features Tab -->
-            <div class="tab-content active" id="tab-features">
-                <div class="section-header">
-                    <h2>✨ Powerful Features</h2>
-                    <p>Everything you need to backup and protect your Salesforce data</p>
-                </div>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">⚡</span>
-                            <h3>Bulk API v2</h3>
-                        </div>
-                        <p>Export millions of records efficiently using Salesforce's recommended API.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">🎯</span>
-                            <h3>Field Selection</h3>
-                        </div>
-                        <p>Choose exactly which fields to export. No bloated backups.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">📎</span>
-                            <h3>Blob Downloads</h3>
-                        </div>
-                        <p>Automatically download attachments and files with binary content.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">🔐</span>
-                            <h3>OAuth Security</h3>
-                        </div>
-                        <p>Login through Salesforce's official OAuth. Password never stored.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">🔄</span>
-                            <h3>Multi-threaded</h3>
-                        </div>
-                        <p>Parallel processing for faster backups of multiple objects.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-header">
-                            <span class="feature-icon">💻</span>
-                            <h3>Cross-Platform</h3>
-                        </div>
-                        <p>Native apps for Windows, macOS, and Linux. No Java required.</p>
-                    </div>
-                </div>
-
-                <div class="section-header" style="margin-top: 50px;">
-                    <h2>🚀 Get Started in Minutes</h2>
-                </div>
-                <div class="steps-grid">
-                    <div class="step-card">
-                        <div class="step-number">1</div>
-                        <h4>Download & Extract</h4>
-                        <p>Get the ZIP and extract anywhere. No installer needed.</p>
-                    </div>
-                    <div class="step-card">
-                        <div class="step-number">2</div>
-                        <h4>Login to Salesforce</h4>
-                        <p>Authorize securely through your browser with OAuth.</p>
-                    </div>
-                    <div class="step-card">
-                        <div class="step-number">3</div>
-                        <h4>Select & Backup</h4>
-                        <p>Pick objects, choose fields, and start your backup.</p>
-                    </div>
-                </div>
-
-                <div class="section-header" style="margin-top: 50px;">
-                    <h2>💚 Why Is It Free?</h2>
-                </div>
-                <div class="why-free-grid">
-                    <div class="why-free-card">
-                        <div class="why-free-icon">🎁</div>
-                        <h3>Open Source</h3>
-                        <p>Full source code on GitHub. Inspect, modify, or contribute.</p>
-                    </div>
-                    <div class="why-free-card">
-                        <div class="why-free-icon">🚫</div>
-                        <h3>No Paywalls</h3>
-                        <p>All features included. No "Pro" version or limits.</p>
-                    </div>
-                    <div class="why-free-card">
-                        <div class="why-free-icon">❤️</div>
-                        <h3>Built with Love</h3>
-                        <p>By a Salesforce admin tired of expensive solutions.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Databases Tab -->
-            <div class="tab-content" id="tab-databases">
-                <div class="section-header">
-                    <h2>🗄️ Export Anywhere</h2>
-                    <p>Your data, your destination. Choose where your backups go.</p>
-                </div>
-                <div class="db-grid">
-                    <div class="db-card">
-                        <div class="db-icon">❄️</div>
-                        <h4>Snowflake</h4>
-                        <span>✓ BINARY blobs</span>
-                    </div>
-                    <div class="db-card">
-                        <div class="db-icon">🐘</div>
-                        <h4>PostgreSQL</h4>
-                        <span>✓ BYTEA blobs</span>
-                    </div>
-                    <div class="db-card">
-                        <div class="db-icon">🔷</div>
-                        <h4>SQL Server</h4>
-                        <span>✓ VARBINARY</span>
-                    </div>
-                    <div class="db-card">
-                        <div class="db-icon">📄</div>
-                        <h4>CSV Files</h4>
-                        <span>✓ Universal</span>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 30px; padding: 24px; background: var(--bg-card); border-radius: 12px; max-width: 600px; margin-left: auto; margin-right: auto;">
-                    <h4 style="margin-bottom: 12px;">🔗 Direct Database Integration</h4>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Stream your Salesforce data directly to your data warehouse. No intermediate files, no manual imports. Configure once, backup anytime.</p>
-                </div>
-            </div>
-
-            <!-- Compare Tab -->
-            <div class="tab-content" id="tab-compare">
-                <div class="section-header">
-                    <h2>📊 Why BackupForce?</h2>
-                    <p>Enterprise-grade backup without the enterprise price tag</p>
-                </div>
-                
-                <div style="overflow-x: auto; margin-bottom: 30px;">
-                    <table style="width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 12px; overflow: hidden; min-width: 400px;">
-                        <thead>
-                            <tr style="background: rgba(63, 185, 80, 0.15);">
-                                <th style="padding: 16px; text-align: left; border-bottom: 1px solid var(--border);">Feature</th>
-                                <th style="padding: 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent);">BackupForce</th>
-                            </tr>
-                        </thead>
-                        <tbody style="color: var(--text-secondary);">
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">💰 <strong>Cost</strong></td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); color: var(--accent); font-weight: 700;">Open Source</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📤 Data Backup</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ Bulk API v2</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📥 Data Restore</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ With Relationship Resolution</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">📎 Blob/Attachments</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ Full Support</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🔄 Cross-Org Transform</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ RecordTypes, Picklists, Users</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🔗 Relationship-Aware Backup</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ With Manifest Generation</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">💻 Open Source</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ MIT License</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px; border-bottom: 1px solid var(--border);">🏠 Self-Hosted</td>
-                                <td style="padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border);">✅ Your Data Stays With You</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 14px 16px;">☕ No Java Required</td>
-                                <td style="padding: 14px 16px; text-align: center;">✅ Bundled Runtime</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="why-free-grid">
-                    <div class="why-free-card">
-                        <div class="why-free-icon">🏥</div>
-                        <h3>Perfect for Nonprofits</h3>
-                        <p>Small organizations with tight budgets deserve enterprise-grade backup. No more choosing between features and cost.</p>
-                    </div>
-                    <div class="why-free-card">
-                        <div class="why-free-icon">🔐</div>
-                        <h3>Data Sovereignty</h3>
-                        <p>Your Salesforce data never leaves your control. Back up to your own infrastructure, your own databases.</p>
-                    </div>
-                    <div class="why-free-card">
-                        <div class="why-free-icon">🔓</div>
-                        <h3>No Vendor Lock-in</h3>
-                        <p>Your data, your rules. Export to any database, modify the source code, or migrate whenever you want.</p>
-                    </div>
-                </div>
-
-                <div style="text-align: center; background: rgba(63, 185, 80, 0.1); border: 1px solid var(--accent); border-radius: 12px; padding: 24px; max-width: 600px; margin: 30px auto 0;">
-                    <p style="font-size: 1.1rem; margin-bottom: 12px;">
-                        <strong style="color: var(--accent);">"Exporting data is easy, it's the restoring that is the hard part."</strong>
-                    </p>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
-                        — Reddit /r/salesforce community<br>
-                        <em>BackupForce includes full restore with relationship resolution and cross-org transformation.</em>
-                    </p>
-                </div>
-            </div>
-
-            <!-- Roadmap Tab -->
-            <div class="tab-content" id="tab-roadmap">
-                <div class="section-header">
-                    <h2>🗺️ Roadmap</h2>
-                    <p>Where we've been and where we're going</p>
-                </div>
-                <div class="roadmap-grid">
-                    <div class="roadmap-item complete">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge complete">Complete</span>
-                            <h3>Full Backup & Restore System</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Bulk API v2 for millions of records</li>
-                            <li>Database export to all platforms</li>
-                            <li>Blob & attachment downloads</li>
-                            <li>Data restoration with dependency ordering</li>
-                            <li>Cross-org transformation</li>
-                            <li>Relationship resolution</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item complete">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge complete">v3.0.0</span>
-                            <h3>Multi-Platform Native Builds</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Windows, macOS & Linux executables</li>
-                            <li>No Java installation required</li>
-                            <li>GitHub-inspired dark theme</li>
-                            <li>Nature landscape background</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item coming-soon">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge coming-soon">v3.1 - Coming Soon</span>
-                            <h3>🔥 Relationship-Aware Backup</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Backup Account with limit → auto-include related Contacts, Cases</li>
-                            <li>Configure relationship depth (1-3 levels)</li>
-                            <li>Smart query building for parent-child data</li>
-                            <li>Backup manifest with relationship maps</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item coming-soon">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge coming-soon">v3.1 - Coming Soon</span>
-                            <h3>🔥 Cascade Delete</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Delete record → auto-delete all related children</li>
-                            <li>Preview deletion before execution</li>
-                            <li>Query-based deletion with relationships</li>
-                            <li>Backup before delete safety option</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item planned">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge planned">Planned</span>
-                            <h3>Scheduled & Automated Backups</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Daily/weekly/monthly schedules</li>
-                            <li>Incremental backups (changed records only)</li>
-                            <li>Email/Slack notifications</li>
-                            <li>Retention policies</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item planned">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge planned">Planned</span>
-                            <h3>CLI & Automation</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Command-line interface</li>
-                            <li>CI/CD pipeline integration</li>
-                            <li>Docker container image</li>
-                            <li>GitHub Actions support</li>
-                        </ul>
-                    </div>
-                    <div class="roadmap-item" style="border-left: 3px solid var(--text-secondary);">
-                        <div class="roadmap-header">
-                            <span class="roadmap-badge future">Future</span>
-                            <h3>Enterprise Features</h3>
-                        </div>
-                        <ul class="roadmap-list">
-                            <li>Field history archiving (beyond 24 months)</li>
-                            <li>Data masking for GDPR/HIPAA</li>
-                            <li>Metadata backup with Git integration</li>
-                            <li>Multi-org management</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Privacy Tab -->
-            <div class="tab-content" id="tab-privacy">
-                <div class="section-header">
-                    <h2>🔒 Your Data Stays Yours</h2>
-                    <p>Complete privacy and security by design</p>
-                </div>
-                <div class="privacy-grid">
-                    <div class="privacy-card">
-                        <div class="privacy-icon">🏠</div>
-                        <h4>100% Local</h4>
-                        <p>Data exports directly to YOUR computer. Nothing goes through third-party servers.</p>
-                    </div>
-                    <div class="privacy-card">
-                        <div class="privacy-icon">🚫</div>
-                        <h4>Zero Telemetry</h4>
-                        <p>No analytics, no tracking, no data collection. We don't even know you're using it.</p>
-                    </div>
-                    <div class="privacy-card">
-                        <div class="privacy-icon">🔐</div>
-                        <h4>OAuth Only</h4>
-                        <p>Login through Salesforce's official OAuth. Your password never touches this app.</p>
-                    </div>
-                </div>
-                <div style="text-align: center; background: rgba(88, 166, 255, 0.1); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 20px; max-width: 500px; margin: 0 auto;">
-                    <p style="font-size: 0.9rem; color: var(--text-secondary);">
-                        <strong style="color: var(--accent-blue);">✓ Verified Safe:</strong> 
-                        <a href="https://www.virustotal.com" target="_blank" style="color: var(--accent-blue);">VirusTotal Scan</a> available
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta">
-        <div class="container">
-            <h2>Ready to Backup?</h2>
-            <p>Join Salesforce admins who trust BackupForce with their data.</p>
-            <div class="cta-features">
-                <div class="cta-feature">✓ Free forever</div>
-                <div class="cta-feature">✓ No signup required</div>
-                <div class="cta-feature">✓ Works in 5 minutes</div>
-            </div>
-            <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="btn-primary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 15.5l-5-5h3V4h4v6.5h3l-5 5zM19 18H5v2h14v-2z"/>
-                </svg>
-                Download BackupForce — It's Free
-            </a>
-        </div>
-    </section>
-
-    <!-- Footer -->
     <footer>
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <h3>⚡ BackupForce</h3>
-                    <p>The free, open-source Salesforce backup tool built by admins, for admins.</p>
-                </div>
-                <div class="footer-links">
-                    <h4>Resources</h4>
-                    <ul>
-                        <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub Repository</a></li>
-                        <li><a href="https://github.com/victorfelisbino/BackupForce/releases">All Releases</a></li>
-                        <li><a href="https://github.com/victorfelisbino/BackupForce/issues">Report a Bug</a></li>
-                    </ul>
-                </div>
-                <div class="footer-links">
-                    <h4>Documentation</h4>
-                    <ul>
-                        <li><a href="OAUTH_SETUP.html">OAuth Setup Guide</a></li>
-                        <li><a href="BUILD_EXECUTABLE.html">Build Instructions</a></li>
-                        <li><a href="V2_DATABASE_INTEGRATION.html">Database Integration</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>Created with ❤️ by Victor Felisbino • <a href="https://github.com/victorfelisbino/BackupForce/blob/master/LICENSE">MIT License</a></p>
-                <p class="disclaimer">
-                    <strong>Disclaimer:</strong> This tool is provided "as is" without warranty. Users are responsible for ensuring compliance with their organization's data policies and Salesforce terms of service.
-                </p>
-            </div>
+            MIT License · <a href="https://github.com/victorfelisbino/BackupForce">GitHub</a>
         </div>
     </footer>
-
-    <!-- Scroll to Top Button -->
-    <button class="scroll-top" id="scrollTop" onclick="scrollToTop()">↑</button>
-
-    <script>
-        // Mobile Menu Toggle
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobileMenu');
-            menu.classList.toggle('active');
-            document.body.style.overflow = menu.classList.contains('active') ? 'hidden' : '';
-        }
-
-        // Content Tabs
-        function showTab(id) {
-            // Update tab buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById('tab-' + id).classList.add('active');
-        }
-
-        // Scroll to Top
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Show/hide scroll to top button
-        window.addEventListener('scroll', () => {
-            const btn = document.getElementById('scrollTop');
-            if (window.scrollY > 400) {
-                btn.classList.add('visible');
-            } else {
-                btn.classList.remove('visible');
-            }
-        });
-
-        // Close mobile menu on escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const menu = document.getElementById('mobileMenu');
-                if (menu.classList.contains('active')) {
-                    toggleMobileMenu();
-                }
-            }
-        });
-
-        // Handle anchor links for tabs
-        window.addEventListener('load', () => {
-            const hash = window.location.hash;
-            if (hash === '#features' || hash === '#databases' || hash === '#compare' || hash === '#roadmap') {
-                const tabId = hash.substring(1);
-                const tabBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
-                if (tabBtn) {
-                    tabBtn.click();
-                    setTimeout(() => {
-                        document.querySelector('.content-tabs').scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                }
-            }
-        });
-    </script>
 </body>
 </html>

@@ -135,6 +135,7 @@ public class BulkV2Client implements AutoCloseable {
     private CloseableHttpClient httpClient;
     private PoolingHttpClientConnectionManager connectionManager;
     private volatile boolean clientShutdown = false;
+    private volatile long reconnectVersion = 0; // Track reconnection attempts to avoid race conditions
     private final Object clientLock = new Object();
 
     public BulkV2Client(String instanceUrl, String accessToken, String apiVersion) {
@@ -153,16 +154,26 @@ public class BulkV2Client implements AutoCloseable {
      */
     private void initializeHttpClient() {
         synchronized (clientLock) {
+            logger.info("Initializing HTTP client (reconnect version {} -> {})", reconnectVersion, reconnectVersion + 1);
+            
             // Close existing client if present
             if (httpClient != null) {
                 try {
+                    logger.debug("Closing old HTTP client...");
                     httpClient.close();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.debug("Error closing old HTTP client: {}", e.getMessage());
+                }
+                httpClient = null;
             }
             if (connectionManager != null) {
                 try {
+                    logger.debug("Closing old connection manager...");
                     connectionManager.close();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.debug("Error closing old connection manager: {}", e.getMessage());
+                }
+                connectionManager = null;
             }
             
             // Configure connection pool with long timeouts for backup operations
@@ -191,7 +202,8 @@ public class BulkV2Client implements AutoCloseable {
                 .build();
             
             this.clientShutdown = false;
-            logger.info("HTTP connection pool initialized/reinitialized");
+            this.reconnectVersion++;
+            logger.info("HTTP connection pool initialized/reinitialized (version {})", reconnectVersion);
         }
     }
     
@@ -213,13 +225,22 @@ public class BulkV2Client implements AutoCloseable {
     /**
      * Force reconnection of the HTTP client. Call this after detecting
      * connection pool errors to ensure subsequent requests will work.
+     * Thread-safe and uses version tracking to prevent redundant reconnections.
      */
     public void forceReconnect() {
-        logger.info("Forcing HTTP client reconnection...");
+        long versionBefore = reconnectVersion;
+        logger.info("Force reconnection requested (current version: {})", versionBefore);
         synchronized (clientLock) {
-            initializeHttpClient();
+            // Check if another thread already reconnected while we waited
+            if (reconnectVersion == versionBefore) {
+                logger.info("Forcing HTTP client reconnection (version {} -> {})", versionBefore, versionBefore + 1);
+                clientShutdown = true;
+                initializeHttpClient();
+            } else {
+                logger.info("Skipping force reconnect - another thread already reconnected (version {} -> {})", 
+                    versionBefore, reconnectVersion);
+            }
         }
-        logger.info("HTTP client reconnected successfully");
     }
     
     /**
@@ -245,18 +266,53 @@ public class BulkV2Client implements AutoCloseable {
     /**
      * Execute an HTTP request with automatic recovery from pool shutdown.
      * If the connection pool was shut down (e.g., due to OOM), recreate it and retry.
+     * Uses version tracking to avoid race conditions when multiple threads detect shutdown.
      */
     private <T> T executeWithRecovery(HttpRequestExecutor<T> executor) throws IOException, ParseException {
-        int maxRetries = 2;
+        int maxRetries = 3;
+        long versionAtStart = reconnectVersion;
+        
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 ensureHttpClient();
-                return executor.execute(httpClient);
+                CloseableHttpClient currentClient;
+                synchronized (clientLock) {
+                    currentClient = httpClient;
+                }
+                return executor.execute(currentClient);
             } catch (IOException e) {
                 if (isPoolShutdownError(e) && attempt < maxRetries) {
-                    logger.warn("Connection pool shut down detected, recreating HTTP client (attempt {}/{})", attempt, maxRetries);
-                    markClientShutdown();
-                    ensureHttpClient();
+                    long currentVersion = reconnectVersion;
+                    
+                    // Only force reconnect if no other thread has already done so
+                    if (currentVersion == versionAtStart) {
+                        logger.warn("Connection pool shut down detected (version {}), recreating HTTP client (attempt {}/{})", 
+                            currentVersion, attempt, maxRetries);
+                        synchronized (clientLock) {
+                            // Double-check: another thread may have reconnected while we waited for the lock
+                            if (reconnectVersion == versionAtStart) {
+                                clientShutdown = true;
+                                initializeHttpClient();
+                            } else {
+                                logger.info("Another thread already reconnected (version {} -> {}), using existing pool", 
+                                    versionAtStart, reconnectVersion);
+                            }
+                        }
+                    } else {
+                        logger.info("Pool already reconnected by another thread (version {} -> {}), retrying with new pool", 
+                            versionAtStart, currentVersion);
+                    }
+                    
+                    // Update our version reference for next iteration
+                    versionAtStart = reconnectVersion;
+                    
+                    // Brief pause before retry to let reconnection stabilize
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted while waiting for reconnection", ie);
+                    }
                     // retry on next iteration
                 } else {
                     throw e;

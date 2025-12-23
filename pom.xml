@@ -274,7 +274,7 @@
                     <winDirChooser>true</winDirChooser>
                     <winShortcut>true</winShortcut>
                     <winMenuGroup>BackupForce</winMenuGroup>
-                    <icon>src/main/resources/icon.ico</icon>
+                    <icon>src/main/resources/images/backupforce-icon.ico</icon>
                     <type>EXE</type>
                 </configuration>
             </plugin>

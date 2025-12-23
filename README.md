@@ -1,249 +1,112 @@
 # BackupForce
 
-[![Download](https://img.shields.io/github/v/release/victorfelisbino/BackupForce?label=Download&style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases/latest)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue?style=for-the-badge)](https://github.com/victorfelisbino/BackupForce/releases)
-[![Java](https://img.shields.io/badge/Java-21+-orange?style=for-the-badge)](https://openjdk.org/)
-[![Salesforce](https://img.shields.io/badge/Salesforce-Bulk%20API%20v2-00A1E0?style=for-the-badge)](https://developer.salesforce.com/)
-
-A powerful desktop application for backing up Salesforce data to CSV files or databases. Features a beautiful **GitHub-inspired dark theme** with a calming nature background for stress-free data operations.
+A desktop application for backing up and restoring Salesforce data using the Bulk API v2. Supports export to CSV files or direct database integration (Snowflake, PostgreSQL, SQL Server).
 
 ![BackupForce Screenshot](docs/screenshot.png)
 
----
+## Downloads
 
-## 🚀 Quick Download
+| Platform | Download |
+|----------|----------|
+| Windows | [BackupForce-3.0.0-portable.zip](https://github.com/victorfelisbino/BackupForce/releases/latest) |
+| macOS | [BackupForce-3.0.0-macos.zip](https://github.com/victorfelisbino/BackupForce/releases/latest) |
+| Linux | [BackupForce-3.0.0-linux.tar.gz](https://github.com/victorfelisbino/BackupForce/releases/latest) |
 
-**[⬇️ Download BackupForce v3.0.0](https://github.com/victorfelisbino/BackupForce/releases/latest)**
-
-### Windows
-- `BackupForce-3.0.0-portable.zip` - Portable (Recommended)
-
-### macOS
-- `BackupForce-3.0.0-macos.zip` - Portable
-
-### Linux
-- `BackupForce-3.0.0-linux.tar.gz` - Universal
-
-**No Java installation required** - runtime is bundled!
+Runtime is bundled - no Java installation required.
 
 ---
 
-## ✨ Features
+## Architecture
 
-### Data Export
-- **Bulk API v2** - Fast, efficient data extraction for millions of records
-- **Field Selection** - Choose exactly which fields to export for each object
-- **Blob Downloads** - Automatically downloads Attachment.Body, ContentVersion.VersionData, Document.Body
-- **Record Limits** - Test exports with a limited number of records
-- **Multi-threaded** - Parallel processing for faster backups
-- **Relationship Preservation** - Maintains all lookup/master-detail relationships for restore
-
-### Database Support
-| Database | Blob Storage | SSO Support | Status |
-|----------|-------------|-------------|--------|
-| **Snowflake** | BINARY(8MB) | ✅ Externalbrowser | ✅ Recommended |
-| **PostgreSQL** | BYTEA | — | ✅ Supported |
-| **SQL Server** | VARBINARY(MAX) | — | ✅ Supported |
-| **CSV Files** | File + Path column | — | ✅ Supported |
-
-### Data Restore
-- **Bulk API v2 Restore** - Efficiently restore millions of records back to Salesforce
-- **Insert/Update/Upsert** - Choose the right operation for your data
-- **CSV Source** - Restore from backup CSV files
-- **Relationship Resolution** - Automatically resolve lookup references
-- **Dependency Ordering** - Restore parent objects before children
-- **Cross-Org Transformation** - Map RecordTypes, picklist values, and users between different orgs
-- **Dry Run Preview** - Preview data transformations before actual restore
-- **Save/Load Mappings** - Persist transformation configs as JSON files
-
-### User Experience
-- **GitHub Dark Theme** - Beautiful GitHub-inspired dark UI with semi-transparent panels
-- **Nature Background** - Calming mountain landscape for stress-free data operations
-- **Custom Title Bar** - Sleek integrated title bar matching the theme
-- **OAuth Authentication** - Secure Salesforce login
-- **Session Caching** - SSO sessions cached for 30 minutes (no repeated browser popups)
-- **Object Selection** - Search and filter 2500+ objects
-- **Progress Tracking** - Real-time progress and logging
-- **Memory Monitoring** - Automatic warnings for large objects
-
----
-
-## 🗺️ Roadmap
-
-See the full [Development Roadmap](docs/ROADMAP.md) for upcoming features.
-
-### Completed ✅
-| Feature | Status |
-|---------|--------|
-| Bulk API v2 Backup | ✅ Complete |
-| Database Export (Snowflake, PostgreSQL, SQL Server) | ✅ Complete |
-| Blob/Attachment Download | ✅ Complete |
-| Data Restoration with Bulk API v2 | ✅ Complete |
-| Relationship Resolution | ✅ Complete |
-| Dependency Ordering | ✅ Complete |
-| Cross-Org Transformation | ✅ Complete |
-| Multi-Platform Native Builds | ✅ Complete |
-
-### Coming Soon 🔥
-| Feature | Description |
-|---------|-------------|
-| **Relationship-Aware Backup** | Set a limit on Account, preserve relationships → auto-download related Contacts, Cases, Opportunities |
-| **Cascade Delete** | Delete an Account → automatically delete all related child records |
-| **Duplicate Handling** | Smart duplicate detection with merge/skip/update options |
-| **Related Record Creation** | Import Accounts → auto-create Opportunities with default values |
-
-### Planned ⏳
-| Feature | Description |
-|---------|-------------|
-| Scheduled Backups | Daily/weekly automated backups with notifications |
-| Incremental Backups | Only backup changed records since last run |
-| CLI Version | Command-line interface for CI/CD automation |
-| Field History Archiving | Export field history beyond 24-month limit |
-| Data Masking | GDPR/HIPAA compliant data anonymization |
-| Metadata Backup | Export classes, triggers, flows with Git integration |
-
----
-
-## 📋 Requirements
-
-### For Running (Pre-built Releases)
-- **Windows**: Windows 10/11
-- **macOS**: macOS 11+ (Big Sur or later)
-- **Linux**: Ubuntu 20.04+, Debian 10+, Fedora 36+, RHEL 8+
-- No additional software needed!
-
-### For Building from Source
-- Java 21+
-- Maven 3.9+
-
----
-
-## 🔧 Installation
-
-### Option 1: Download Pre-built (Recommended)
-
-1. **Download** the latest release for your platform from [Releases](https://github.com/victorfelisbino/BackupForce/releases)
-2. **Install or Extract**:
-   - **Windows**: Run `.msi` installer or extract portable `.zip`
-   - **macOS**: Mount `.dmg` and drag to Applications
-   - **Linux**: Install `.deb`/`.rpm` or extract `.tar.gz`
-3. **Run** BackupForce
-
-### Option 2: Build from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/victorfelisbino/BackupForce.git
-cd BackupForce
-
-# Build and run
-mvn javafx:run
-
-# Or build portable executable
-.\build-portable.ps1
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         BackupForce                              │
+├─────────────────────────────────────────────────────────────────┤
+│  UI Layer (JavaFX)                                               │
+│  ├── FXML Controllers                                            │
+│  └── CSS Theming                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  Service Layer                                                   │
+│  ├── BackupService (orchestrates backup operations)              │
+│  ├── RestoreService (handles data restoration)                   │
+│  └── TransformationService (cross-org field mapping)             │
+├─────────────────────────────────────────────────────────────────┤
+│  API Layer                                                       │
+│  ├── BulkV2Client (Salesforce Bulk API v2)                       │
+│  ├── SalesforceClient (REST API for metadata)                    │
+│  └── OAuthManager (OAuth 2.0 authentication)                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Storage Layer                                                   │
+│  ├── CsvExporter                                                 │
+│  ├── DatabaseExporter (Snowflake, PostgreSQL, SQL Server)        │
+│  └── BlobDownloader (Attachments, ContentVersion, Document)      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Key Components
 
-## 📖 Usage
-
-### 1. Login to Salesforce
-- Click "Login with OAuth" for secure authentication
-- Browser will open for Salesforce authorization
-- Supports Production and Sandbox environments
-
-### 2. Select Objects
-- Browse or search 2500+ Salesforce objects
-- Check objects to backup (Account, Contact, Opportunity, etc.)
-- Use "Select All" or "Deselect All" for bulk selection
-
-### 3. Configure Export
-- **Output Folder**: Where CSV/blob files are saved
-- **Record Limit**: Optional limit for testing (leave blank for all records)
-- **Database Export**: Configure Snowflake/PostgreSQL/SQL Server connection
-
-### 4. Start Backup
-- Click "Start Backup"
-- Monitor progress in the log panel
-- Blobs are downloaded and stored alongside data
+| Component | Description |
+|-----------|-------------|
+| `BulkV2Client` | HTTP client for Salesforce Bulk API v2 with connection pool recovery |
+| `BackupService` | Multi-threaded backup orchestration (5 parallel workers) |
+| `RestoreService` | Handles insert/update/upsert with relationship resolution |
+| `TransformationService` | Maps RecordTypes, picklist values, and users between orgs |
 
 ---
 
-## 🔗 How Relationship Preservation Works
+## Features
 
-BackupForce preserves all Salesforce relationships (lookups and master-detail) so you can restore data with referential integrity intact. Here's how it works:
+### Backup
+- **Bulk API v2** - Efficient export for large datasets (millions of records)
+- **Field Selection** - Select specific fields per object
+- **Blob Export** - Downloads `Attachment.Body`, `ContentVersion.VersionData`, `Document.Body`
+- **Record Limits** - Test with limited record counts
+- **Parallel Processing** - 5 concurrent worker threads
 
-### What Gets Backed Up
+### Database Integration
 
-Every record includes:
-- **Salesforce ID** - The 18-character record ID (always included)
-- **All Lookup Fields** - Fields like `AccountId`, `ContactId`, `ParentId` that reference other records
-- **External ID Fields** - Custom fields marked as External ID (when available)
-- **Name/Unique Fields** - Fields that can uniquely identify records
+| Database | Blob Storage | SSO | Notes |
+|----------|-------------|-----|-------|
+| Snowflake | `BINARY(8MB)` | Externalbrowser | Recommended |
+| PostgreSQL | `BYTEA` | - | Standard JDBC |
+| SQL Server | `VARBINARY(MAX)` | - | Standard JDBC |
+| CSV | File + path column | - | Default |
 
-### Backup Output Files
+### Restore
+- **Insert/Update/Upsert** operations
+- **Relationship Resolution** - Resolves lookup references automatically
+- **Dependency Ordering** - Restores parent objects before children
+- **Cross-Org Transformation** - Maps metadata between different orgs
+- **Dry Run** - Preview transformations before execution
+
+---
+
+## Relationship Preservation
+
+BackupForce maintains referential integrity by preserving all lookup and master-detail relationships.
+
+### Backup Output
 
 | File | Purpose |
 |------|---------|
-| `ObjectName.csv` | All record data including IDs and lookup references |
-| `_backup_manifest.json` | Metadata about relationships, restore order, and field info |
-| `_id_mapping.json` | Maps Salesforce IDs to external identifiers for cross-org restore |
+| `ObjectName.csv` | Record data with IDs and lookup references |
+| `_backup_manifest.json` | Relationship metadata and restore order |
+| `_id_mapping.json` | ID to external identifier mappings |
 
-### Restore Scenarios
+### Restore Process
 
-#### Same Org Restore
-The simplest case - lookup field values (like `AccountId`) still point to existing records:
-1. Restore parent objects first (Account, User, etc.)
-2. Restore child objects (Contact, Opportunity, etc.)
-3. Lookup IDs work automatically since records exist
+**Same Org:**
+1. Restore parent objects (Account, User)
+2. Restore child objects (Contact, Opportunity)
+3. Lookup IDs resolve automatically
 
-#### Different Org / Sandbox Refresh
-When restoring to a different org, IDs won't match. BackupForce handles this:
+**Different Org:**
+1. Insert parent records, capture new IDs
+2. Build OldId → NewId mapping
+3. Transform lookup values in child records
+4. Insert child records
 
-1. **With External IDs** (Best)
-   - Use Upsert operation with External ID field
-   - Records are matched by External ID, not Salesforce ID
-   - Lookup fields are resolved using parent External IDs
-
-2. **Without External IDs** (Still Works!)
-   - Restore parent objects first (following `restoreOrder` in manifest)
-   - Build an OldId → NewId mapping as records are inserted
-   - Update lookup fields in child records using the mapping
-   - BackupForce's restore feature handles this automatically
-
-### Example: Backing Up Account Hierarchy
-
-```
-Account (parent)
-  └── Contact (child, has AccountId lookup)
-      └── Case (grandchild, has ContactId lookup)
-```
-
-**During Backup:**
-- Account.csv: Contains Account IDs
-- Contact.csv: Contains ContactId AND the AccountId lookup value
-- Case.csv: Contains CaseId AND the ContactId lookup value
-- `_backup_manifest.json`: Documents the relationships and restore order
-
-**During Restore:**
-1. Insert Accounts → Get new Account IDs
-2. Map OldAccountId → NewAccountId
-3. Update Contact.csv lookup values
-4. Insert Contacts → Get new Contact IDs
-5. Map OldContactId → NewContactId
-6. Update Case.csv lookup values
-7. Insert Cases
-
-### Relationship-Aware Backup Option
-
-When enabled, BackupForce can automatically:
-1. **Discover child relationships** for your selected objects
-2. **Auto-include related records** with WHERE filters
-3. **Preserve the exact subset** of related data
-
-Example: Back up 100 Accounts → automatically includes only the Contacts, Cases, and Opportunities related to those specific 100 Accounts.
-
-### Manifest Example
+### Manifest Structure
 
 ```json
 {
@@ -251,14 +114,11 @@ Example: Back up 100 Accounts → automatically includes only the Contacts, Case
     "version": "2.0",
     "backupType": "relationship-aware"
   },
-  "restoreOrder": ["Account", "Contact", "Case", "Opportunity"],
+  "restoreOrder": ["Account", "Contact", "Case"],
   "objects": {
     "Contact": {
       "relationshipFields": [
-        {
-          "fieldName": "AccountId",
-          "referenceTo": ["Account"]
-        }
+        { "fieldName": "AccountId", "referenceTo": ["Account"] }
       ],
       "externalIdFields": [
         { "name": "External_ID__c", "type": "string" }
@@ -270,73 +130,150 @@ Example: Back up 100 Accounts → automatically includes only the Contacts, Case
 
 ---
 
-## 🗄️ Database Export
+## Requirements
 
-### Snowflake Configuration
+### Pre-built Releases
+- Windows 10/11, macOS 11+, or Linux (Ubuntu 20.04+, RHEL 8+)
+
+### Building from Source
+- Java 21+
+- Maven 3.9+
+
+---
+
+## Installation
+
+### Pre-built Release
+
+1. Download from [Releases](https://github.com/victorfelisbino/BackupForce/releases)
+2. Extract or install:
+   - **Windows**: Extract `.zip` or run `.msi`
+   - **macOS**: Mount `.dmg`, drag to Applications
+   - **Linux**: Extract `.tar.gz` or install `.deb`/`.rpm`
+
+### From Source
+
+```bash
+git clone https://github.com/victorfelisbino/BackupForce.git
+cd BackupForce
+mvn javafx:run
 ```
-Host: your-account.snowflakecomputing.com
+
+Build executable:
+```powershell
+.\scripts\build-portable.ps1
+```
+
+---
+
+## Usage
+
+### Authentication
+OAuth 2.0 with Salesforce. Supports Production and Sandbox environments.
+
+### Backup
+1. Select objects from the object list
+2. Configure output folder
+3. Optional: Set record limit, configure database connection
+4. Start backup
+
+### Restore
+1. Select backup folder containing CSV files and manifest
+2. Choose operation: Insert, Update, or Upsert
+3. Configure transformation mappings if restoring to different org
+4. Preview with dry run, then execute
+
+---
+
+## Database Export
+
+### Snowflake
+
+```
+Host: account.snowflakecomputing.com
 Database: SALESFORCE_BACKUP
 Schema: PUBLIC
-Username: your_user
-Password: your_password
 ```
 
-Blob fields are stored as `BINARY(8388608)` with additional columns:
-- `BLOB_FILE_PATH` - Original file name
-- `BLOB_SIZE` - File size in bytes
+Blob columns include:
+- `BLOB_FILE_PATH` - Original filename
+- `BLOB_SIZE` - Size in bytes
 
-### Viewing Blobs in Snowflake
+Query blobs:
 ```sql
--- View as hex
 SELECT Id, Name, TO_VARCHAR(Body, 'HEX') as BodyHex FROM Attachment;
-
--- Get file info
-SELECT Id, Name, BLOB_FILE_PATH, BLOB_SIZE FROM Attachment;
 ```
 
 ---
 
-## 🔒 Security
+## Configuration
 
-- OAuth 2.0 authentication (no password storage)
-- Credentials stored securely in Windows Registry
-- All data transmitted over HTTPS
-- [VirusTotal Scan](https://www.virustotal.com/gui/file/72a63cc03f44c80292fd7d2d25106d18e737d5c4fefd386b459bf9eb18228a04) - 1/66 (Microsoft ML false positive, common for unsigned apps)
-
----
-
-## 🐛 Troubleshooting
-
-### "Failed to launch JVM"
-- Use the latest release with bundled runtime
-- Or install Java 11+ and run with Maven
-
-### OutOfMemoryError
+### Memory
+Default: 4GB heap. Adjust for large objects:
 ```bash
-java -Xmx4g -jar BackupForce.jar
+java -Xmx8g -jar BackupForce.jar
 ```
 
-### Connection Errors
-- Verify Salesforce credentials
-- Check if your IP is whitelisted
-- Ensure API access is enabled for your user
+### OAuth
+Configure Connected App in Salesforce Setup. See [docs/OAUTH_SETUP.md](docs/OAUTH_SETUP.md).
 
 ---
 
-## 📄 License
+## Troubleshooting
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-Created and maintained by Victor Felisbino.
-
----
-
-## 🤝 Contributing
-
-Issues and pull requests are welcome!
+| Issue | Solution |
+|-------|----------|
+| JVM launch failure | Use bundled runtime release |
+| OutOfMemoryError | Increase heap: `-Xmx4g` or `-Xmx8g` |
+| Connection errors | Check IP whitelist, verify API access |
 
 ---
 
-<p align="center">
-  <b>Made with ❤️ for the Salesforce community</b>
-</p>
+## Development
+
+### Project Structure
+
+```
+src/main/java/com/backupforce/
+├── api/          # Salesforce API clients
+├── model/        # Data models
+├── service/      # Business logic
+├── ui/           # JavaFX controllers
+└── util/         # Utilities
+```
+
+### Build
+
+```bash
+mvn clean package           # JAR
+mvn javafx:run              # Run from source
+.\scripts\build-portable.ps1  # Windows executable
+```
+
+### Testing
+
+```bash
+mvn test                    # Unit tests
+mvn verify -PuiTests        # UI tests (headless)
+```
+
+---
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+| Status | Feature |
+|--------|---------|
+| Complete | Bulk API v2 backup, Database export, Blob download, Data restore, Cross-org transformation |
+| Planned | Scheduled backups, Incremental backups, CLI, Field history archiving |
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE).
+
+## Contributing
+
+Issues and pull requests welcome.
