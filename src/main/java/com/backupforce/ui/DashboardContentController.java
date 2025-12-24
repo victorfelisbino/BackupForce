@@ -1,5 +1,7 @@
 package com.backupforce.ui;
 
+import com.backupforce.config.BackupHistory;
+import com.backupforce.config.BackupHistory.BackupRun;
 import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
 import com.backupforce.ui.LoginController.ConnectionInfo;
@@ -9,6 +11,7 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
@@ -18,7 +21,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.NumberFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.prefs.Preferences;
 
 /**
@@ -48,13 +55,28 @@ public class DashboardContentController {
     @FXML private VBox configBackupCard;
     @FXML private VBox metadataBackupCard;
     
+    // New backup summary fields
+    @FXML private VBox backupHealthCard;
+    @FXML private Label backupHealthLabel;
+    @FXML private VBox lastBackupSummaryPanel;
+    @FXML private Label lastBackupSummaryIcon;
+    @FXML private Label lastBackupSummaryTitle;
+    @FXML private Label lastBackupSummaryDetails;
+    @FXML private Button verifyLastBackupButton;
+    @FXML private Label summaryObjectsLabel;
+    @FXML private Label summaryRecordsLabel;
+    @FXML private Label summarySizeLabel;
+    @FXML private Label summaryDurationLabel;
+    @FXML private Label summaryDestinationLabel;
+    
     private MainController mainController;
+    private BackupRun lastBackupRun;
     
     @FXML
     public void initialize() {
         // Setup card hover effects
         setupCardHoverEffect(dataBackupCard);
-        setupCardHoverEffect(dataRestoreCard);
+        // dataRestoreCard is now disabled, no hover effect needed
     }
     
     public void setMainController(MainController mainController) {
@@ -68,7 +90,7 @@ public class DashboardContentController {
         loadRecentActivity();
         loadSavedConnections();
         loadDataBackupMetrics();
-        loadDataRestoreMetrics();
+        loadBackupHistorySummary();
         fetchObjectCount();
         updateConnectionStatus();
     }
@@ -177,21 +199,178 @@ public class DashboardContentController {
         }
     }
     
-    private void loadDataRestoreMetrics() {
-        int sourceCount = prefs.getInt("restoreSourceCount", 0);
-        long lastRestoreRows = prefs.getLong("lastRestoreRowCount", 0);
-        String lastRestore = prefs.get("lastRestoreDate", null);
+    /**
+     * Load backup history summary from BackupHistory
+     */
+    private void loadBackupHistorySummary() {
+        try {
+            BackupHistory history = BackupHistory.getInstance();
+            List<BackupRun> allBackups = history.getHistory();
+            
+            if (allBackups.isEmpty()) {
+                // No backups yet
+                if (backupHealthLabel != null) {
+                    backupHealthLabel.setText("No backups");
+                    backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #8b949e;");
+                }
+                if (lastBackupSummaryPanel != null) {
+                    lastBackupSummaryPanel.setVisible(false);
+                    lastBackupSummaryPanel.setManaged(false);
+                }
+                return;
+            }
+            
+            // Get the most recent backup
+            lastBackupRun = allBackups.get(0);
+            
+            // Update backup health indicator
+            updateBackupHealthStatus(lastBackupRun);
+            
+            // Show and populate the summary panel
+            if (lastBackupSummaryPanel != null) {
+                lastBackupSummaryPanel.setVisible(true);
+                lastBackupSummaryPanel.setManaged(true);
+                
+                populateBackupSummary(lastBackupRun);
+            }
+            
+            // Update stats labels with real data
+            if (lastBackupRowsLabel != null) {
+                lastBackupRowsLabel.setText(formatRowCount(lastBackupRun.getTotalRecords()));
+            }
+            
+            if (lastDataBackupLabel != null && lastBackupRun.getStartTime() != null) {
+                lastDataBackupLabel.setText(formatRelativeTime(lastBackupRun.getStartTime()));
+            }
+            
+            // Store for prefs too
+            prefs.putLong("lastBackupRowCount", lastBackupRun.getTotalRecords());
+            
+        } catch (Exception e) {
+            logger.warn("Failed to load backup history summary", e);
+        }
+    }
+    
+    private void updateBackupHealthStatus(BackupRun run) {
+        if (backupHealthLabel == null) return;
         
-        if (restoreSourcesLabel != null) {
-            restoreSourcesLabel.setText(sourceCount > 0 ? String.valueOf(sourceCount) : "--");
+        String status = run.getStatus();
+        if ("COMPLETED".equals(status)) {
+            int failed = run.getFailedObjects();
+            if (failed == 0) {
+                backupHealthLabel.setText("✓ Healthy");
+                backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #28a745;");
+            } else {
+                backupHealthLabel.setText("⚠ " + failed + " failed");
+                backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #ffc107;");
+            }
+        } else if ("FAILED".equals(status)) {
+            backupHealthLabel.setText("✗ Failed");
+            backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #dc3545;");
+        } else if ("RUNNING".equals(status)) {
+            backupHealthLabel.setText("⏳ Running");
+            backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #58a6ff;");
+        } else if ("CANCELLED".equals(status)) {
+            backupHealthLabel.setText("⏹ Cancelled");
+            backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #8b949e;");
+        } else {
+            backupHealthLabel.setText("--");
+            backupHealthLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #8b949e;");
+        }
+    }
+    
+    private void populateBackupSummary(BackupRun run) {
+        // Icon and title based on status
+        String status = run.getStatus();
+        if ("COMPLETED".equals(status)) {
+            if (lastBackupSummaryIcon != null) {
+                int failed = run.getFailedObjects();
+                if (failed == 0) {
+                    lastBackupSummaryIcon.setText("✓");
+                    lastBackupSummaryIcon.setStyle("-fx-font-size: 20px; -fx-text-fill: #28a745;");
+                } else {
+                    lastBackupSummaryIcon.setText("⚠");
+                    lastBackupSummaryIcon.setStyle("-fx-font-size: 20px; -fx-text-fill: #ffc107;");
+                }
+            }
+            if (lastBackupSummaryTitle != null) {
+                int failed = run.getFailedObjects();
+                if (failed == 0) {
+                    lastBackupSummaryTitle.setText("Last Backup Successful");
+                } else {
+                    lastBackupSummaryTitle.setText("Last Backup Completed with Warnings");
+                }
+            }
+        } else if ("FAILED".equals(status)) {
+            if (lastBackupSummaryIcon != null) {
+                lastBackupSummaryIcon.setText("✗");
+                lastBackupSummaryIcon.setStyle("-fx-font-size: 20px; -fx-text-fill: #dc3545;");
+            }
+            if (lastBackupSummaryTitle != null) {
+                lastBackupSummaryTitle.setText("Last Backup Failed");
+            }
+        } else {
+            if (lastBackupSummaryIcon != null) {
+                lastBackupSummaryIcon.setText("ℹ");
+                lastBackupSummaryIcon.setStyle("-fx-font-size: 20px; -fx-text-fill: #58a6ff;");
+            }
+            if (lastBackupSummaryTitle != null) {
+                lastBackupSummaryTitle.setText("Last Backup: " + status);
+            }
         }
         
-        if (lastRestoreRowsLabel != null) {
-            lastRestoreRowsLabel.setText(lastRestoreRows > 0 ? formatRowCount(lastRestoreRows) : "--");
+        // Details line
+        if (lastBackupSummaryDetails != null && run.getStartTime() != null) {
+            String when = formatRelativeTime(run.getStartTime());
+            String user = run.getUsername() != null ? run.getUsername() : "Unknown";
+            lastBackupSummaryDetails.setText(when + " • " + user);
         }
         
-        if (lastDataRestoreLabel != null) {
-            lastDataRestoreLabel.setText(lastRestore != null ? lastRestore : "No restores yet");
+        // Stats
+        if (summaryObjectsLabel != null) {
+            summaryObjectsLabel.setText(String.valueOf(run.getCompletedObjects()));
+        }
+        if (summaryRecordsLabel != null) {
+            summaryRecordsLabel.setText(formatRowCount(run.getTotalRecords()));
+        }
+        if (summarySizeLabel != null) {
+            summarySizeLabel.setText(run.getFormattedSize());
+        }
+        if (summaryDurationLabel != null) {
+            summaryDurationLabel.setText(run.getDuration());
+        }
+        if (summaryDestinationLabel != null) {
+            String dest = run.getDestination() != null ? run.getDestination() : "CSV";
+            summaryDestinationLabel.setText(dest);
+        }
+    }
+    
+    private String formatRelativeTime(String isoDateTime) {
+        try {
+            LocalDateTime time = LocalDateTime.parse(isoDateTime);
+            LocalDateTime now = LocalDateTime.now();
+            
+            long minutes = ChronoUnit.MINUTES.between(time, now);
+            long hours = ChronoUnit.HOURS.between(time, now);
+            long days = ChronoUnit.DAYS.between(time, now);
+            
+            if (minutes < 1) return "Just now";
+            if (minutes < 60) return minutes + " min ago";
+            if (hours < 24) return hours + " hour" + (hours > 1 ? "s" : "") + " ago";
+            if (days < 7) return days + " day" + (days > 1 ? "s" : "") + " ago";
+            
+            return time.format(DateTimeFormatter.ofPattern("MMM d, yyyy"));
+        } catch (Exception e) {
+            return isoDateTime;
+        }
+    }
+    
+    @FXML
+    private void handleVerifyLastBackup() {
+        if (mainController != null && lastBackupRun != null) {
+            // Navigate to backup page and trigger verification
+            mainController.navigateToBackup();
+            // The backup controller will have the verify functionality
         }
     }
     

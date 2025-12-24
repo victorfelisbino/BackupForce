@@ -28,6 +28,7 @@ public class DatabaseSettingsController {
     @FXML private GridPane settingsGrid;
     @FXML private CheckBox rememberCheckBox;
     @FXML private CheckBox recreateTablesCheckBox;
+    @FXML private CheckBox skipMatchingCountsCheckBox;
     @FXML private TextField connectionNameField;
     @FXML private Label statusLabel;
     
@@ -38,10 +39,12 @@ public class DatabaseSettingsController {
     private DatabaseConnectionInfo connectionInfo;
     private boolean saved = false;
     private Connection activeConnection = null; // Store authenticated connection for reuse
+    private String editingConnectionId = null; // Track the connection being edited
     
     public void initialize() {
         // Clear any saved values from previous dialogs
         savedComboValues.clear();
+        editingConnectionId = null;
         
         setupDatabaseTypes();
         databaseTypeCombo.setOnAction(e -> updateFieldsForDatabase());
@@ -757,9 +760,12 @@ public class DatabaseSettingsController {
         
         logger.info("Creating DatabaseConnectionInfo with fields: {}", fields.keySet());
         boolean recreateTables = recreateTablesCheckBox != null && recreateTablesCheckBox.isSelected();
+        boolean skipMatchingCounts = skipMatchingCountsCheckBox != null && skipMatchingCountsCheckBox.isSelected();
         boolean useSso = ssoCheckBox != null && ssoCheckBox.isSelected();
         logger.info("Recreate tables option: {}", recreateTables);
+        logger.info("Skip matching counts option: {}", skipMatchingCounts);
         connectionInfo = new DatabaseConnectionInfo(dbType.name, fields, useSso, recreateTables);
+        connectionInfo.setSkipMatchingCounts(skipMatchingCounts);
         
         // Save to ConnectionManager if "remember" is checked
         if (rememberCheckBox.isSelected()) {
@@ -770,9 +776,18 @@ public class DatabaseSettingsController {
                 }
                 
                 SavedConnection savedConn = new SavedConnection();
+                
+                // If editing an existing connection, preserve its ID to update instead of create
+                if (editingConnectionId != null) {
+                    savedConn.setId(editingConnectionId);
+                    logger.info("Updating existing connection: {}", editingConnectionId);
+                }
+                
                 savedConn.setName(connectionName);
                 savedConn.setType(dbType.name);
                 savedConn.setUseSso(useSso);
+                savedConn.setRecreateTables(recreateTables);
+                savedConn.setSkipMatchingCounts(skipMatchingCounts);
                 
                 if (dbType.name.equals("Snowflake")) {
                     savedConn.setAccount(fields.get("Account"));
@@ -1031,6 +1046,9 @@ public class DatabaseSettingsController {
             return;
         }
         
+        // Store the connection ID so we update instead of creating new on save
+        this.editingConnectionId = connectionId;
+        
         logger.info("Loading connection: {} ({})", conn.getName(), conn.getType());
         
         // Select the database type
@@ -1044,6 +1062,16 @@ public class DatabaseSettingsController {
         // Wait for UI to update then populate fields
         Platform.runLater(() -> {
             connectionNameField.setText(conn.getName());
+            
+            // Restore recreate tables checkbox
+            if (recreateTablesCheckBox != null) {
+                recreateTablesCheckBox.setSelected(conn.isRecreateTables());
+            }
+            
+            // Restore skip matching counts checkbox
+            if (skipMatchingCountsCheckBox != null) {
+                skipMatchingCountsCheckBox.setSelected(conn.isSkipMatchingCounts());
+            }
             
             // Populate fields based on database type
             if (fieldMap.containsKey("Account") && conn.getAccount() != null) {
@@ -1131,6 +1159,7 @@ public class DatabaseSettingsController {
         private final Map<String, String> fields;
         private final boolean useSso;
         private final boolean recreateTables;
+        private boolean skipMatchingCounts;
         
         public DatabaseConnectionInfo(String databaseType, Map<String, String> fields, boolean useSso, boolean recreateTables) {
             this.databaseType = databaseType;
@@ -1144,5 +1173,7 @@ public class DatabaseSettingsController {
         public String getField(String name) { return fields.get(name); }
         public boolean isUseSso() { return useSso; }
         public boolean isRecreateTables() { return recreateTables; }
+        public boolean isSkipMatchingCounts() { return skipMatchingCounts; }
+        public void setSkipMatchingCounts(boolean skipMatchingCounts) { this.skipMatchingCounts = skipMatchingCounts; }
     }
 }

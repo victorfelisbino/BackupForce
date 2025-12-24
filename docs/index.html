@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BackupForce - Salesforce Backup Tool</title>
-    <meta name="description" content="Desktop application for backing up and restoring Salesforce data using Bulk API v2. Export to CSV, Snowflake, PostgreSQL, or SQL Server.">
+    <title>BackupForce - Salesforce Backup & Restore Tool</title>
+    <meta name="description" content="Desktop application for backing up and restoring Salesforce data. Export to CSV, Snowflake, PostgreSQL, or SQL Server. Verify your backups with confidence.">
     <meta name="theme-color" content="#0d1117">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,10 +14,13 @@
             --bg-primary: #0d1117;
             --bg-secondary: #161b22;
             --bg-card: #21262d;
+            --bg-card-hover: #2d333b;
             --text-primary: #f0f6fc;
             --text-secondary: #8b949e;
             --accent: #58a6ff;
             --accent-green: #3fb950;
+            --accent-orange: #d29922;
+            --accent-purple: #a371f7;
             --border: #30363d;
             --code-bg: #161b22;
         }
@@ -36,7 +39,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 0 24px;
         }
@@ -45,6 +48,10 @@
         header {
             border-bottom: 1px solid var(--border);
             padding: 16px 0;
+            position: sticky;
+            top: 0;
+            background: var(--bg-primary);
+            z-index: 100;
         }
 
         header .container {
@@ -60,15 +67,82 @@
             text-decoration: none;
         }
 
+        .logo-version {
+            font-size: 0.7rem;
+            color: var(--accent-green);
+            margin-left: 8px;
+            padding: 2px 6px;
+            background: rgba(63, 185, 80, 0.15);
+            border-radius: 4px;
+        }
+
         nav a {
             color: var(--text-secondary);
             text-decoration: none;
             margin-left: 24px;
             font-size: 0.9rem;
+            transition: color 0.2s;
         }
 
         nav a:hover {
             color: var(--accent);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 64px 0 48px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 32px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: #79b8ff;
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
         }
 
         /* Main Content */
@@ -88,14 +162,14 @@
         }
 
         h2 {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             margin: 48px 0 16px;
             padding-bottom: 8px;
             border-bottom: 1px solid var(--border);
         }
 
         h3 {
-            font-size: 1rem;
+            font-size: 1.1rem;
             margin: 24px 0 12px;
             color: var(--text-primary);
         }
@@ -103,6 +177,174 @@
         p {
             margin-bottom: 16px;
             color: var(--text-secondary);
+        }
+
+        /* Feature Cards with Expandable Details */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 24px 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent);
+        }
+
+        .feature-header {
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .feature-content {
+            flex: 1;
+        }
+
+        .feature-content h4 {
+            font-size: 1rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-content p {
+            font-size: 0.9rem;
+            margin: 0;
+            color: var(--text-secondary);
+        }
+
+        .feature-toggle {
+            color: var(--accent);
+            font-size: 0.8rem;
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .feature-toggle::after {
+            content: '▼';
+            font-size: 0.6rem;
+            transition: transform 0.2s;
+        }
+
+        .feature-card.expanded .feature-toggle::after {
+            transform: rotate(180deg);
+        }
+
+        .feature-details {
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .feature-card.expanded .feature-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-top: 16px;
+        }
+
+        .detail-section h5 {
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-section p, .detail-section li {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .detail-section ul {
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+
+        .detail-section li {
+            margin-bottom: 4px;
+        }
+
+        .tech-note {
+            background: var(--bg-primary);
+            border-left: 3px solid var(--accent-purple);
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-size: 0.85rem;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tech-note code {
+            background: var(--bg-card);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .code-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent);
+            font-size: 0.8rem;
+            text-decoration: none;
+            margin-top: 8px;
+        }
+
+        .code-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Status Badges */
+        .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .badge-available {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .badge-coming {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .badge-new {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--accent-purple);
         }
 
         /* Download Section */
@@ -117,12 +359,23 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 20px;
+            padding: 24px;
             text-align: center;
+            transition: all 0.2s;
+        }
+
+        .download-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
         }
 
         .download-card h4 {
             margin-bottom: 8px;
+        }
+
+        .download-card .os-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
         }
 
         .download-card a {
@@ -181,31 +434,6 @@
             padding: 0;
         }
 
-        /* Feature List */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin: 16px 0;
-        }
-
-        .feature {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-        }
-
-        .feature h4 {
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-        }
-
-        .feature p {
-            font-size: 0.85rem;
-            margin: 0;
-        }
-
         /* Architecture Diagram */
         .architecture {
             background: var(--code-bg);
@@ -225,26 +453,139 @@
             color: var(--accent);
         }
 
+        /* Workflow Steps */
+        .workflow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 24px 0;
+            padding: 20px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .workflow-arrow {
+            color: var(--accent);
+            font-size: 1.2rem;
+        }
+
+        /* Quick Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 20px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* FAQ Section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            padding: 16px 20px;
+            background: var(--bg-card);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+        }
+
+        .faq-question::after {
+            content: '+';
+            font-size: 1.2rem;
+            color: var(--accent);
+        }
+
+        .faq-item.expanded .faq-question::after {
+            content: '−';
+        }
+
+        .faq-answer {
+            display: none;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .faq-item.expanded .faq-answer {
+            display: block;
+        }
+
         /* Footer */
         footer {
             border-top: 1px solid var(--border);
-            padding: 24px 0;
-            margin-top: 48px;
+            padding: 32px 0;
+            margin-top: 64px;
             text-align: center;
             color: var(--text-secondary);
             font-size: 0.85rem;
         }
 
+        footer .links {
+            margin-bottom: 16px;
+        }
+
+        footer .links a {
+            margin: 0 16px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
-            .downloads {
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+            .downloads, .stats {
                 grid-template-columns: 1fr;
             }
-            .features {
+            .feature-grid {
                 grid-template-columns: 1fr;
             }
             nav a {
-                margin-left: 16px;
+                margin-left: 12px;
+                font-size: 0.8rem;
+            }
+            .workflow {
+                flex-direction: column;
+            }
+            .workflow-arrow {
+                transform: rotate(90deg);
             }
         }
     </style>
@@ -252,210 +593,725 @@
 <body>
     <header>
         <div class="container">
-            <a href="#" class="logo">BackupForce</a>
+            <a href="#" class="logo">BackupForce <span class="logo-version">v3.1</span></a>
             <nav>
-                <a href="#downloads">Downloads</a>
-                <a href="#architecture">Architecture</a>
                 <a href="#features">Features</a>
+                <a href="#backup">Backup</a>
+                <a href="#restore">Restore</a>
+                <a href="#downloads">Download</a>
                 <a href="https://github.com/victorfelisbino/BackupForce">GitHub</a>
             </nav>
         </div>
     </header>
 
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Backup & Restore Your Salesforce Data</h1>
+            <p class="subtitle">A free, open-source desktop app that gives you complete control over your Salesforce data. Export to CSV files or directly to your data warehouse. Verify everything. Restore when needed.</p>
+            <div class="hero-buttons">
+                <a href="https://github.com/victorfelisbino/BackupForce/releases/latest" class="btn btn-primary">Download for Free</a>
+                <a href="https://github.com/victorfelisbino/BackupForce" class="btn btn-secondary">View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
     <main>
         <div class="container">
-            <h1>BackupForce</h1>
-            <p class="subtitle">Desktop application for backing up and restoring Salesforce data using Bulk API v2. Supports CSV export and direct database integration.</p>
 
-            <h2 id="downloads">Downloads</h2>
-            <p>Pre-built releases with bundled Java runtime. No additional software required.</p>
+            <!-- Quick Stats -->
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">1-15</div>
+                    <div class="stat-label">Parallel Workers</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Export Destinations</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">4GB</div>
+                    <div class="stat-label">Default Memory</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">∞</div>
+                    <div class="stat-label">Records Supported</div>
+                </div>
+            </div>
+
+            <!-- Simple Workflow -->
+            <div class="workflow">
+                <div class="workflow-step">🔐 Connect to Salesforce</div>
+                <span class="workflow-arrow">→</span>
+                <div class="workflow-step">📋 Select Objects</div>
+                <span class="workflow-arrow">→</span>
+                <div class="workflow-step">⚙️ Choose Destination</div>
+                <span class="workflow-arrow">→</span>
+                <div class="workflow-step">▶️ Run Backup</div>
+                <span class="workflow-arrow">→</span>
+                <div class="workflow-step">✅ Verify</div>
+            </div>
+
+            <!-- BACKUP FEATURES SECTION -->
+            <h2 id="backup">Data Backup Features</h2>
+            <p>Everything you need to safely export your Salesforce data, from simple CSV exports to enterprise data warehouses.</p>
+
+            <div class="feature-grid">
+
+                <!-- Incremental Backup -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">📅</div>
+                        <div class="feature-content">
+                            <h4>Incremental Backup <span class="badge badge-available">Available</span></h4>
+                            <p>Only backup records that changed since your last backup. Save time and API calls on large orgs.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>Instead of exporting all records every time, incremental backup only fetches records that were created or modified since your last successful backup. Perfect for daily backups of large orgs.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Check the <strong>"Incremental Backup"</strong> checkbox on the Backup page</li>
+                                <li>The app automatically remembers your last backup date per object</li>
+                                <li>First run is always a full backup, subsequent runs are incremental</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses <code>LastModifiedDate > [timestamp]</code> in the SOQL WHERE clause. Backup history is stored in <code>~/.backupforce/backup_history.json</code>. Objects without LastModifiedDate field (like History objects or Custom Metadata) automatically fall back to full backup.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/history/BackupHistory.java" class="code-link">📄 View BackupHistory.java</a>
+                    </div>
+                </div>
+
+                <!-- Skip Matching Counts -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">⏭️</div>
+                        <div class="feature-content">
+                            <h4>Skip If Already Backed Up <span class="badge badge-available">Available</span></h4>
+                            <p>Resume interrupted backups by skipping objects that already match your Salesforce record count.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>If your backup gets interrupted (crash, timeout, out of memory), you can restart it and the app will skip objects that are already fully backed up. It compares record counts in your destination with Salesforce.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Go to <strong>Configure Database</strong> settings</li>
+                                <li>Check <strong>"Skip tables if record count matches Salesforce"</strong></li>
+                                <li>Make sure "Drop and recreate tables" is <em>unchecked</em></li>
+                                <li>When you restart a backup, matching objects show "SKIPPED"</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Queries <code>SELECT COUNT(DISTINCT Id) FROM table</code> in Snowflake/PostgreSQL/SQL Server and compares to Salesforce's record count via <code>getRecordCount()</code>. Only available for database destinations (not CSV yet).
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/sink/JdbcDatabaseSink.java" class="code-link">📄 View JdbcDatabaseSink.java</a>
+                    </div>
+                </div>
+
+                <!-- Field Selection -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">✏️</div>
+                        <div class="feature-content">
+                            <h4>Field Selection <span class="badge badge-available">Available</span></h4>
+                            <p>Choose exactly which fields to backup per object. Skip formula fields, reduce file sizes.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>Instead of backing up all 500+ fields on an object, select only the ones you need. Essential fields (Id, Name, CreatedDate, etc.) are always included automatically.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Click the <strong>✏️ pencil icon</strong> next to any object in the list</li>
+                                <li>A dialog shows all available fields with checkboxes</li>
+                                <li>Use "Select All" / "Deselect All" for quick selection</li>
+                                <li>System and essential fields are pre-selected</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Salesforce REST API <code>/describe</code> to get field metadata. Builds a custom SOQL SELECT statement with only chosen fields. Field selections are remembered per object.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/ui/FieldSelectionDialog.java" class="code-link">📄 View FieldSelectionDialog.java</a>
+                    </div>
+                </div>
+
+                <!-- Custom WHERE Filter -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🔍</div>
+                        <div class="feature-content">
+                            <h4>Custom WHERE Filter <span class="badge badge-available">Available</span></h4>
+                            <p>Filter your backup with any SOQL WHERE clause. Backup only active records, specific record types, or date ranges.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>Add custom filtering conditions that apply to all objects during backup. Great for backing up only active accounts, opportunities from a specific date range, or records owned by certain users.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Check <strong>"Use Custom WHERE"</strong> checkbox</li>
+                                <li>Enter your condition: <code>IsDeleted = false AND CreatedDate > 2024-01-01T00:00:00Z</code></li>
+                                <li>Don't include the "WHERE" keyword - just the condition</li>
+                                <li>Works together with incremental backup (conditions are combined with AND)</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> The WHERE clause is appended to the Bulk API v2 query. If combined with incremental backup, the final query becomes: <code>WHERE (LastModifiedDate > [timestamp]) AND ([your condition])</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backup Verification -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">✅</div>
+                        <div class="feature-content">
+                            <h4>Backup Verification <span class="badge badge-new">New</span></h4>
+                            <p>Verify your backup is complete by comparing record counts with Salesforce. Build trust in your data.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>After a backup completes, verification checks that every object in your destination has the same record count as Salesforce. You get a confidence report: HIGH (exact match), MODERATE (small variance), or LOW (significant difference).</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Click the <strong>Verify</strong> button after a backup completes</li>
+                                <li>Or check <strong>"Verify after backup"</strong> to run automatically</li>
+                                <li>Set default in Preferences → "Verify backup after completion by default"</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> For CSV: counts rows in each CSV file (excluding header). For databases: runs <code>SELECT COUNT(DISTINCT Id)</code>. Compares against Salesforce <code>/query?q=SELECT COUNT() FROM Object</code>. Results saved to backup history.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/verify/BackupVerifier.java" class="code-link">📄 View BackupVerifier.java</a>
+                    </div>
+                </div>
+
+                <!-- Binary Data Export -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">📎</div>
+                        <div class="feature-content">
+                            <h4>Attachments & Files <span class="badge badge-available">Available</span></h4>
+                            <p>Download actual file content from Attachments, ContentVersion, and Documents - not just metadata.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>When backing up Attachment, ContentVersion, or Document objects, the actual binary file content (PDFs, images, Word docs, etc.) is downloaded and saved alongside the record metadata.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>Supported Objects</h5>
+                            <ul>
+                                <li><strong>Attachment</strong> → Body field</li>
+                                <li><strong>ContentVersion</strong> → VersionData field</li>
+                                <li><strong>Document</strong> → Body field</li>
+                            </ul>
+                        </div>
+                        <div class="detail-section">
+                            <h5>Storage</h5>
+                            <ul>
+                                <li><strong>CSV:</strong> Files saved to <code>[backup-folder]/blobs/[ObjectName]/[RecordId]_filename.ext</code>. CSV includes a BlobFilePath column.</li>
+                                <li><strong>Snowflake:</strong> Binary stored in <code>BINARY(8MB)</code> column</li>
+                                <li><strong>PostgreSQL:</strong> Binary stored in <code>BYTEA</code> column</li>
+                                <li><strong>SQL Server:</strong> Binary stored in <code>VARBINARY(MAX)</code> column</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Salesforce REST API to download binary content via <code>/sobjects/[Object]/[Id]/Body</code> or <code>/sobjects/ContentVersion/[Id]/VersionData</code>. Memory-efficient streaming for large files. Default heap is 4GB to handle large attachments.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/bulkv2/BulkV2Client.java#L700" class="code-link">📄 View blob download code</a>
+                    </div>
+                </div>
+
+                <!-- Parallel Processing -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">⚡</div>
+                        <div class="feature-content">
+                            <h4>Parallel Processing <span class="badge badge-available">Available</span></h4>
+                            <p>Backup up to 15 objects simultaneously (default: 5). Large orgs with 200+ objects finish in hours, not days.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>Instead of backing up objects one at a time, BackupForce runs parallel backup workers. While waiting for Salesforce to process one Bulk API job, other objects are already being processed.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to configure</h5>
+                            <ul>
+                                <li>Go to <strong>Preferences → Backup Defaults → Parallel Threads</strong></li>
+                                <li>Set between 1-15 workers (default: 5)</li>
+                                <li>Lower values = less memory/API pressure, good for large objects</li>
+                                <li>Higher values = faster backups, good for many small objects</li>
+                            </ul>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How it works</h5>
+                            <ul>
+                                <li>You select 100 objects to backup</li>
+                                <li>N workers start simultaneously (where N = your configured value)</li>
+                                <li>As each worker finishes, it picks up the next object in queue</li>
+                                <li>Progress bar shows overall completion</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Java <code>ExecutorService</code> with a configurable thread pool (1-15). Salesforce allows 100 concurrent Bulk API jobs per org; we limit to 15 to avoid consuming too many org resources. Each worker manages its own Bulk API v2 job lifecycle: create job → upload query → poll for completion → download results. Thread-safe progress tracking via <code>AtomicInteger</code> counters. Preference stored in Java Preferences at <code>com.backupforce/threads</code>.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/ui/BackupController.java#L2200" class="code-link">📄 View parallel backup code</a>
+                    </div>
+                </div>
+
+                <!-- Bulk API v2 -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🚀</div>
+                        <div class="feature-content">
+                            <h4>Salesforce Bulk API v2 <span class="badge badge-available">Available</span></h4>
+                            <p>The fastest way to export data from Salesforce. Handle millions of records efficiently.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it does</h5>
+                            <p>Bulk API v2 is Salesforce's most efficient API for large data operations. Unlike regular REST API (2,000 records per call) or SOAP API (batch mode), Bulk v2 processes queries server-side and streams results.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>Why it matters</h5>
+                            <ul>
+                                <li>Export 10 million records without hitting API limits</li>
+                                <li>Server-side query processing (no pagination on client)</li>
+                                <li>Automatic result locator handling for large results</li>
+                                <li>Supports SOQL queries including relationships</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Creates query jobs via <code>POST /services/data/v62.0/jobs/query</code>. Polls <code>/jobs/query/[jobId]</code> until state is <code>JobComplete</code>. Downloads results via <code>/jobs/query/[jobId]/results</code> with streaming. Handles <code>Sforce-Locator</code> header for multi-part results.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/bulkv2/BulkV2Client.java" class="code-link">📄 View BulkV2Client.java</a>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- DESTINATIONS SECTION -->
+            <h2 id="destinations">Export Destinations</h2>
+            <p>Choose where to store your backups. Start simple with CSV files, or integrate directly with your data warehouse.</p>
+
+            <div class="feature-grid">
+
+                <!-- CSV Export -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">📁</div>
+                        <div class="feature-content">
+                            <h4>CSV Files <span class="badge badge-available">Available</span></h4>
+                            <p>Export to simple CSV files. Easy to open in Excel, import to other systems, or archive.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>Output Structure</h5>
+                            <ul>
+                                <li><code>Account.csv</code> - One CSV file per object</li>
+                                <li><code>blobs/Attachment/</code> - Binary files organized by object</li>
+                                <li><code>_backup_manifest.json</code> - Metadata about the backup</li>
+                            </ul>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Select destination: <strong>CSV Folder</strong></li>
+                                <li>Click <strong>Browse</strong> to choose output folder</li>
+                                <li>Files are written as each object completes</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Apache Commons CSV with RFC 4180 format. UTF-8 encoding with BOM for Excel compatibility. Handles NULL values, embedded quotes, and newlines in field data.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Snowflake -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">❄️</div>
+                        <div class="feature-content">
+                            <h4>Snowflake <span class="badge badge-available">Available</span></h4>
+                            <p>Stream data directly to Snowflake. Supports SSO authentication and automatic schema creation.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>Features</h5>
+                            <ul>
+                                <li>Auto-creates tables matching Salesforce object structure</li>
+                                <li>Maps Salesforce types to Snowflake types</li>
+                                <li>SSO via "externalbrowser" authenticator</li>
+                                <li>Binary data stored in BINARY columns</li>
+                            </ul>
+                        </div>
+                        <div class="detail-section">
+                            <h5>Connection Settings</h5>
+                            <ul>
+                                <li><strong>Account:</strong> your-account.snowflakecomputing.com</li>
+                                <li><strong>Database:</strong> SALESFORCE_BACKUP</li>
+                                <li><strong>Schema:</strong> TBS_DATA (or your preference)</li>
+                                <li><strong>Warehouse:</strong> COMPUTE_WH</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Snowflake JDBC driver with <code>net.snowflake:snowflake-jdbc</code>. Table DDL generated dynamically from Salesforce <code>/describe</code> metadata. Batch inserts via <code>PreparedStatement.addBatch()</code>.
+                        </div>
+                        <a href="https://github.com/victorfelisbino/BackupForce/blob/main/src/main/java/com/backupforce/sink/JdbcDatabaseSink.java" class="code-link">📄 View JdbcDatabaseSink.java</a>
+                    </div>
+                </div>
+
+                <!-- PostgreSQL -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🐘</div>
+                        <div class="feature-content">
+                            <h4>PostgreSQL <span class="badge badge-available">Available</span></h4>
+                            <p>Back up to your PostgreSQL database. Great for on-premise data warehouses or cloud PostgreSQL.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>Type Mapping</h5>
+                            <ul>
+                                <li>Salesforce Text → <code>TEXT</code></li>
+                                <li>Salesforce Number → <code>NUMERIC</code></li>
+                                <li>Salesforce Date → <code>DATE</code></li>
+                                <li>Salesforce DateTime → <code>TIMESTAMP</code></li>
+                                <li>Salesforce Boolean → <code>BOOLEAN</code></li>
+                                <li>Binary data → <code>BYTEA</code></li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses PostgreSQL JDBC driver. Table and column names are quoted to preserve case and handle reserved words. Uses <code>ON CONFLICT DO NOTHING</code> for upserts when not recreating tables.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SQL Server -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🗄️</div>
+                        <div class="feature-content">
+                            <h4>SQL Server <span class="badge badge-available">Available</span></h4>
+                            <p>Direct integration with Microsoft SQL Server for enterprise backup strategies.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>Type Mapping</h5>
+                            <ul>
+                                <li>Salesforce Text → <code>NVARCHAR(MAX)</code></li>
+                                <li>Salesforce Number → <code>DECIMAL</code></li>
+                                <li>Salesforce DateTime → <code>DATETIME2</code></li>
+                                <li>Binary data → <code>VARBINARY(MAX)</code></li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses Microsoft JDBC driver <code>mssql-jdbc</code>. Supports Windows authentication and SQL authentication. Schema and table names use bracket notation <code>[schema].[table]</code>.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RESTORE SECTION -->
+            <h2 id="restore">Data Restore <span class="badge badge-coming">Coming Soon</span></h2>
+            <p>Restore your backed-up data back to Salesforce. Whether recovering from data loss, migrating between orgs, or setting up sandboxes - restore makes it simple.</p>
+
+            <div class="feature-grid">
+
+                <!-- Relationship Resolution -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🔗</div>
+                        <div class="feature-content">
+                            <h4>Relationship Resolution <span class="badge badge-coming">Coming Soon</span></h4>
+                            <p>Automatically resolve lookup and master-detail relationships. Old IDs map to new IDs seamlessly.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>The Problem</h5>
+                            <p>When you restore an Opportunity, it has an AccountId pointing to the old Account record's ID. But in the target org, that Account has a different ID (or doesn't exist yet).</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>The Solution</h5>
+                            <ul>
+                                <li>Restore parent objects first (Accounts before Opportunities)</li>
+                                <li>Track Old ID → New ID mapping for every inserted record</li>
+                                <li>Replace lookup field values with new IDs before insert</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Uses topological sort to determine restore order based on relationship metadata. Stores mappings in <code>_id_mapping.json</code>. Handles circular references by doing a two-pass insert (insert with nulls, then update with resolved IDs).
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cross-Org Transformation -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🔄</div>
+                        <div class="feature-content">
+                            <h4>Cross-Org Transformation <span class="badge badge-coming">Coming Soon</span></h4>
+                            <p>Migrate data between different orgs. Map RecordTypes, picklist values, and users automatically.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What it solves</h5>
+                            <p>Source org has RecordType "Enterprise Account" with ID 012xxx. Target org has same RecordType but ID 012yyy. Same for picklist values, users, profiles, and more.</p>
+                        </div>
+                        <div class="detail-section">
+                            <h5>Automatic Mapping</h5>
+                            <ul>
+                                <li><strong>RecordTypes:</strong> Matched by DeveloperName</li>
+                                <li><strong>Users:</strong> Matched by Email or Username</li>
+                                <li><strong>Picklists:</strong> Matched by API value</li>
+                                <li><strong>Profiles:</strong> Matched by Name</li>
+                            </ul>
+                        </div>
+                        <div class="tech-note">
+                            <strong>Technical Details:</strong> Pre-restore phase queries target org metadata. Builds transformation map. Dry-run mode shows what will change without actually inserting. Transformation rules stored in <code>_transformation_rules.json</code>.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dry Run -->
+                <div class="feature-card" onclick="toggleFeature(this)">
+                    <div class="feature-header">
+                        <div class="feature-icon">🔬</div>
+                        <div class="feature-content">
+                            <h4>Dry Run Mode <span class="badge badge-coming">Coming Soon</span></h4>
+                            <p>Preview exactly what will happen before committing any changes. See transformations, warnings, and potential issues.</p>
+                            <span class="feature-toggle">How it works</span>
+                        </div>
+                    </div>
+                    <div class="feature-details">
+                        <div class="detail-section">
+                            <h5>What you see</h5>
+                            <ul>
+                                <li>Number of records to be inserted per object</li>
+                                <li>Fields that will be transformed</li>
+                                <li>Unmapped values (missing RecordTypes, etc.)</li>
+                                <li>Relationship resolution preview</li>
+                                <li>Estimated API usage</li>
+                            </ul>
+                        </div>
+                        <div class="detail-section">
+                            <h5>How to use</h5>
+                            <ul>
+                                <li>Select your backup folder or database connection</li>
+                                <li>Configure transformation options</li>
+                                <li>Click <strong>"Dry Run"</strong> instead of "Restore"</li>
+                                <li>Review the report, then run actual restore</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- DOWNLOADS SECTION -->
+            <h2 id="downloads">Download</h2>
+            <p>Pre-built releases include bundled Java runtime. No additional software required - just download, extract, and run.</p>
             
             <div class="downloads">
                 <div class="download-card">
+                    <div class="os-icon">🪟</div>
                     <h4>Windows</h4>
+                    <p style="font-size: 0.85rem; margin: 8px 0;">Windows 10/11 (64-bit)</p>
                     <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">BackupForce-portable.zip</a>
                 </div>
                 <div class="download-card">
+                    <div class="os-icon">🍎</div>
                     <h4>macOS</h4>
+                    <p style="font-size: 0.85rem; margin: 8px 0;">macOS 11+ (Apple Silicon & Intel)</p>
                     <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">BackupForce.dmg</a>
                 </div>
                 <div class="download-card">
+                    <div class="os-icon">🐧</div>
                     <h4>Linux</h4>
+                    <p style="font-size: 0.85rem; margin: 8px 0;">Ubuntu 20.04+, RHEL 8+</p>
                     <a href="https://github.com/victorfelisbino/BackupForce/releases/latest">backupforce.tar.gz</a>
                 </div>
             </div>
 
+            <!-- ARCHITECTURE SECTION -->
             <h2 id="architecture">Architecture</h2>
-            <div class="architecture">┌─────────────────────────────────────────────────────────────┐
-│                        BackupForce                           │
-├─────────────────────────────────────────────────────────────┤
-│  UI Layer (JavaFX)                                           │
-│  ├── FXML Controllers                                        │
-│  └── CSS Theming                                             │
-├─────────────────────────────────────────────────────────────┤
-│  Service Layer                                               │
-│  ├── BackupService (5 parallel workers)                      │
-│  ├── RestoreService (relationship resolution)                │
-│  └── TransformationService (cross-org mapping)               │
-├─────────────────────────────────────────────────────────────┤
-│  API Layer                                                   │
-│  ├── BulkV2Client (Bulk API v2 + connection recovery)        │
-│  ├── SalesforceClient (REST API for metadata)                │
-│  └── OAuthManager (OAuth 2.0)                                │
-├─────────────────────────────────────────────────────────────┤
-│  Storage Layer                                               │
-│  ├── CsvExporter                                             │
-│  ├── DatabaseExporter (Snowflake, PostgreSQL, SQL Server)    │
-│  └── BlobDownloader                                          │
-└─────────────────────────────────────────────────────────────┘</div>
+            <p>BackupForce is a JavaFX desktop application built for reliability and performance.</p>
 
-            <h3>Key Components</h3>
-            <table>
-                <tr>
-                    <th>Component</th>
-                    <th>Description</th>
-                </tr>
-                <tr>
-                    <td><code>BulkV2Client</code></td>
-                    <td>HTTP client with connection pool recovery and version tracking</td>
-                </tr>
-                <tr>
-                    <td><code>BackupService</code></td>
-                    <td>Multi-threaded orchestration with 5 parallel workers</td>
-                </tr>
-                <tr>
-                    <td><code>RestoreService</code></td>
-                    <td>Insert/Update/Upsert with OldId → NewId mapping</td>
-                </tr>
-                <tr>
-                    <td><code>TransformationService</code></td>
-                    <td>Cross-org RecordType, picklist, and user mapping</td>
-                </tr>
-            </table>
+            <div class="architecture">┌─────────────────────────────────────────────────────────────────┐
+│                         BackupForce                              │
+├─────────────────────────────────────────────────────────────────┤
+│  UI Layer (JavaFX)                                               │
+│  ├── FXML Controllers (Dashboard, Backup, Restore, Preferences)  │
+│  └── CSS Theming (Windows 11 Dark, VS Code Dark)                 │
+├─────────────────────────────────────────────────────────────────┤
+│  Service Layer                                                   │
+│  ├── BackupService ─────→ 1-15 parallel workers (configurable)   │
+│  ├── RestoreService ────→ Relationship resolution, ID mapping    │
+│  ├── VerificationService → Count comparison, confidence scoring  │
+│  └── BackupHistory ─────→ Incremental tracking, last modified    │
+├─────────────────────────────────────────────────────────────────┤
+│  API Layer                                                       │
+│  ├── BulkV2Client ──────→ Query jobs, result streaming           │
+│  ├── SalesforceClient ──→ REST API, describe, blob download      │
+│  └── OAuthManager ──────→ OAuth 2.0, token refresh               │
+├─────────────────────────────────────────────────────────────────┤
+│  Storage Layer (DataSink interface)                              │
+│  ├── CsvExporter ───────→ Apache Commons CSV, blob files         │
+│  ├── SnowflakeSink ─────→ Snowflake JDBC, SSO support            │
+│  ├── PostgresSink ──────→ PostgreSQL JDBC                        │
+│  └── SqlServerSink ─────→ Microsoft JDBC                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Configuration                                                   │
+│  ├── ConnectionManager ─→ Saved connections (encrypted)          │
+│  ├── Preferences ───────→ User settings                          │
+│  └── BackupHistory ─────→ ~/.backupforce/backup_history.json     │
+└─────────────────────────────────────────────────────────────────┘</div>
 
-            <h2 id="features">Features</h2>
-            
-            <h3>Backup</h3>
-            <div class="features">
-                <div class="feature">
-                    <h4>Bulk API v2</h4>
-                    <p>Efficient export for large datasets (millions of records)</p>
-                </div>
-                <div class="feature">
-                    <h4>Field Selection</h4>
-                    <p>Select specific fields per object</p>
-                </div>
-                <div class="feature">
-                    <h4>Blob Export</h4>
-                    <p>Attachment.Body, ContentVersion.VersionData, Document.Body</p>
-                </div>
-                <div class="feature">
-                    <h4>Parallel Processing</h4>
-                    <p>5 concurrent worker threads</p>
+            <!-- FAQ Section -->
+            <h2>Frequently Asked Questions</h2>
+
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">How is this different from Salesforce's Data Export service?</div>
+                <div class="faq-answer">
+                    Salesforce's built-in Data Export runs weekly (or monthly on lower editions) and gives you a ZIP file of CSVs. BackupForce lets you backup on-demand, choose specific objects and fields, export directly to databases like Snowflake, run incremental backups, and verify that your backup is complete. Plus, it works with all Salesforce editions.
                 </div>
             </div>
 
-            <h3>Database Integration</h3>
-            <table>
-                <tr>
-                    <th>Database</th>
-                    <th>Blob Storage</th>
-                    <th>SSO</th>
-                </tr>
-                <tr>
-                    <td>Snowflake</td>
-                    <td><code>BINARY(8MB)</code></td>
-                    <td>Externalbrowser</td>
-                </tr>
-                <tr>
-                    <td>PostgreSQL</td>
-                    <td><code>BYTEA</code></td>
-                    <td>—</td>
-                </tr>
-                <tr>
-                    <td>SQL Server</td>
-                    <td><code>VARBINARY(MAX)</code></td>
-                    <td>—</td>
-                </tr>
-                <tr>
-                    <td>CSV</td>
-                    <td>File + path column</td>
-                    <td>—</td>
-                </tr>
-            </table>
-
-            <h3>Restore</h3>
-            <div class="features">
-                <div class="feature">
-                    <h4>Relationship Resolution</h4>
-                    <p>Automatically resolves lookup references during restore</p>
-                </div>
-                <div class="feature">
-                    <h4>Dependency Ordering</h4>
-                    <p>Restores parent objects before children</p>
-                </div>
-                <div class="feature">
-                    <h4>Cross-Org Transformation</h4>
-                    <p>Maps metadata between different orgs</p>
-                </div>
-                <div class="feature">
-                    <h4>Dry Run</h4>
-                    <p>Preview transformations before execution</p>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">What Salesforce editions are supported?</div>
+                <div class="faq-answer">
+                    BackupForce works with any Salesforce edition that supports the Bulk API v2 and REST API. This includes Enterprise, Unlimited, Developer, and Performance editions. Professional Edition works if you have API access enabled (usually requires an add-on).
                 </div>
             </div>
 
-            <h2>Backup Output</h2>
-            <table>
-                <tr>
-                    <th>File</th>
-                    <th>Purpose</th>
-                </tr>
-                <tr>
-                    <td><code>ObjectName.csv</code></td>
-                    <td>Record data with IDs and lookup references</td>
-                </tr>
-                <tr>
-                    <td><code>_backup_manifest.json</code></td>
-                    <td>Relationship metadata and restore order</td>
-                </tr>
-                <tr>
-                    <td><code>_id_mapping.json</code></td>
-                    <td>ID to external identifier mappings</td>
-                </tr>
-            </table>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">How many API calls does a backup use?</div>
+                <div class="faq-answer">
+                    Bulk API v2 jobs don't count against your daily REST API limits - they use a separate allocation. A typical backup of 100 objects might use: 100 Bulk API jobs (one per object), plus a few hundred REST calls for metadata and record counts. For most orgs, this is well within limits.
+                </div>
+            </div>
 
-            <h2>Requirements</h2>
-            <h3>Pre-built Releases</h3>
-            <p>Windows 10/11, macOS 11+, or Linux (Ubuntu 20.04+, RHEL 8+)</p>
-            
-            <h3>Building from Source</h3>
-            <p>Java 21+, Maven 3.9+</p>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">Can I schedule automated backups?</div>
+                <div class="faq-answer">
+                    Not yet within the app, but it's on the roadmap. For now, you can use Windows Task Scheduler, cron, or any automation tool to launch BackupForce with command-line arguments for unattended backups.
+                </div>
+            </div>
+
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">Is my data secure?</div>
+                <div class="faq-answer">
+                    BackupForce runs entirely on your machine - no data is sent to any third-party servers. OAuth tokens are stored locally in your OS credential store. Database passwords for saved connections are encrypted. Your backup files are stored wherever you choose.
+                </div>
+            </div>
+
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">What about custom objects and fields?</div>
+                <div class="faq-answer">
+                    Fully supported. BackupForce queries the Salesforce <code>/describe</code> API to discover all objects and fields, including custom ones (__c), managed package objects, and custom metadata types (__mdt).
+                </div>
+            </div>
+
+            <!-- Building from Source -->
+            <h2>Building from Source</h2>
+            <h3>Requirements</h3>
+            <ul style="color: var(--text-secondary); margin-left: 20px; margin-bottom: 16px;">
+                <li>Java 21 or later (OpenJDK or Oracle JDK)</li>
+                <li>Maven 3.9 or later</li>
+            </ul>
+
             <pre><code>git clone https://github.com/victorfelisbino/BackupForce.git
 cd BackupForce
-mvn javafx:run</code></pre>
+mvn clean package -DskipTests
+java -jar target/BackupForce.jar</code></pre>
 
-            <h2>Configuration</h2>
-            <h3>Memory</h3>
-            <p>Default: 4GB heap. Adjust for large objects:</p>
-            <pre><code>java -Xmx8g -jar BackupForce.jar</code></pre>
+            <h3>Creating Native Executables</h3>
+            <pre><code># Windows
+.\scripts\build-portable.ps1
 
-            <h3>OAuth</h3>
-            <p>Configure Connected App in Salesforce Setup. See <a href="OAUTH_SETUP.md">OAUTH_SETUP.md</a>.</p>
+# macOS  
+./scripts/build-mac.sh
 
+# The output is in the /dist folder</code></pre>
+
+            <!-- Documentation Links -->
             <h2>Documentation</h2>
             <ul style="color: var(--text-secondary); margin-left: 20px;">
                 <li><a href="OAUTH_SETUP.md">OAuth Setup</a> - Configure Salesforce Connected App</li>
                 <li><a href="BUILD_EXECUTABLE.md">Build Guide</a> - Create native executables</li>
+                <li><a href="DISTRIBUTION_GUIDE.md">Distribution Guide</a> - Packaging for release</li>
                 <li><a href="ROADMAP.md">Roadmap</a> - Planned features</li>
-                <li><a href="https://github.com/victorfelisbino/BackupForce">GitHub Repository</a></li>
+                <li><a href="https://github.com/victorfelisbino/BackupForce/issues">Issue Tracker</a> - Report bugs and request features</li>
             </ul>
+
         </div>
     </main>
 
     <footer>
         <div class="container">
-            MIT License · <a href="https://github.com/victorfelisbino/BackupForce">GitHub</a>
+            <div class="links">
+                <a href="https://github.com/victorfelisbino/BackupForce">GitHub</a>
+                <a href="https://github.com/victorfelisbino/BackupForce/releases">Releases</a>
+                <a href="https://github.com/victorfelisbino/BackupForce/issues">Issues</a>
+                <a href="https://github.com/victorfelisbino/BackupForce/blob/main/LICENSE">MIT License</a>
+            </div>
+            <p>Made with ☕ for the Salesforce community</p>
         </div>
     </footer>
+
+    <script>
+        function toggleFeature(card) {
+            card.classList.toggle('expanded');
+        }
+
+        function toggleFaq(item) {
+            item.classList.toggle('expanded');
+        }
+    </script>
 </body>
 </html>

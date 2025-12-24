@@ -68,7 +68,7 @@ jpackage \
   --vendor "BackupForce" \
   --description "Salesforce Backup Tool" \
   --java-options '--add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED' \
-  --java-options '-Xmx2g'
+  --java-options '-Xmx4g'
 
 if [ ! -d "build/BackupForce.app" ]; then
     echo "❌ jpackage failed to create .app bundle"
@@ -93,7 +93,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
       --vendor "BackupForce" \
       --description "Salesforce Backup Tool" \
       --java-options '--add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED' \
-      --java-options '-Xmx2g'
+      --java-options '-Xmx4g'
     
     if [ -f build/BackupForce-1.0.0.dmg ]; then
         echo "✅ DMG installer created: build/BackupForce-1.0.0.dmg"

@@ -18,6 +18,9 @@ import com.backupforce.ui.RelationshipPreviewController.SelectedRelatedObject;
 import com.backupforce.sink.DataSink;
 import com.backupforce.sink.DataSinkFactory;
 import com.backupforce.ui.DatabaseSettingsController.DatabaseConnectionInfo;
+import com.backupforce.verification.BackupVerifier;
+import com.backupforce.verification.BackupVerifier.VerificationResult;
+import com.backupforce.verification.BackupVerifier.VerificationStatus;
 import com.sforce.soap.partner.DescribeGlobalResult;
 import com.sforce.soap.partner.DescribeGlobalSObjectResult;
 import javafx.application.Platform;
@@ -69,6 +72,41 @@ public class BackupController {
     // Objects known to cause memory issues due to large binary data
     private static final Set<String> LARGE_OBJECTS = new HashSet<>(Arrays.asList(
         "Attachment", "ContentVersion", "Document", "StaticResource"
+    ));
+    
+    // System/metadata objects that typically fail or aren't useful for backup
+    private static final Set<String> SYSTEM_OBJECTS = new HashSet<>(Arrays.asList(
+        // Metadata objects requiring special filters
+        "FieldDefinition", "FieldSecurityClassification", "FlowTestView", "FlowVariableView",
+        "FlowVersionView", "IconDefinition", "ListViewChartInstance", "OwnerChangeOptionInfo",
+        "PicklistValueInfo", "PlatformAction", "RelatedListColumnDefinition", "RelatedListDefinition",
+        "RelationshipDomain", "RelationshipInfo", "SearchLayout", "SiteDetail", "UserEntityAccess",
+        "UserFieldAccess", "EntityDefinition", "EntityParticle", "Publisher", "QuickActionDefinition",
+        "QuickActionListItem", "QuickActionList", "TabDefinition", "ColorDefinition", "DataType",
+        
+        // Objects not supported by Bulk API
+        "OrderStatus", "TaskWhoRelation", "WorkStepStatus", "CaseStatus", "ContractStatus",
+        "LeadStatus", "OpportunityStage", "PartnerRole", "SolutionStatus", "TaskStatus",
+        
+        // Objects requiring specific WHERE filters
+        "Vote", "IdeaComment", "FeedComment", "FeedItem", "FeedLike", "FeedPollChoice",
+        "FeedPollVote", "FeedRevision", "FeedSignal", "FeedTrackedChange",
+        
+        // External/system objects
+        "SalesforcePayment", "FlexQueueItem", "OutgoingEmail", "OutgoingEmailRelation",
+        "UnifiedActivity", "ContentFolderMember", "ContentWorkspaceMember",
+        
+        // Share objects (usually auto-managed)
+        "UserShare", "GroupMember", "QueueSobject",
+        
+        // Compound/address objects
+        "Address", "Location",
+        
+        // Other problematic objects
+        "items_Quip__x", "ApexClass", "ApexTrigger", "ApexComponent", "ApexPage",
+        "AsyncApexJob", "CronTrigger", "CronJobDetail", "ApexEmailNotification",
+        "ApexTestQueueItem", "ApexTestResult", "ApexTestResultLimits", "ApexTestRunResult",
+        "ApexLog", "TraceFlag", "DebugLevel"
     ));
     
     // Rate-limited logging to prevent UI thread saturation
@@ -142,6 +180,7 @@ public class BackupController {
     @FXML private Button deselectAllButton;
     @FXML private Button startBackupButton;
     @FXML private Button stopBackupButton;
+    @FXML private Button verifyBackupButton;
     @FXML private Button exportResultsButton;
     
     // Removed: openRestoreButton - only used by old backup.fxml
@@ -894,12 +933,19 @@ public class BackupController {
                 fields.put("Password", ConnectionManager.getInstance().getDecryptedPassword(connection));
             }
             
+            logger.info("Loading saved connection '{}' - recreateTables: {}, skipMatchingCounts: {}", 
+                connection.getName(), connection.isRecreateTables(), connection.isSkipMatchingCounts());
+            
             databaseConnectionInfo = new DatabaseConnectionInfo(
                 connection.getType(),
                 fields,
                 connection.isUseSso(),
-                true // recreate tables - can be configured
+                connection.isRecreateTables()
             );
+            databaseConnectionInfo.setSkipMatchingCounts(connection.isSkipMatchingCounts());
+            
+            logger.info("Created DatabaseConnectionInfo - recreateTables: {}, skipMatchingCounts: {}", 
+                databaseConnectionInfo.isRecreateTables(), databaseConnectionInfo.isSkipMatchingCounts());
             
             // Update the connection info display
             connectionInfoBox.setVisible(true);
@@ -1359,7 +1405,10 @@ public class BackupController {
         }
         
         // Set recreate tables option
+        logger.info("Setting sink options - recreateTables: {}, skipMatchingCounts: {}", 
+            config.isRecreateTables(), config.isSkipMatchingCounts());
         sink.setRecreateTables(config.isRecreateTables());
+        sink.setSkipMatchingCounts(config.isSkipMatchingCounts());
         return sink;
     }
 
@@ -1388,6 +1437,45 @@ public class BackupController {
             filteredObjects.forEach(item -> item.setSelected(false));
             allObjectsTable.refresh();
             updateSelectionCount();
+        }
+    }
+    
+    @FXML
+    private void handleSelectBusinessOnly() {
+        if (filteredObjects != null) {
+            int selected = 0;
+            int excluded = 0;
+            for (SObjectItem item : filteredObjects) {
+                String name = item.getName();
+                // Exclude system objects, metadata objects, and known problematic patterns
+                boolean isSystemObject = SYSTEM_OBJECTS.contains(name) ||
+                    name.endsWith("__mdt") ||           // Custom metadata types
+                    name.endsWith("__e") ||             // Platform events
+                    name.endsWith("__x") ||             // External objects
+                    name.endsWith("__b") ||             // Big objects
+                    name.endsWith("__pc") ||            // Person account fields
+                    name.endsWith("ChangeEvent") ||     // Change data capture
+                    name.contains("Feed") ||            // Feed objects (usually huge)
+                    name.contains("History") ||         // History objects (can be huge)
+                    name.contains("Share") ||           // Share objects (auto-managed)
+                    name.startsWith("Setup") ||         // Setup objects
+                    name.startsWith("Auth") ||          // Auth objects
+                    name.startsWith("Login") ||         // Login objects
+                    name.startsWith("Session") ||       // Session objects
+                    name.startsWith("TwoFactor") ||     // 2FA objects
+                    name.startsWith("Apex");            // Apex-related objects
+                
+                if (isSystemObject) {
+                    item.setSelected(false);
+                    excluded++;
+                } else {
+                    item.setSelected(true);
+                    selected++;
+                }
+            }
+            allObjectsTable.refresh();
+            updateSelectionCount();
+            logMessage(String.format("Business objects selected: %d (excluded %d system/metadata objects)", selected, excluded));
         }
     }
     
@@ -1503,7 +1591,8 @@ public class BackupController {
             }
             
             try {
-                logger.info("Creating data sink from config...");
+                logger.info("Creating data sink from config - skipMatchingCounts: {}, recreateTables: {}", 
+                    databaseConnectionInfo.isSkipMatchingCounts(), databaseConnectionInfo.isRecreateTables());
                 dataSink = createDataSinkFromConfig(databaseConnectionInfo);
                 logger.info("Data sink created successfully: {}", dataSink.getDisplayName());
             } catch (Exception e) {
@@ -1616,6 +1705,7 @@ public class BackupController {
                 databaseRadioButton.setDisable(false);
                 databaseSettingsButton.setDisable(false);
                 exportResultsButton.setDisable(false);
+                if (verifyBackupButton != null) verifyBackupButton.setDisable(false);
             });
         });
         
@@ -1631,6 +1721,7 @@ public class BackupController {
                 databaseRadioButton.setDisable(false);
                 databaseSettingsButton.setDisable(false);
                 exportResultsButton.setDisable(false);
+                if (verifyBackupButton != null) verifyBackupButton.setDisable(false);
                 progressLabel.setText("Backup failed");
                 logMessage("Backup failed: " + currentBackupTask.getException().getMessage());
             });
@@ -1648,6 +1739,7 @@ public class BackupController {
                 databaseRadioButton.setDisable(false);
                 databaseSettingsButton.setDisable(false);
                 exportResultsButton.setDisable(false);
+                if (verifyBackupButton != null) verifyBackupButton.setDisable(false);
                 progressLabel.setText("Backup cancelled");
             });
         });
@@ -1765,6 +1857,162 @@ public class BackupController {
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         
         dialog.getDialogPane().setContent(tabPane);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+    
+    @FXML
+    private void handleVerifyBackup() {
+        String outputFolder = outputFolderField.getText();
+        if (outputFolder == null || outputFolder.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Backup Folder");
+            alert.setHeaderText("Please select a backup folder to verify");
+            alert.setContentText("Set the output folder to the location of your backup CSV files.");
+            alert.showAndWait();
+            return;
+        }
+        
+        if (connectionInfo == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Not Connected");
+            alert.setHeaderText("Please connect to Salesforce first");
+            alert.setContentText("Verification requires a connection to compare backup with the source org.");
+            alert.showAndWait();
+            return;
+        }
+        
+        // Get objects to verify (completed ones from last backup)
+        List<String> objectsToVerify = allObjects.stream()
+                .filter(item -> item.getStatus().contains("Completed") || item.getStatus().contains("✓"))
+                .map(SObjectItem::getName)
+                .collect(Collectors.toList());
+        
+        if (objectsToVerify.isEmpty()) {
+            // If no completed backup, verify all CSVs in folder
+            objectsToVerify = null;
+        }
+        
+        logMessage("🔍 Starting backup verification...");
+        progressLabel.setText("Verifying backup...");
+        progressBar.setProgress(-1); // Indeterminate
+        
+        // Run verification in background
+        final List<String> finalObjectsToVerify = objectsToVerify;
+        Task<VerificationResult> verifyTask = new Task<>() {
+            @Override
+            protected VerificationResult call() throws Exception {
+                BackupVerifier verifier = new BackupVerifier(
+                        connectionInfo.getInstanceUrl(),
+                        connectionInfo.getSessionId(),
+                        "v59.0");
+                verifier.setLogConsumer(msg -> Platform.runLater(() -> logMessage(msg)));
+                
+                // Check if database backup or CSV
+                if (databaseRadioButton.isSelected() && databaseConnectionInfo != null) {
+                    // Database verification
+                    DataSink sink = createDataSinkFromConfig(databaseConnectionInfo);
+                    if (sink != null) {
+                        return verifier.verifyDatabaseBackup(sink, finalObjectsToVerify);
+                    }
+                }
+                
+                // CSV verification
+                return verifier.verifyBackup(outputFolder, finalObjectsToVerify);
+            }
+        };
+        
+        verifyTask.setOnSucceeded(event -> {
+            VerificationResult result = verifyTask.getValue();
+            Platform.runLater(() -> {
+                progressBar.setProgress(1);
+                progressLabel.setText("Verification complete");
+                
+                // Show results dialog
+                showVerificationResultsDialog(result);
+            });
+        });
+        
+        verifyTask.setOnFailed(event -> {
+            Platform.runLater(() -> {
+                progressBar.setProgress(0);
+                progressLabel.setText("Verification failed");
+                logMessage("❌ Verification failed: " + verifyTask.getException().getMessage());
+                
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Verification Failed");
+                alert.setHeaderText("Backup verification encountered an error");
+                alert.setContentText(verifyTask.getException().getMessage());
+                alert.showAndWait();
+            });
+        });
+        
+        new Thread(verifyTask).start();
+    }
+    
+    private void showVerificationResultsDialog(VerificationResult result) {
+        BackupVerifier verifier = new BackupVerifier(
+                connectionInfo.getInstanceUrl(),
+                connectionInfo.getSessionId(),
+                "v59.0");
+        String report = verifier.generateReport(result);
+        
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Backup Verification Results");
+        
+        // Set header based on status
+        String statusEmoji = result.getOverallStatus() == VerificationStatus.PASSED ? "✓" :
+                            result.getOverallStatus() == VerificationStatus.WARNING ? "⚠" : "✗";
+        String statusColor = result.getOverallStatus() == VerificationStatus.PASSED ? "#28a745" :
+                            result.getOverallStatus() == VerificationStatus.WARNING ? "#ffc107" : "#dc3545";
+        
+        dialog.setHeaderText(statusEmoji + " " + result.getOverallStatus() + ": " + result.getSummary());
+        
+        // Report text area
+        TextArea reportArea = new TextArea(report);
+        reportArea.setEditable(false);
+        reportArea.setWrapText(false);
+        reportArea.setPrefSize(700, 500);
+        reportArea.setStyle("-fx-font-family: 'Consolas', monospace; -fx-font-size: 11px;");
+        
+        // Copy button
+        Button copyBtn = new Button("Copy Report to Clipboard");
+        copyBtn.setOnAction(e -> {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(report);
+            clipboard.setContent(content);
+            copyBtn.setText("✓ Copied!");
+        });
+        
+        // Save button
+        Button saveBtn = new Button("Save Report");
+        saveBtn.setOnAction(e -> {
+            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("Save Verification Report");
+            fileChooser.setInitialFileName("backup-verification-report.txt");
+            fileChooser.getExtensionFilters().add(
+                    new javafx.stage.FileChooser.ExtensionFilter("Text Files", "*.txt"));
+            
+            File file = fileChooser.showSaveDialog(dialog.getDialogPane().getScene().getWindow());
+            if (file != null) {
+                try {
+                    Files.writeString(file.toPath(), report);
+                    logMessage("✓ Verification report saved to: " + file.getAbsolutePath());
+                    saveBtn.setText("✓ Saved!");
+                } catch (IOException ex) {
+                    logMessage("❌ Failed to save report: " + ex.getMessage());
+                }
+            }
+        });
+        
+        HBox buttons = new HBox(10, copyBtn, saveBtn);
+        buttons.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        
+        VBox content = new VBox(10, reportArea, buttons);
+        content.setPadding(new javafx.geometry.Insets(10));
+        
+        dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.showAndWait();
     }
@@ -2031,6 +2279,11 @@ public class BackupController {
                         // Check if doing incremental backup
                         String whereClause = null;
                         
+                        // Log blob objects for visibility
+                        if (LARGE_OBJECTS.contains(objectName)) {
+                            logMessage(String.format("[%s] ⚠ Large blob object - checking incremental status...", objectName));
+                        }
+                        
                         // For CSV backups, check if incremental mode is enabled
                         if (dataSink == null || dataSink.getType().equals("CSV")) {
                             if (incrementalBackupCheckbox != null && incrementalBackupCheckbox.isSelected()) {
@@ -2044,52 +2297,98 @@ public class BackupController {
                                     
                                     if (lastBackup.isPresent() && lastBackup.get().getLastModifiedDate() != null) {
                                         String lastModified = lastBackup.get().getLastModifiedDate();
-                                        whereClause = "LastModifiedDate > " + lastModified;
+                                        // Convert Java ISO format to Salesforce SOQL format
+                                        // Input: 2025-12-22T22:49:05.6774347 -> Output: 2025-12-22T22:49:05Z
+                                        String soqlDate = lastModified;
+                                        if (lastModified.contains(".")) {
+                                            soqlDate = lastModified.substring(0, lastModified.indexOf('.')) + "Z";
+                                        } else if (!lastModified.endsWith("Z")) {
+                                            soqlDate = lastModified + "Z";
+                                        }
+                                        whereClause = "LastModifiedDate > " + soqlDate;
                                         String displayDate = lastModified.length() > 10 ? lastModified.substring(0, 10) : lastModified;
                                         Platform.runLater(() -> item.setStatus("Incremental since " + displayDate));
                                         logMessage(String.format("[%s] Incremental backup - records modified after %s", objectName, displayDate));
                                     } else {
                                         Platform.runLater(() -> item.setStatus("Full backup - first time"));
-                                        logMessage(String.format("[%s] Full backup - no previous backup found", objectName));
+                                        logMessage(String.format("[%s] Full backup - no previous successful backup found in history", objectName));
                                     }
                                 }
                             }
                         } else if (dataSink != null && !dataSink.getType().equals("CSV")) {
-                            // Check if recreate tables is enabled - if so, always do full backup
+                            // Database backup - check recreate tables and incremental checkbox
                             com.backupforce.sink.JdbcDatabaseSink jdbcSink = (com.backupforce.sink.JdbcDatabaseSink) dataSink;
+                            boolean incrementalEnabled = incrementalBackupCheckbox != null && incrementalBackupCheckbox.isSelected();
+                            String fullTablePath = jdbcSink.getFullTablePath(objectName);
+                            
+                            // Check if skip matching counts is enabled - if counts match, skip this object
+                            logMessage(String.format("[%s] Checking %s - skipEnabled: %s, recreateTables: %s", 
+                                objectName, fullTablePath, jdbcSink.isSkipMatchingCounts(), jdbcSink.isRecreateTables()));
+                            if (jdbcSink.isSkipMatchingCounts() && !jdbcSink.isRecreateTables()) {
+                                long tableRowCount = jdbcSink.getTableRowCount(objectName);
+                                logMessage(String.format("[%s] Snowflake unique record count: %d", objectName, tableRowCount));
+                                if (tableRowCount >= 0) {
+                                    // Table exists, check if count matches Salesforce
+                                    try {
+                                        int sfCount = bulkClient.getRecordCount(objectName);
+                                        logMessage(String.format("[%s] Salesforce record count: %d", objectName, sfCount));
+                                        
+                                        if (sfCount >= 0 && tableRowCount == sfCount) {
+                                            // Counts match - skip this object
+                                            final int displayCount = sfCount;
+                                            Platform.runLater(() -> item.setStatus("Skipped - count matches (" + displayCount + ")"));
+                                            logMessage(String.format("[%s] ✓ SKIPPED - Snowflake has %d unique records matching Salesforce", objectName, sfCount));
+                                            item.setRecordCount(String.valueOf(sfCount));
+                                            // Only increment successful here - completed is handled in finally block
+                                            successful.incrementAndGet();
+                                            return; // Skip this object
+                                        } else if (sfCount >= 0) {
+                                            logMessage(String.format("[%s] Count mismatch - Snowflake: %d unique, Salesforce: %d - will backup", 
+                                                objectName, tableRowCount, sfCount));
+                                        }
+                                    } catch (Exception countEx) {
+                                        logMessage(String.format("[%s] Could not get Salesforce count: %s - proceeding with backup", 
+                                            objectName, countEx.getMessage()));
+                                    }
+                                } else {
+                                    logMessage(String.format("[%s] Table does not exist in Snowflake - will create", objectName));
+                                }
+                            }
                             
                             if (jdbcSink.isRecreateTables()) {
-                                // Full reload mode - no incremental, will drop and recreate table
+                                // Full reload mode - drop and recreate table, always query all records
                                 Platform.runLater(() -> item.setStatus("Full backup - recreate mode"));
                                 logMessage(String.format("[%s] Full backup - recreate tables mode enabled", objectName));
+                            } else if (!incrementalEnabled) {
+                                // Incremental checkbox not checked - do full query but append to existing table
+                                Platform.runLater(() -> item.setStatus("Full backup"));
+                                logMessage(String.format("[%s] Full backup - incremental mode not enabled", objectName));
                             } else if (!supportsLastModifiedDate(objectName)) {
                                 // Object doesn't support LastModifiedDate field (History, __mdt, etc.)
                                 Platform.runLater(() -> item.setStatus("Full backup - no LastModifiedDate"));
                                 logMessage(String.format("[%s] Full backup - object does not support incremental (no LastModifiedDate)", objectName));
                             } else {
-                                // Check if table exists and get last backup timestamp for incremental
-                                try {
-                                    com.backupforce.sink.dialect.SnowflakeDialect dialect = new com.backupforce.sink.dialect.SnowflakeDialect();
-                                    String tableName = dialect.sanitizeTableName(objectName);
-                                    java.sql.Timestamp lastBackup = jdbcSink.getLastBackupTimestamp(tableName);
-                                    
-                                    if (lastBackup != null) {
-                                        // Format timestamp for SOQL (ISO 8601)
-                                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                                        sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-                                        String formattedDate = sdf.format(lastBackup);
-                                        whereClause = "LastModifiedDate > " + formattedDate;
-                                        
-                                        Platform.runLater(() -> item.setStatus("Delta backup since " + formattedDate.substring(0, 10)));
-                                        logMessage(String.format("[%s] Incremental backup - querying records modified after %s", objectName, formattedDate));
-                                    } else {
-                                        Platform.runLater(() -> item.setStatus("Full backup - first time"));
-                                        logMessage(String.format("[%s] Full backup - table exists but empty", objectName));
+                                // Incremental mode enabled - use backup history to find last successful backup
+                                Optional<ObjectBackupResult> lastBackupResult = BackupHistory.getInstance()
+                                        .getLastSuccessfulBackup(connectionInfo.getUsername(), objectName);
+                                
+                                if (lastBackupResult.isPresent() && lastBackupResult.get().getLastModifiedDate() != null) {
+                                    String lastModified = lastBackupResult.get().getLastModifiedDate();
+                                    // Convert Java ISO format to Salesforce SOQL format
+                                    // Input: 2025-12-22T22:49:05.6774347 -> Output: 2025-12-22T22:49:05Z
+                                    String soqlDate = lastModified;
+                                    if (lastModified.contains(".")) {
+                                        soqlDate = lastModified.substring(0, lastModified.indexOf('.')) + "Z";
+                                    } else if (!lastModified.endsWith("Z")) {
+                                        soqlDate = lastModified + "Z";
                                     }
-                                } catch (Exception e) {
-                                    // Table doesn't exist or error checking - do full backup
-                                    Platform.runLater(() -> item.setStatus("Full backup - new table"));
-                                    logMessage(String.format("[%s] Full backup - creating new table", objectName));
+                                    whereClause = "LastModifiedDate > " + soqlDate;
+                                    String displayDate = lastModified.length() > 10 ? lastModified.substring(0, 10) : lastModified;
+                                    Platform.runLater(() -> item.setStatus("Incremental since " + displayDate));
+                                    logMessage(String.format("[%s] Incremental backup - records modified after %s", objectName, displayDate));
+                                } else {
+                                    Platform.runLater(() -> item.setStatus("Full backup - first time"));
+                                    logMessage(String.format("[%s] Full backup - no previous successful backup found", objectName));
                                 }
                             }
                         }
@@ -2149,7 +2448,12 @@ public class BackupController {
                             objectName, dataSink != null ? dataSink.getDisplayName() : "null",
                             dataSink != null ? dataSink.getType() : "N/A");
                         if (dataSink != null && !dataSink.getType().equals("CSV")) {
-                            logMessage(String.format("[%s] Writing to %s...", objectName, dataSink.getDisplayName()));
+                            // Get full table path for better logging
+                            String writeTablePath = dataSink.getDisplayName();
+                            if (dataSink instanceof com.backupforce.sink.JdbcDatabaseSink) {
+                                writeTablePath = ((com.backupforce.sink.JdbcDatabaseSink) dataSink).getFullTablePath(objectName);
+                            }
+                            logMessage(String.format("[%s] Writing to %s...", objectName, writeTablePath));
                             Platform.runLater(() -> item.setStatus("Writing to database..."));
                             
                             File csvFile = new File(outputFolder, objectName + ".csv");
@@ -2179,12 +2483,18 @@ public class BackupController {
                                         }
                                     }
                                     
+                                    // Get full table path for better logging
+                                    String tablePath = dataSink.getDisplayName();
+                                    if (dataSink instanceof com.backupforce.sink.JdbcDatabaseSink) {
+                                        tablePath = ((com.backupforce.sink.JdbcDatabaseSink) dataSink).getFullTablePath(objectName);
+                                    }
+                                    
                                     if (recordsWritten < csvRecords) {
                                         logMessage(String.format("[%s] ⚠ WARNING: CSV has %d records but only %d written to database (missing %d)", 
                                             objectName, csvRecords, recordsWritten, csvRecords - recordsWritten));
                                     } else {
                                         logMessage(String.format("[%s] ✓ Wrote %d records to %s", 
-                                            objectName, recordsWritten, dataSink.getDisplayName()));
+                                            objectName, recordsWritten, tablePath));
                                     }
                                 } catch (Exception dbEx) {
                                     logMessage(String.format("[%s] WARNING: Failed to write to database: %s", 
@@ -2226,6 +2536,10 @@ public class BackupController {
                             objResult.setDurationMs(objectTime);
                             objResult.setLastModifiedDate(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                             currentBackupRun.getObjectResults().add(objResult);
+                            // Save progress periodically (every 10 objects) to persist in case of crash
+                            if (currentBackupRun.getObjectResults().size() % 10 == 0) {
+                                BackupHistory.getInstance().updateBackup(currentBackupRun);
+                            }
                         }
                         
                         Platform.runLater(() -> {
@@ -2372,6 +2686,10 @@ public class BackupController {
                                 objResult.setStatus("FAILED");
                                 objResult.setErrorMessage(cleanError);
                                 currentBackupRun.getObjectResults().add(objResult);
+                                // Save progress periodically (every 10 objects) to persist in case of crash
+                                if (currentBackupRun.getObjectResults().size() % 10 == 0) {
+                                    BackupHistory.getInstance().updateBackup(currentBackupRun);
+                                }
                             }
                             
                             final String finalError = cleanError;
@@ -2480,7 +2798,9 @@ public class BackupController {
                     
                     // Complete backup history record
                     if (currentBackupRun != null) {
-                        boolean success = failed.get() == 0;
+                        // Consider backup successful if at least some objects completed
+                        // (system objects often fail, which is expected)
+                        boolean success = successful.get() > 0;
                         BackupHistory.getInstance().completeBackup(currentBackupRun, success);
                         currentBackupRun = null;
                     }
@@ -2496,14 +2816,20 @@ public class BackupController {
                 resetUIForNewBackup();
                 
                 if (!cancelled) {
-                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                    alert.setTitle("Backup Complete");
-                    alert.setHeaderText("Backup Finished Successfully");
-                    alert.setContentText(String.format(
-                        "Backed up %d objects (%,d records) in %d seconds\n\nOutput: %s",
-                        successful.get(), finalTotalRecords, totalTime / 1000, displayOutput
-                    ));
-                    alert.showAndWait();
+                    // Use nested Platform.runLater to ensure all pending UI updates 
+                    // from backup tasks complete before showing the completion dialog
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("Backup Complete");
+                        alert.setHeaderText("Backup Finished Successfully");
+                        alert.setContentText(String.format(
+                            "Backed up %d objects (%,d records) in %d seconds\n\n" +
+                            "Output: %s\n\n" +
+                            "💡 Tip: Click 'Verify' button to validate your backup against Salesforce.",
+                            successful.get(), finalTotalRecords, totalTime / 1000, displayOutput
+                        ));
+                        alert.showAndWait();
+                    });
                 }
             });
             
@@ -2893,6 +3219,22 @@ public class BackupController {
         progressBar.setProgress(0);
         progressLabel.setText("Ready to start backup");
         
+        // Reset all item states for next backup (keep selection, clear status)
+        if (allObjects != null) {
+            for (SObjectItem item : allObjects) {
+                // Reset status but keep disabled state for known unsupported objects
+                if (!KNOWN_UNSUPPORTED.contains(item.getName())) {
+                    item.setStatus("");
+                }
+                item.setRecordCount("");
+                item.setFileSize("");
+                item.setDuration("");
+                item.setErrorMessage("");
+            }
+            // Refresh the table to update checkbox states
+            allObjectsTable.refresh();
+        }
+        
         // Switch back to "All Objects" tab
         statusTabPane.getSelectionModel().select(0);
     }
@@ -3121,6 +3463,25 @@ public class BackupController {
         
         // ChangeEvent objects for Change Data Capture don't support LastModifiedDate
         if (objectName.endsWith("ChangeEvent") || objectName.endsWith("__ChangeEvent")) {
+            return false;
+        }
+        
+        // Info/Definition objects typically don't have LastModifiedDate
+        if (objectName.endsWith("Info") || objectName.endsWith("Definition")) {
+            return false;
+        }
+        
+        // Specific objects known not to support LastModifiedDate
+        Set<String> noLastModifiedDate = Set.of(
+            "AsyncApexJob", "ApexPageInfo", "AppDefinition", "AppTabMember",
+            "AuraDefinitionBundleInfo", "AuraDefinitionInfo", 
+            "ClientBrowser", "DeleteEvent", "DataStatistics", "DataType",
+            "ContentDocumentLink", "ContentFolderItem", "ContentFolderMember",
+            "DatacloudAddress", "BrowserPolicyViolation", "ColorDefinition",
+            "ApexTypeImplementor", "ActivityMetric", "ActivityMetricRollup",
+            "ActivityUsrConnectionStatus", "AnalyticsDashPageWidget"
+        );
+        if (noLastModifiedDate.contains(objectName)) {
             return false;
         }
         

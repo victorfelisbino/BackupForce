@@ -29,6 +29,7 @@ public class PreferencesContentController {
     @FXML private Spinner<Integer> threadSpinner;
     @FXML private CheckBox includeArchivedCheck;
     @FXML private CheckBox downloadBlobsCheck;
+    @FXML private CheckBox verifyAfterBackupCheck;
     
     // Restore Defaults
     @FXML private ComboBox<String> restoreOpCombo;
@@ -66,7 +67,8 @@ public class PreferencesContentController {
         logLevelCombo.getItems().addAll("ERROR", "WARN", "INFO", "DEBUG");
         
         // Setup spinners with value factories
-        threadSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 20, 4));
+        // Parallel threads: 1-15 (Salesforce allows 100 concurrent Bulk API jobs per org, we recommend max 15)
+        threadSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 15, 15));
         batchSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 2000, 200));
         timeoutSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(30, 600, 120));
         
@@ -85,9 +87,10 @@ public class PreferencesContentController {
             // Backup Defaults
             outputFormatCombo.setValue(prefs.get("outputFormat", "CSV"));
             defaultBackupPath.setText(prefs.get("defaultBackupPath", System.getProperty("user.home") + File.separator + "BackupForce"));
-            threadSpinner.getValueFactory().setValue(prefs.getInt("threads", 4));
+            threadSpinner.getValueFactory().setValue(prefs.getInt("threads", 15));
             includeArchivedCheck.setSelected(prefs.getBoolean("includeArchived", false));
             downloadBlobsCheck.setSelected(prefs.getBoolean("downloadBlobs", true));
+            verifyAfterBackupCheck.setSelected(prefs.getBoolean("verifyAfterBackup", true));
             
             // Restore Defaults
             restoreOpCombo.setValue(prefs.get("restoreOp", "Insert Only"));
@@ -123,6 +126,7 @@ public class PreferencesContentController {
             prefs.putInt("threads", threadSpinner.getValue());
             prefs.putBoolean("includeArchived", includeArchivedCheck.isSelected());
             prefs.putBoolean("downloadBlobs", downloadBlobsCheck.isSelected());
+            prefs.putBoolean("verifyAfterBackup", verifyAfterBackupCheck.isSelected());
             
             // Restore Defaults
             prefs.put("restoreOp", restoreOpCombo.getValue());

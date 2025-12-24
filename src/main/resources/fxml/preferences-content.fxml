@@ -54,7 +54,12 @@
                 
                 <HBox spacing="16" alignment="CENTER_LEFT">
                     <Label text="Parallel Threads:" prefWidth="150"/>
-                    <Spinner fx:id="threadSpinner" prefWidth="100" min="1" max="20" initialValue="4"/>
+                    <Spinner fx:id="threadSpinner" prefWidth="100" min="1" max="15" initialValue="15">
+                        <tooltip>
+                            <Tooltip text="Number of concurrent backup threads (1-15). Salesforce allows 100 concurrent Bulk API jobs per org. Default: 5" wrapText="true" maxWidth="300"/>
+                        </tooltip>
+                    </Spinner>
+                    <Label text="(1-15, Salesforce org limit: 100 concurrent jobs)" styleClass="hint-label"/>
                 </HBox>
                 
                 <HBox spacing="16" alignment="CENTER_LEFT">
@@ -63,6 +68,10 @@
                 
                 <HBox spacing="16" alignment="CENTER_LEFT">
                     <CheckBox fx:id="downloadBlobsCheck" text="Download blob/file fields by default"/>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="verifyAfterBackupCheck" text="Verify backup after completion by default"/>
                 </HBox>
             </VBox>
             

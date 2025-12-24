@@ -9,6 +9,7 @@ import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
@@ -337,6 +338,45 @@ public class BulkV2Client implements AutoCloseable {
     @FunctionalInterface
     public interface ProgressCallback {
         void update(String status);
+    }
+    
+    /**
+     * Get the total record count for a Salesforce object using REST API.
+     * @param objectName The Salesforce object name
+     * @return The total number of records, or -1 if an error occurs
+     */
+    public int getRecordCount(String objectName) {
+        try {
+            String url = String.format("%s/services/data/v%s/query?q=%s",
+                instanceUrl, apiVersion, 
+                java.net.URLEncoder.encode("SELECT COUNT() FROM " + objectName, "UTF-8"));
+            
+            HttpGet request = new HttpGet(url);
+            request.addHeader("Authorization", "Bearer " + accessToken);
+            request.addHeader("Accept", "application/json");
+            
+            // Use a separate HttpClient for thread safety - don't share connection
+            try (CloseableHttpClient countClient = HttpClients.createDefault()) {
+                try (CloseableHttpResponse response = countClient.execute(request)) {
+                    int statusCode = response.getCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    
+                    if (statusCode != 200) {
+                        logger.warn("Failed to get count for {}: HTTP {} - {}", objectName, statusCode, responseBody);
+                        return -1;
+                    }
+                    
+                    // Parse JSON response to get totalSize
+                    JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
+                    int count = json.get("totalSize").getAsInt();
+                    logger.debug("Salesforce count for {}: {}", objectName, count);
+                    return count;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error getting record count for {}: {}", objectName, e.getMessage());
+            return -1;
+        }
     }
     
     public void queryObject(String objectName, String outputFolder) throws IOException, InterruptedException, ParseException {
@@ -708,6 +748,7 @@ public class BulkV2Client implements AutoCloseable {
         logger.info("{}: Found {} records in CSV to download blobs for", objectName, csvRecordIds.size());
         
         int downloadCount = 0;
+        int skippedCount = 0;
         int failedCount = 0;
         java.util.Map<String, String> blobPaths = new java.util.HashMap<>();
         int totalRecords = csvRecordIds.size();
@@ -735,6 +776,20 @@ public class BulkV2Client implements AutoCloseable {
             
             if (blobUrl != null) {
                 Path blobFile = blobsDir.resolve(fileName);
+                
+                // Skip if blob file already exists (incremental backup support)
+                if (Files.exists(blobFile) && Files.size(blobFile) > 0) {
+                    blobPaths.put(recordId, blobFile.toAbsolutePath().toString());
+                    skippedCount++;
+                    int processed = downloadCount + skippedCount + failedCount;
+                    if (progressCallback != null && processed % 10 == 0) {
+                        double pct = totalRecords > 0 ? (processed * 100.0 / totalRecords) : 0;
+                        progressCallback.update(String.format("Blobs: %,d/%,d (%.1f%%) - %d skipped", 
+                            processed, totalRecords, pct, skippedCount));
+                    }
+                    continue;
+                }
+                
                 boolean success = downloadBlob(blobUrl, blobFile);
                 
                 if (success) {
@@ -744,37 +799,44 @@ public class BulkV2Client implements AutoCloseable {
                     failedCount++;
                 }
                 
-                int processed = downloadCount + failedCount;
+                int processed = downloadCount + skippedCount + failedCount;
                 // Log progress every 100 files and update UI every 10 files
                 if (processed % 100 == 0) {
                     double pct = totalRecords > 0 ? (processed * 100.0 / totalRecords) : 0;
-                    logger.info("{}: Blob download progress: {}/{} ({:.1f}%)", 
-                        objectName, processed, totalRecords, pct);
+                    logger.info("{}: Blob download progress: {}/{} ({:.1f}%) - {} skipped", 
+                        objectName, processed, totalRecords, pct, skippedCount);
                 }
                 if (progressCallback != null && processed % 10 == 0) {
                     double pct = totalRecords > 0 ? (processed * 100.0 / totalRecords) : 0;
-                    progressCallback.update(String.format("Downloading blobs: %,d/%,d (%.1f%%)", 
-                        processed, totalRecords, pct));
+                    progressCallback.update(String.format("Blobs: %,d/%,d (%.1f%%) - %d skipped", 
+                        processed, totalRecords, pct, skippedCount));
                 }
             }
         }
         
-        // Update CSV to add blob file path column
-        if (downloadCount > 0) {
+        // Update CSV to add blob file path column (include skipped files too)
+        if (downloadCount > 0 || skippedCount > 0) {
             updateCsvWithBlobPaths(csvPath, blobPaths, blobFieldName);
         }
         
+        if (skippedCount > 0) {
+            logger.info("{}: Skipped {} existing blobs (incremental)", objectName, skippedCount);
+        }
         if (failedCount > 0) {
-            logger.warn("{}: Downloaded {} blobs, {} failed", objectName, downloadCount, failedCount);
-        } else {
+            logger.warn("{}: Downloaded {} blobs, {} skipped, {} failed", objectName, downloadCount, skippedCount, failedCount);
+        } else if (downloadCount > 0) {
             logger.info("{}: Downloaded {} blob files to {}", objectName, downloadCount, blobsDir);
         }
         
         if (progressCallback != null) {
-            progressCallback.update(String.format("Downloaded %,d blobs", downloadCount));
+            if (skippedCount > 0) {
+                progressCallback.update(String.format("Blobs: %,d new, %,d skipped", downloadCount, skippedCount));
+            } else {
+                progressCallback.update(String.format("Downloaded %,d blobs", downloadCount));
+            }
         }
         
-        return downloadCount;
+        return downloadCount + skippedCount; // Return total processed (new + existing)
     }
     
     /**

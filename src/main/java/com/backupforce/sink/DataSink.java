@@ -65,6 +65,16 @@ public interface DataSink {
     }
     
     /**
+     * Set whether to skip tables if record count matches Salesforce
+     * Default is false
+     * 
+     * @param skip true to skip tables with matching counts
+     */
+    default void setSkipMatchingCounts(boolean skip) {
+        // Default: no-op for sinks that don't support this
+    }
+    
+    /**
      * Drop existing table if it exists
      * 
      * @param objectName Salesforce object name

@@ -48,7 +48,46 @@
                     <Label text="RECORDS BACKED UP" styleClass="stat-card-title"/>
                     <Label fx:id="lastBackupRowsLabel" text="--" styleClass="stat-card-value"/>
                 </VBox>
+                <VBox fx:id="backupHealthCard" styleClass="stat-card" spacing="4" HBox.hgrow="ALWAYS" minWidth="140">
+                    <Label text="BACKUP STATUS" styleClass="stat-card-title"/>
+                    <Label fx:id="backupHealthLabel" text="--" styleClass="stat-card-value" style="-fx-font-size: 16px;"/>
+                </VBox>
             </HBox>
+            
+            <!-- Last Backup Summary Panel -->
+            <VBox fx:id="lastBackupSummaryPanel" styleClass="panel" spacing="12" managed="false" visible="false">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label fx:id="lastBackupSummaryIcon" text="✓" style="-fx-font-size: 20px; -fx-text-fill: #28a745;"/>
+                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                        <Label fx:id="lastBackupSummaryTitle" text="Last Backup Successful" styleClass="panel-header"/>
+                        <Label fx:id="lastBackupSummaryDetails" text="" styleClass="form-hint"/>
+                    </VBox>
+                    <Button fx:id="verifyLastBackupButton" text="✓ Verify Backup" 
+                            onAction="#handleVerifyLastBackup" styleClass="btn btn-ghost btn-sm"/>
+                </HBox>
+                <HBox spacing="24">
+                    <VBox spacing="2">
+                        <Label text="Objects" styleClass="stat-label"/>
+                        <Label fx:id="summaryObjectsLabel" text="--" styleClass="stat-value"/>
+                    </VBox>
+                    <VBox spacing="2">
+                        <Label text="Records" styleClass="stat-label"/>
+                        <Label fx:id="summaryRecordsLabel" text="--" styleClass="stat-value"/>
+                    </VBox>
+                    <VBox spacing="2">
+                        <Label text="Size" styleClass="stat-label"/>
+                        <Label fx:id="summarySizeLabel" text="--" styleClass="stat-value"/>
+                    </VBox>
+                    <VBox spacing="2">
+                        <Label text="Duration" styleClass="stat-label"/>
+                        <Label fx:id="summaryDurationLabel" text="--" styleClass="stat-value"/>
+                    </VBox>
+                    <VBox spacing="2">
+                        <Label text="Destination" styleClass="stat-label"/>
+                        <Label fx:id="summaryDestinationLabel" text="--" styleClass="stat-value"/>
+                    </VBox>
+                </HBox>
+            </VBox>
             
             <!-- Action Cards Section -->
             <VBox spacing="16">
@@ -82,11 +121,11 @@
                                fx:id="lastBackupBadge"/>
                     </VBox>
                     
-                    <!-- Data Restore Card -->
-                    <VBox fx:id="dataRestoreCard" styleClass="action-card" spacing="16" 
-                          onMouseClicked="#handleDataRestore" HBox.hgrow="ALWAYS">
+                    <!-- Data Restore Card - Coming Soon -->
+                    <VBox fx:id="dataRestoreCard" styleClass="action-card action-card-disabled" spacing="16" 
+                          HBox.hgrow="ALWAYS">
                         <HBox spacing="16" alignment="CENTER_LEFT">
-                            <StackPane styleClass="card-icon card-icon-success">
+                            <StackPane styleClass="card-icon card-icon-muted">
                                 <Label text="📥"/>
                             </StackPane>
                             <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -95,17 +134,7 @@
                                        styleClass="card-description" wrapText="true"/>
                             </VBox>
                         </HBox>
-                        <HBox spacing="16" alignment="CENTER_LEFT">
-                            <VBox spacing="2">
-                                <Label fx:id="restoreSourcesLabel" text="--" styleClass="stat-value"/>
-                                <Label text="Sources" styleClass="stat-label"/>
-                            </VBox>
-                            <VBox spacing="2">
-                                <Label fx:id="lastRestoreRowsLabel" text="--" styleClass="stat-value"/>
-                                <Label text="Restored" styleClass="stat-label"/>
-                            </VBox>
-                        </HBox>
-                        <Label fx:id="lastDataRestoreLabel" text="No restores yet" styleClass="card-badge"/>
+                        <Label text="Coming Soon" styleClass="badge badge-muted"/>
                     </VBox>
                 </HBox>
                 

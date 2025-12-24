@@ -75,7 +75,7 @@ try {
              --app-version 3.0.0 `
              --vendor "Victor Felisbino" `
              --description "Salesforce Backup Tool with Nature-Inspired UI" `
-             --java-options "-Xmx512m" `
+             --java-options "-Xmx4g" `
              --java-options "--enable-native-access=ALL-UNNAMED" `
              --java-options "--add-opens=java.base/java.lang=ALL-UNNAMED"
     if ($LASTEXITCODE -ne 0) { throw "jpackage failed" }

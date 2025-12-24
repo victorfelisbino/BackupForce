@@ -25,6 +25,7 @@ public class JdbcDatabaseSink implements DataSink {
     private final String displayName;
     private Connection connection;
     private boolean recreateTables = false;  // Default: incremental mode
+    private boolean skipMatchingCounts = false;  // Default: don't skip based on count matching
     private final boolean externalConnection;  // If true, don't close the connection on disconnect
     
     public JdbcDatabaseSink(String jdbcUrl, Properties connectionProperties, 
@@ -61,6 +62,21 @@ public class JdbcDatabaseSink implements DataSink {
      */
     public boolean isRecreateTables() {
         return this.recreateTables;
+    }
+    
+    /**
+     * Set whether to skip tables if record count matches Salesforce
+     */
+    public void setSkipMatchingCounts(boolean skip) {
+        this.skipMatchingCounts = skip;
+        logger.info("Skip matching counts mode: {}", skip ? "ENABLED" : "DISABLED");
+    }
+    
+    /**
+     * Returns whether skip matching counts mode is enabled
+     */
+    public boolean isSkipMatchingCounts() {
+        return this.skipMatchingCounts;
     }
     
     @Override
@@ -482,24 +498,78 @@ public class JdbcDatabaseSink implements DataSink {
     }
     
     private boolean tableExists(String tableName) throws SQLException {
-        DatabaseMetaData meta = connection.getMetaData();
-        // Get schema/database from connectionProperties if available, otherwise from connection
+        String upperTableName = tableName.toUpperCase();
+        
+        // Get schema - try multiple sources
         String schema = null;
-        String database = null;
         if (connectionProperties != null) {
             schema = connectionProperties.getProperty("schema");
-            database = connectionProperties.getProperty("db");
         }
-        if (schema == null) {
+        if (schema == null || schema.isEmpty()) {
             schema = connection.getSchema();
         }
-        if (database == null) {
-            database = connection.getCatalog();
+        // If still null, try querying Snowflake directly for current schema
+        if (schema == null || schema.isEmpty()) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT CURRENT_SCHEMA()")) {
+                if (rs.next()) {
+                    schema = rs.getString(1);
+                    logger.info("Got current schema from Snowflake: {}", schema);
+                }
+            } catch (SQLException e) {
+                logger.warn("Could not get current schema: {}", e.getMessage());
+            }
+        }
+        String upperSchema = schema != null ? schema.toUpperCase() : null;
+        
+        logger.info("tableExists check: schema={}, table={}", upperSchema, upperTableName);
+        
+        // First try: query table without schema prefix (relies on USE SCHEMA context)
+        String query = String.format("SELECT 1 FROM %s LIMIT 1", upperTableName);
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            logger.info("Table {} EXISTS (query succeeded)", upperTableName);
+            return true;
+        } catch (SQLException e) {
+            String msg = e.getMessage().toLowerCase();
+            logger.info("Query '{}' failed: {}", query, e.getMessage());
+            
+            // If "does not exist" error, table doesn't exist
+            if (msg.contains("does not exist") || msg.contains("not found") || 
+                msg.contains("invalid object") || msg.contains("unknown table")) {
+                logger.info("Table {} confirmed NOT EXIST", upperTableName);
+                return false;
+            }
+            // Some other error - continue to try with schema prefix
         }
         
-        try (ResultSet rs = meta.getTables(database, schema, tableName, new String[]{"TABLE"})) {
-            return rs.next();
+        // Second try: with fully qualified name if we have a schema
+        if (upperSchema != null) {
+            String qualifiedTable = upperSchema + "." + upperTableName;
+            query = String.format("SELECT 1 FROM %s LIMIT 1", qualifiedTable);
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(query)) {
+                logger.info("Table {} EXISTS (found with schema prefix)", qualifiedTable);
+                return true;
+            } catch (SQLException e) {
+                String msg = e.getMessage().toLowerCase();
+                logger.info("Query '{}' failed: {}", query, e.getMessage());
+                
+                if (msg.contains("does not exist") || msg.contains("not found") || 
+                    msg.contains("invalid object") || msg.contains("unknown table")) {
+                    logger.info("Table {} confirmed NOT EXIST", qualifiedTable);
+                    return false;
+                }
+                // Other error - table might exist but we can't query it
+                // Assume it exists to avoid trying to create it
+                logger.warn("Cannot determine if table {} exists, assuming it DOES exist: {}", 
+                    qualifiedTable, e.getMessage());
+                return true;
+            }
         }
+        
+        logger.info("Table {} - assuming does not exist", upperTableName);
+        return false;
     }
     
     /**
@@ -541,6 +611,120 @@ public class JdbcDatabaseSink implements DataSink {
         } catch (SQLException e) {
             // Column might already exist with different case or the syntax might differ
             logger.warn("Could not add BLOB_DATA column to {}: {}", tableName, e.getMessage());
+        }
+    }
+    
+    /**
+     * Check if a table exists in the database.
+     * @param objectName The Salesforce object name
+     * @return true if table exists, false otherwise
+     */
+    public boolean doesTableExist(String objectName) {
+        try {
+            ensureConnection();
+            String tableName = dialect.sanitizeTableName(objectName);
+            return tableExists(tableName);
+        } catch (Exception e) {
+            logger.warn("Error checking if table exists for {}: {}", objectName, e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get the unique record count of a table (by ID column).
+     * This handles multiple backup runs where the same record may exist multiple times.
+     * @param objectName The Salesforce object name
+     * @return The number of unique IDs in the table, or -1 if table doesn't exist or error
+     */
+    public long getTableRowCount(String objectName) {
+        try {
+            ensureConnection();
+            String tableName = dialect.sanitizeTableName(objectName);
+            String upperTableName = tableName.toUpperCase();
+            
+            logger.info("Checking unique record count for {} (full path: {})", objectName, getFullTablePath(objectName));
+            
+            if (!tableExists(tableName)) {
+                logger.info("Table {} does not exist, returning -1", upperTableName);
+                return -1;
+            }
+            
+            // Count DISTINCT IDs to handle multiple backup runs with duplicates
+            // First check if ID column exists
+            String idColumn = dialect.sanitizeColumnName("ID");
+            String query;
+            
+            // Try to use DISTINCT ID count (handles duplicates from multiple backups)
+            try {
+                query = String.format("SELECT COUNT(DISTINCT %s) as ROW_COUNT FROM %s", idColumn, upperTableName);
+                logger.info("Executing distinct count query: {}", query);
+                try (Statement stmt = connection.createStatement();
+                     ResultSet rs = stmt.executeQuery(query)) {
+                    if (rs.next()) {
+                        long count = rs.getLong("ROW_COUNT");
+                        logger.info("Table {} has {} unique records (by ID)", upperTableName, count);
+                        return count;
+                    }
+                }
+            } catch (SQLException idEx) {
+                // ID column might not exist, fall back to regular count
+                logger.info("Could not count by ID column, falling back to total row count: {}", idEx.getMessage());
+            }
+            
+            // Fallback: regular count (for tables without ID column)
+            query = String.format("SELECT COUNT(*) as ROW_COUNT FROM %s", upperTableName);
+            logger.info("Executing total count query: {}", query);
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(query)) {
+                if (rs.next()) {
+                    long count = rs.getLong("ROW_COUNT");
+                    logger.info("Table {} has {} total rows", upperTableName, count);
+                    return count;
+                }
+            }
+            return -1;
+        } catch (Exception e) {
+            logger.warn("Error getting row count for {}: {}", objectName, e.getMessage());
+            return -1;
+        }
+    }
+    
+    /**
+     * Get the full qualified table path (database.schema.table) for display purposes.
+     * @param objectName The Salesforce object name
+     * @return The full table path like "DATABASE.SCHEMA.TABLENAME"
+     */
+    public String getFullTablePath(String objectName) {
+        try {
+            String tableName = dialect.sanitizeTableName(objectName).toUpperCase();
+            String schema = null;
+            String database = null;
+            
+            if (connectionProperties != null) {
+                schema = connectionProperties.getProperty("schema");
+                database = connectionProperties.getProperty("db");
+            }
+            if (schema == null || schema.isEmpty()) {
+                try {
+                    schema = connection.getSchema();
+                } catch (Exception e) {
+                    schema = "?";
+                }
+            }
+            if (database == null || database.isEmpty()) {
+                try {
+                    database = connection.getCatalog();
+                } catch (Exception e) {
+                    database = "?";
+                }
+            }
+            
+            return String.format("%s.%s.%s", 
+                database != null ? database.toUpperCase() : "?",
+                schema != null ? schema.toUpperCase() : "?",
+                tableName);
+        } catch (Exception e) {
+            return objectName.toUpperCase();
         }
     }
     

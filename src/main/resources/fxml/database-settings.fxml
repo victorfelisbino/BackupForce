@@ -43,6 +43,9 @@
         <CheckBox fx:id="recreateTablesCheckBox" text="Drop and recreate tables (full reload)"/>
         <Label text="⚠ Warning: This will delete existing data in the target tables" 
                styleClass="status-text" style="-fx-font-size: 11px;"/>
+        <CheckBox fx:id="skipMatchingCountsCheckBox" text="Skip tables if record count matches Salesforce"/>
+        <Label text="ℹ If the table exists and row count matches, the object will be skipped" 
+               styleClass="status-text" style="-fx-font-size: 11px;"/>
     </VBox>
     
     <!-- Connection Management -->

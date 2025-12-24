@@ -377,6 +377,8 @@ public class ConnectionManager {
         private String port;
         private boolean useSso;
         private boolean encrypted;
+        private boolean recreateTables;
+        private boolean skipMatchingCounts;
         private long lastUsed;
         private Map<String, String> additionalProps;
         
@@ -442,6 +444,12 @@ public class ConnectionManager {
         
         public boolean isUseSso() { return useSso; }
         public void setUseSso(boolean useSso) { this.useSso = useSso; }
+        
+        public boolean isRecreateTables() { return recreateTables; }
+        public void setRecreateTables(boolean recreateTables) { this.recreateTables = recreateTables; }
+        
+        public boolean isSkipMatchingCounts() { return skipMatchingCounts; }
+        public void setSkipMatchingCounts(boolean skipMatchingCounts) { this.skipMatchingCounts = skipMatchingCounts; }
         
         public boolean isEncrypted() { return encrypted; }
         public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
