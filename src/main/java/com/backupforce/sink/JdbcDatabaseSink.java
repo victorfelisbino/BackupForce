@@ -861,7 +861,50 @@ public class JdbcDatabaseSink implements DataSink {
         }
         return success;
     }
-    
+
+    /**
+     * Get list of all tables in the current schema that match Salesforce backup pattern.
+     * This is used for verification to find what was actually backed up.
+     * @return List of table names (Salesforce object names format)
+     */
+    public List<String> listBackedUpTables() {
+        List<String> tables = new ArrayList<>();
+        try {
+            ensureConnection();
+            
+            String schema = null;
+            String database = null;
+            
+            if (connectionProperties != null) {
+                schema = connectionProperties.getProperty("schema");
+                database = connectionProperties.getProperty("db");
+            }
+            if (schema == null || schema.isEmpty()) {
+                schema = connection.getSchema();
+            }
+            if (database == null || database.isEmpty()) {
+                database = connection.getCatalog();
+            }
+            
+            logger.info("Listing tables in schema: {}.{}", database, schema);
+            
+            DatabaseMetaData metaData = connection.getMetaData();
+            try (ResultSet rs = metaData.getTables(database, schema, "%", new String[]{"TABLE"})) {
+                while (rs.next()) {
+                    String tableName = rs.getString("TABLE_NAME");
+                    if (tableName != null && !tableName.startsWith("_") && !tableName.startsWith("SYS")) {
+                        tables.add(tableName);
+                    }
+                }
+            }
+            
+            logger.info("Found {} tables in schema", tables.size());
+        } catch (Exception e) {
+            logger.error("Error listing tables: {}", e.getMessage());
+        }
+        return tables;
+    }
+
     /**
      * Database-specific dialect for SQL generation and type mapping
      */
