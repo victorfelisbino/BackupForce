@@ -75,6 +75,68 @@
                 </HBox>
             </VBox>
             
+            <!-- Object Category Filters Section -->
+            <VBox spacing="16" styleClass="panel">
+                <Label text="Object Categories to Include" styleClass="panel-header"/>
+                <Label text="Choose which types of Salesforce objects to include in backups. Unselected categories will be excluded from the object list." styleClass="hint-label" wrapText="true"/>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeApexCodeCheck" text="Apex Code (ApexClass, ApexTrigger, ApexComponent, ApexPage)">
+                        <tooltip>
+                            <Tooltip text="Include your Apex classes, triggers, Visualforce pages and components. Recommended: Keep this ON to backup your custom code." wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeApexLogsCheck" text="Apex Logs &amp; Test Results (ApexLog, ApexTestResult, etc.)">
+                        <tooltip>
+                            <Tooltip text="Include debug logs, test results, and execution data. These are transient and regenerated often. Default: OFF" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeFeedObjectsCheck" text="Feed Objects (Chatter posts: AccountFeed, CaseFeed, etc.)">
+                        <tooltip>
+                            <Tooltip text="Include Chatter feed posts and comments attached to records. Can be very large in active orgs. Default: OFF" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeHistoryObjectsCheck" text="History Objects (Field tracking: AccountHistory, OpportunityHistory, etc.)">
+                        <tooltip>
+                            <Tooltip text="Include field history tracking records. Useful for audit trails but can be very large. Default: OFF" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeShareObjectsCheck" text="Share Objects (Sharing entries: AccountShare, CaseShare, etc.)">
+                        <tooltip>
+                            <Tooltip text="Include manual sharing entries. These are auto-managed by Salesforce sharing rules and can be regenerated. Default: OFF" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeSetupObjectsCheck" text="Setup/Config Objects (SetupAuditTrail, PermissionSet, etc.)">
+                        <tooltip>
+                            <Tooltip text="Include setup and configuration objects. For complete org config backup, use Salesforce Metadata API instead. Default: OFF" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+                
+                <HBox spacing="16" alignment="CENTER_LEFT">
+                    <CheckBox fx:id="includeManagedPkgCheck" text="Managed Package Objects (installed AppExchange packages)">
+                        <tooltip>
+                            <Tooltip text="Include data from installed managed packages (objects with namespace prefixes like 'SBQQ__'). Default: ON" wrapText="true" maxWidth="350"/>
+                        </tooltip>
+                    </CheckBox>
+                </HBox>
+            </VBox>
+            
             <!-- Restore Defaults Section -->
             <VBox spacing="16" styleClass="panel">
                 <Label text="Restore Defaults" styleClass="panel-header"/>

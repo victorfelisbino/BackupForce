@@ -31,6 +31,15 @@ public class PreferencesContentController {
     @FXML private CheckBox downloadBlobsCheck;
     @FXML private CheckBox verifyAfterBackupCheck;
     
+    // Object Category Filters - what to include in backups
+    @FXML private CheckBox includeApexCodeCheck;       // ApexClass, ApexTrigger, ApexComponent, ApexPage
+    @FXML private CheckBox includeApexLogsCheck;       // ApexLog, ApexTestResult, etc.
+    @FXML private CheckBox includeFeedObjectsCheck;    // *Feed objects (Chatter feeds)
+    @FXML private CheckBox includeHistoryObjectsCheck; // *History objects (field history tracking)
+    @FXML private CheckBox includeShareObjectsCheck;   // *Share objects (sharing entries)
+    @FXML private CheckBox includeSetupObjectsCheck;   // Setup and configuration objects
+    @FXML private CheckBox includeManagedPkgCheck;     // Managed package objects (*__*)
+    
     // Restore Defaults
     @FXML private ComboBox<String> restoreOpCombo;
     @FXML private Spinner<Integer> batchSpinner;
@@ -92,6 +101,15 @@ public class PreferencesContentController {
             downloadBlobsCheck.setSelected(prefs.getBoolean("downloadBlobs", true));
             verifyAfterBackupCheck.setSelected(prefs.getBoolean("verifyAfterBackup", true));
             
+            // Object Category Filters - defaults favor more complete backups
+            includeApexCodeCheck.setSelected(prefs.getBoolean("includeApexCode", true));          // ON by default - your code is valuable
+            includeApexLogsCheck.setSelected(prefs.getBoolean("includeApexLogs", false));         // OFF by default - transient data
+            includeFeedObjectsCheck.setSelected(prefs.getBoolean("includeFeedObjects", false));   // OFF by default - can be very large
+            includeHistoryObjectsCheck.setSelected(prefs.getBoolean("includeHistoryObjects", false)); // OFF by default - can be large
+            includeShareObjectsCheck.setSelected(prefs.getBoolean("includeShareObjects", false)); // OFF by default - auto-managed
+            includeSetupObjectsCheck.setSelected(prefs.getBoolean("includeSetupObjects", false)); // OFF by default - use Metadata API
+            includeManagedPkgCheck.setSelected(prefs.getBoolean("includeManagedPkg", true));      // ON by default - include installed packages
+            
             // Restore Defaults
             restoreOpCombo.setValue(prefs.get("restoreOp", "Insert Only"));
             batchSpinner.getValueFactory().setValue(prefs.getInt("batchSize", 200));
@@ -127,6 +145,15 @@ public class PreferencesContentController {
             prefs.putBoolean("includeArchived", includeArchivedCheck.isSelected());
             prefs.putBoolean("downloadBlobs", downloadBlobsCheck.isSelected());
             prefs.putBoolean("verifyAfterBackup", verifyAfterBackupCheck.isSelected());
+            
+            // Object Category Filters
+            prefs.putBoolean("includeApexCode", includeApexCodeCheck.isSelected());
+            prefs.putBoolean("includeApexLogs", includeApexLogsCheck.isSelected());
+            prefs.putBoolean("includeFeedObjects", includeFeedObjectsCheck.isSelected());
+            prefs.putBoolean("includeHistoryObjects", includeHistoryObjectsCheck.isSelected());
+            prefs.putBoolean("includeShareObjects", includeShareObjectsCheck.isSelected());
+            prefs.putBoolean("includeSetupObjects", includeSetupObjectsCheck.isSelected());
+            prefs.putBoolean("includeManagedPkg", includeManagedPkgCheck.isSelected());
             
             // Restore Defaults
             prefs.put("restoreOp", restoreOpCombo.getValue());

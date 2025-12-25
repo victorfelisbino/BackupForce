@@ -7,7 +7,7 @@
 
     <groupId>com.backupforce</groupId>
     <artifactId>backupforce</artifactId>
-    <version>3.1.0</version>
+    <version>3.1.1</version>
     <packaging>jar</packaging>
 
     <name>BackupForce v3</name>

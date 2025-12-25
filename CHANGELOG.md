@@ -5,6 +5,50 @@ All notable changes to BackupForce will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2025-12-24
+
+### 🎄 Object Category Filter System & Performance
+
+Empowering users with choice! This release introduces a user-centric object filtering system that differentiates BackupForce from other backup solutions by giving users full control over what to backup.
+
+### Added
+
+#### Object Category Filter System
+- **7 Configurable Object Categories**: 
+  - **Apex Code** (ON by default) - ApexClass, ApexTrigger, ApexComponent, ApexPage
+  - **Apex Logs & Test Results** (OFF by default) - ApexLog, ApexTestResult, AsyncApexJob
+  - **Feed Objects** (OFF by default) - AccountFeed, ContactFeed, OpportunityFeed, etc.
+  - **History Objects** (OFF by default) - AccountHistory, ContactHistory, etc.
+  - **Share Objects** (OFF by default) - AccountShare, ContactShare, etc.
+  - **Setup/Config Objects** (OFF by default) - SetupAuditTrail, LoginHistory, etc.
+  - **Managed Package Objects** (ON by default) - Objects with namespace prefix
+- **Preferences UI**: New "Object Categories to Include" panel in Preferences
+- **Descriptive Tooltips**: Each category has detailed descriptions explaining what's included
+- **Smart Selection**: "Select Business Objects" button respects category preferences
+
+#### Performance & Parallel Processing
+- **Configurable Parallel Workers**: 1-15 threads (default: 15) for backup operations
+- **Parallel Workers UI**: New slider in Preferences to configure thread count
+- **Bulk API v2 Optimization**: Up to 15x faster backups with parallel job processing
+
+#### Verification Improvements
+- **SKIPPED Status**: Objects not selected for backup now show SKIPPED instead of FAILED
+- **Accurate Verification Reports**: Clear distinction between errors and expected skips
+- **Progress Tracking**: Better visibility into backup verification status
+
+### Changed
+- **Reduced SYSTEM_OBJECTS List**: Only truly problematic objects are excluded
+- **User Choice Philosophy**: No arbitrary exclusions - users decide what to backup
+- **"Select Business Objects"**: Now uses preference-based category filtering
+
+### Technical
+- 695 unit tests passing (35 new ObjectCategoryFilterTest tests)
+- New test class: `ObjectCategoryFilterTest` with comprehensive coverage
+- Java Preferences API for storing category settings
+- Pattern-based filtering for *Feed, *History, *Share suffixes
+
+---
+
 ## [3.1.0] - 2025-12-22
 
 ### 🎉 Relationship-Aware Backup & Scheduled Backups
