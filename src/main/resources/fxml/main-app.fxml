@@ -38,11 +38,10 @@
                     <Label text="Data Backup"/>
                 </HBox>
                 
-                <HBox fx:id="navRestore" styleClass="nav-item, nav-item-disabled" spacing="10" 
-                      alignment="CENTER_LEFT" disable="true" opacity="0.5">
+                <HBox fx:id="navRestore" styleClass="nav-item" spacing="10" 
+                      alignment="CENTER_LEFT" onMouseClicked="#navigateToRestore">
                     <Label text="📥" styleClass="nav-icon"/>
                     <Label text="Data Restore"/>
-                    <Label text="(Coming Soon)" styleClass="nav-hint" style="-fx-font-size: 10px; -fx-text-fill: #6e7681;"/>
                 </HBox>
                 
                 <Region prefHeight="16"/>

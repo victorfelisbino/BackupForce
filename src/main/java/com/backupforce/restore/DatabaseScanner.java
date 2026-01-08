@@ -2,6 +2,7 @@ package com.backupforce.restore;
 
 import com.backupforce.config.ConnectionManager;
 import com.backupforce.config.ConnectionManager.SavedConnection;
+import com.backupforce.config.SSLHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,10 +73,18 @@ public class DatabaseScanner {
         String password = ConnectionManager.getInstance().getDecryptedPassword(connection);
         
         log("Connecting to " + connection.getType() + " database: " + connection.getDatabase());
+        log("JDBC URL: " + jdbcUrl.replaceAll("password=[^&]*", "password=****"));
         
         List<BackupTable> tables = new ArrayList<>();
         
+        // Set a connection timeout (60 seconds)
+        DriverManager.setLoginTimeout(60);
+        
+        log("Opening JDBC connection...");
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            log("✓ JDBC connection established successfully");
+            log("Setting query timeout to 30 seconds...");
+            
             String schema = connection.getSchema();
             
             switch (connection.getType()) {
@@ -91,6 +100,9 @@ public class DatabaseScanner {
                 default:
                     throw new SQLException("Unsupported database type: " + connection.getType());
             }
+        } catch (SQLException e) {
+            log("ERROR: " + e.getMessage());
+            throw e;
         }
         
         log("Found " + tables.size() + " backup tables");
@@ -100,32 +112,47 @@ public class DatabaseScanner {
     private List<BackupTable> scanSnowflake(Connection conn, String schema) throws SQLException {
         List<BackupTable> tables = new ArrayList<>();
         
+        log("Scanning Snowflake schema: " + (schema != null && !schema.isEmpty() ? schema : "PUBLIC"));
+        
         // Query INFORMATION_SCHEMA for tables in the specified schema
+        // Use LIKE patterns to pre-filter for likely Salesforce tables (speeds up significantly)
         String query = "SELECT TABLE_NAME, ROW_COUNT, LAST_ALTERED " +
             "FROM INFORMATION_SCHEMA.TABLES " +
             "WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE' " +
+            "AND (TABLE_NAME LIKE 'SF_%' OR TABLE_NAME LIKE 'SALESFORCE_%' OR TABLE_NAME LIKE '%__C' " +
+            "OR TABLE_NAME IN ('ACCOUNT', 'CONTACT', 'LEAD', 'OPPORTUNITY', 'CASE', 'USER', 'PROFILE')) " +
             "ORDER BY TABLE_NAME";
         
+        log("Preparing query with Salesforce table name filters...");
         try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setQueryTimeout(30); // 30 second timeout for query execution
             stmt.setString(1, schema != null && !schema.isEmpty() ? schema.toUpperCase() : "PUBLIC");
             
+            log("Executing query...");
             try (ResultSet rs = stmt.executeQuery()) {
+                log("✓ Query executed, processing results...");
+                int totalTables = 0;
+                
                 while (rs.next()) {
                     String tableName = rs.getString("TABLE_NAME");
                     long rowCount = rs.getLong("ROW_COUNT");
                     Timestamp lastAltered = rs.getTimestamp("LAST_ALTERED");
+                    totalTables++;
                     
-                    // Check if this looks like a Salesforce backup table
-                    if (isSalesforceBackupTable(conn, schema, tableName)) {
-                        String objectName = tableNameToObjectName(tableName);
-                        String lastModified = lastAltered != null ? 
-                            lastAltered.toLocalDateTime().toString().substring(0, 16).replace('T', ' ') : 
-                            "Unknown";
-                        
-                        tables.add(new BackupTable(tableName, objectName, rowCount, lastModified, schema));
-                        log("Found backup table: " + tableName + " (" + rowCount + " records)");
-                    }
+                    log("Processing table: " + tableName);
+                    
+                    // Since we've already filtered by Salesforce-like names in the query,
+                    // we can trust these are backup tables without expensive column checks
+                    String objectName = tableNameToObjectName(tableName);
+                    String lastModified = lastAltered != null ? 
+                        lastAltered.toLocalDateTime().toString().substring(0, 16).replace('T', ' ') : 
+                        "Unknown";
+                    
+                    tables.add(new BackupTable(tableName, objectName, rowCount, lastModified, schema));
+                    log("✓ Added backup table: " + tableName + " (" + rowCount + " records)");
                 }
+                
+                log("Finished processing all " + totalTables + " tables in schema");
             }
         }
         

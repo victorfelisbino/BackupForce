@@ -369,8 +369,6 @@ public class LoginController {
             @Override
             protected Void call() throws Exception {
                 try {
-                    updateMessage("Opening browser for authentication...\nComplete login in browser, then return here.");
-                    
                     // Get selected environment
                     String environment = environmentCombo.getSelectionModel().getSelectedItem();
                     String loginUrl = environment.contains("Sandbox") ? 
@@ -379,7 +377,15 @@ public class LoginController {
                     // Start OAuth flow with configurable timeout
                     currentOAuthServer = new SalesforceOAuthServer();
                     currentOAuthServer.setTimeout(TIMEOUT_SECONDS);
-                    SalesforceOAuthServer.OAuthResult result = currentOAuthServer.authenticate(loginUrl);
+                    
+                    // Try silent refresh first (no browser)
+                    updateMessage("Checking for saved session...");
+                    SalesforceOAuthServer.OAuthResult result = currentOAuthServer.authenticateWithSilentRefresh(loginUrl, true);
+                    
+                    // If silent failed, browser was attempted
+                    if (!result.isSuccess() && !result.isCancelled()) {
+                        updateMessage("Opening browser for authentication...\nComplete login in browser, then return here.");
+                    }
                     
                     // Check if cancelled
                     if (result.isCancelled()) {
@@ -407,6 +413,13 @@ public class LoginController {
                     // Test connection
                     String username = connection.getUserInfo().getUserName();
                     logger.info("OAuth login successful for user: {}", username);
+                    
+                    // Store the refresh token for next time (silent login)
+                    if (result.refreshToken != null) {
+                        com.backupforce.auth.TokenStorage.getInstance().storeToken(
+                            loginUrl, username, result.refreshToken, result.instanceUrl
+                        );
+                    }
                     
                     updateMessage("Success! Loading main window...");
                     

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.backupforce.ui.RestoreRelationshipPreviewController"
+           prefWidth="1100" prefHeight="700"
+           stylesheets="@../css/backupforce-modern.css">
+
+    <!-- Main Content (behind loading overlay) -->
+    <VBox fx:id="mainContent" spacing="12" styleClass="dialog-container" visible="false">
+        <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+        
+        <!-- Header -->
+        <HBox spacing="12" alignment="CENTER_LEFT">
+            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="🔗 Relationship Preview &amp; Import" 
+                       style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+                <Label fx:id="summaryLabel" text="Browse and select records to import" 
+                       style="-fx-text-fill: #8b949e;"/>
+            </VBox>
+            <Label fx:id="recordsInMemoryLabel" text="0 records loaded" 
+                   style="-fx-text-fill: #3fb950; -fx-font-weight: 600;"/>
+        </HBox>
+        
+        <!-- Parent Record Section -->
+        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="panel" style="-fx-background-color: #1c2128; -fx-padding: 10;">
+            <Label text="📦 Parent:" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="parentRecordLabel" text="" style="-fx-text-fill: #58a6ff; -fx-font-weight: 600;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="View Details" onAction="#handleViewParentDetails" styleClass="btn btn-ghost btn-sm"/>
+        </HBox>
+        
+        <!-- Main Split View: Tree on left, Details on right -->
+        <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS">
+            <!-- Left: Records Tree -->
+            <VBox spacing="8" SplitPane.resizableWithParent="true">
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Label text="📋 Related Records" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="▼ Expand All" onAction="#handleExpandAll" styleClass="btn btn-ghost btn-xs"/>
+                    <Button text="▲ Collapse" onAction="#handleCollapseAll" styleClass="btn btn-ghost btn-xs"/>
+                    <Separator orientation="VERTICAL"/>
+                    <Button text="✓ All" onAction="#handleSelectAll" styleClass="btn btn-ghost btn-xs"/>
+                    <Button text="✗ None" onAction="#handleDeselectAll" styleClass="btn btn-ghost btn-xs"/>
+                </HBox>
+                <TreeView fx:id="relationshipTree" VBox.vgrow="ALWAYS" styleClass="tree-view"/>
+                <Label text="💡 Click a record to view its details on the right" 
+                       style="-fx-text-fill: #6e7681; -fx-font-size: 11px;"/>
+            </VBox>
+            
+            <!-- Right: Record Details Panel -->
+            <VBox fx:id="detailsPanel" spacing="8" style="-fx-background-color: #161b22; -fx-padding: 12;">
+                <Label fx:id="detailsPanelTitle" text="📄 Record Details" 
+                       style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                <Separator/>
+                <!-- Details Table -->
+                <TableView fx:id="detailsTable" VBox.vgrow="ALWAYS" styleClass="table-view">
+                    <columns>
+                        <TableColumn fx:id="fieldNameColumn" text="Field" prefWidth="150"/>
+                        <TableColumn fx:id="fieldValueColumn" text="Value" prefWidth="280"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="Select a record to view its fields" style="-fx-text-fill: #6e7681;"/>
+                    </placeholder>
+                </TableView>
+                <!-- Copy button -->
+                <HBox spacing="8" alignment="CENTER_RIGHT">
+                    <Button text="📋 Copy All" onAction="#handleCopyDetails" styleClass="btn btn-ghost btn-sm"/>
+                </HBox>
+            </VBox>
+        </SplitPane>
+        
+        <!-- Selection Summary -->
+        <HBox spacing="16" alignment="CENTER_LEFT" styleClass="panel" style="-fx-background-color: #1c2128; -fx-padding: 10;">
+            <Label text="📊 Selected:" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="selectedCountLabel" text="0 records" style="-fx-text-fill: #58a6ff; -fx-font-weight: 600;"/>
+            <Label text="from" style="-fx-text-fill: #8b949e;"/>
+            <Label fx:id="selectedTablesLabel" text="0 tables" style="-fx-text-fill: #8b949e;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="totalRecordsLabel" text="(0 total available)" style="-fx-text-fill: #6e7681;"/>
+        </HBox>
+        
+        <!-- Action Buttons -->
+        <HBox spacing="12" alignment="CENTER_RIGHT">
+            <Button fx:id="cancelBtn" text="Cancel" onAction="#handleCancel" 
+                    styleClass="btn btn-ghost" prefWidth="100"/>
+            <Button fx:id="confirmBtn" text="🚀 Import Selected Records" onAction="#handleConfirm" 
+                    styleClass="btn btn-accent" prefWidth="200"/>
+        </HBox>
+    </VBox>
+    
+    <!-- Loading Overlay -->
+    <VBox fx:id="loadingOverlay" alignment="CENTER" spacing="20" 
+          style="-fx-background-color: rgba(13, 17, 23, 0.98);" visible="true">
+        <padding><Insets top="40" right="40" bottom="40" left="40"/></padding>
+        
+        <!-- Loading Header -->
+        <VBox alignment="CENTER" spacing="8">
+            <Label text="🔍 Loading Related Records" 
+                   style="-fx-font-size: 24px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="loadingStatusLabel" text="Fetching data into memory..." 
+                   style="-fx-font-size: 14px; -fx-text-fill: #8b949e;"/>
+        </VBox>
+        
+        <!-- Progress Bar -->
+        <VBox spacing="8" maxWidth="500" alignment="CENTER">
+            <ProgressBar fx:id="loadingProgressBar" prefWidth="500" prefHeight="8" progress="0"/>
+            <Label fx:id="progressPercentLabel" text="0%" 
+                   style="-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #3fb950;"/>
+        </VBox>
+        
+        <!-- Analysis Log -->
+        <VBox spacing="8" maxWidth="600" VBox.vgrow="ALWAYS">
+            <Label text="Loading Log" style="-fx-text-fill: #8b949e;"/>
+            <TextArea fx:id="analysisLogArea" editable="false" wrapText="true" 
+                     prefHeight="250" VBox.vgrow="ALWAYS"
+                     styleClass="log-area"/>
+        </VBox>
+    </VBox>
+</StackPane>

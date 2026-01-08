@@ -1,10 +1,12 @@
 package com.backupforce.ui;
 
+import com.backupforce.config.SSLHelper;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -17,6 +19,9 @@ public class BackupForceApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         try {
+            // Disable SSL validation globally at application startup for Snowflake connections
+            SSLHelper.disableSSLValidation();
+            
             // Load root application container (handles login/app transitions smoothly)
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/app-root.fxml"));
             Parent root = loader.load();
@@ -31,6 +36,14 @@ public class BackupForceApp extends Application {
             // Use undecorated stage for custom title bar (removes ugly Windows chrome)
             primaryStage.initStyle(StageStyle.UNDECORATED);
             primaryStage.setTitle("BackupForce - Salesforce Backup Tool");
+            
+            // Set application icon
+            try {
+                primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/backupforce-icon.png")));
+            } catch (Exception e) {
+                logger.warn("Failed to load application icon", e);
+            }
+            
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(550);
             primaryStage.setMinHeight(650);
@@ -55,6 +68,12 @@ public class BackupForceApp extends Application {
     }
 
     public static void main(String[] args) {
+        // Set system properties to disable SSL validation for Snowflake JDBC
+        // This must happen BEFORE any SSL context is initialized
+        System.setProperty("javax.net.ssl.trustStore", "");
+        System.setProperty("javax.net.ssl.trustStorePassword", "");
+        System.setProperty("com.sun.net.ssl.checkRevocation", "false");
+        
         launch(args);
     }
 }

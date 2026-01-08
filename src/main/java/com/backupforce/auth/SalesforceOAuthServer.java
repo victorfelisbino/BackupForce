@@ -508,4 +508,94 @@ public class SalesforceOAuthServer {
         byte[] hash = digest.digest(verifier.getBytes(StandardCharsets.UTF_8));
         return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
     }
+    
+    /**
+     * Static method to refresh an access token using a stored refresh token.
+     * This allows silent authentication without opening a browser.
+     * 
+     * @param loginUrl The Salesforce login URL (production or sandbox)
+     * @param refreshToken The stored refresh token
+     * @return OAuthResult with new access token, or error if refresh failed
+     */
+    public static OAuthResult refreshAccessToken(String loginUrl, String refreshToken) {
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            String tokenEndpoint = loginUrl + "/services/oauth2/token";
+            logger.info("Attempting silent token refresh...");
+            
+            HttpPost post = new HttpPost(tokenEndpoint);
+            
+            List<NameValuePair> params = new ArrayList<>();
+            params.add(new BasicNameValuePair("grant_type", "refresh_token"));
+            params.add(new BasicNameValuePair("refresh_token", refreshToken));
+            params.add(new BasicNameValuePair("client_id", CLIENT_ID));
+            
+            post.setEntity(new UrlEncodedFormEntity(params));
+            
+            try (ClassicHttpResponse response = httpClient.executeOpen(null, post, null)) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                
+                if (response.getCode() != 200) {
+                    logger.warn("Token refresh failed: {}", responseBody);
+                    return new OAuthResult("Token refresh failed (session may have expired)");
+                }
+                
+                JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
+                
+                String accessToken = json.get("access_token").getAsString();
+                String instanceUrl = json.get("instance_url").getAsString();
+                
+                logger.info("✅ Successfully refreshed access token silently");
+                
+                // Return result with the SAME refresh token (it's still valid)
+                return new OAuthResult(accessToken, instanceUrl, refreshToken);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error refreshing token", e);
+            return new OAuthResult("Token refresh error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Enhanced authentication that tries silent refresh first (if a refresh token exists),
+     * then falls back to browser-based OAuth if needed.
+     * 
+     * @param loginUrl The Salesforce login URL
+     * @param trySilentFirst Whether to attempt silent refresh before opening browser
+     * @return OAuthResult
+     */
+    public OAuthResult authenticateWithSilentRefresh(String loginUrl, boolean trySilentFirst) throws Exception {
+        if (trySilentFirst) {
+            // Check for stored refresh token
+            TokenStorage.StoredToken stored = TokenStorage.getInstance().getToken(loginUrl, null);
+            
+            if (stored != null && stored.refreshToken != null) {
+                // Check token age (90 days = Salesforce default expiry)
+                long ageMs = System.currentTimeMillis() - stored.storedAt;
+                long ageDays = TimeUnit.MILLISECONDS.toDays(ageMs);
+                
+                if (ageDays < 90) {
+                    logger.info("Found stored refresh token (age: {} days), attempting silent refresh...", ageDays);
+                    
+                    OAuthResult result = refreshAccessToken(loginUrl, stored.refreshToken);
+                    if (result.isSuccess()) {
+                        logger.info("✅ Silent authentication successful!");
+                        return result;
+                    } else {
+                        logger.warn("Silent refresh failed, will open browser: {}", result.error);
+                        // Remove invalid token
+                        TokenStorage.getInstance().removeToken(loginUrl, stored.username);
+                    }
+                } else {
+                    logger.info("Stored token is too old ({} days), will request new login", ageDays);
+                    TokenStorage.getInstance().removeToken(loginUrl, stored.username);
+                }
+            } else {
+                logger.info("No stored refresh token found, will open browser");
+            }
+        }
+        
+        // Fall back to normal browser-based authentication
+        return authenticate(loginUrl);
+    }
 }

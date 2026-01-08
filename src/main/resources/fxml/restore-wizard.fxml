@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<!-- Restore Wizard - Step-by-step guided restore flow -->
+<VBox xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="com.backupforce.ui.RestoreWizardController"
+      spacing="0"
+      stylesheets="@../css/backupforce-modern.css">
+    
+    <!-- Progress Steps Header -->
+    <HBox fx:id="stepsHeader" styleClass="status-bar" spacing="0" alignment="CENTER">
+        <padding><Insets top="12" right="24" bottom="12" left="24"/></padding>
+        
+        <!-- Step 1 -->
+        <VBox fx:id="step1Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step active">
+            <Label text="1" styleClass="wizard-step-number"/>
+            <Label text="Source" styleClass="wizard-step-label"/>
+        </VBox>
+        <Region prefWidth="60" styleClass="wizard-connector"/>
+        
+        <!-- Step 2 -->
+        <VBox fx:id="step2Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step">
+            <Label text="2" styleClass="wizard-step-number"/>
+            <Label text="Find Records" styleClass="wizard-step-label"/>
+        </VBox>
+        <Region prefWidth="60" styleClass="wizard-connector"/>
+        
+        <!-- Step 3 -->
+        <VBox fx:id="step3Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step">
+            <Label text="3" styleClass="wizard-step-number"/>
+            <Label text="Relationships" styleClass="wizard-step-label"/>
+        </VBox>
+        <Region prefWidth="60" styleClass="wizard-connector"/>
+        
+        <!-- Step 4 -->
+        <VBox fx:id="step4Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step">
+            <Label text="4" styleClass="wizard-step-number"/>
+            <Label text="Restore" styleClass="wizard-step-label"/>
+        </VBox>
+    </HBox>
+    
+    <!-- Main Content Area - Swaps between steps -->
+    <StackPane fx:id="contentStack" VBox.vgrow="ALWAYS" styleClass="content-area">
+        
+        <!-- ====== STEP 1: Choose Source ====== -->
+        <VBox fx:id="step1Content" spacing="24" alignment="TOP_CENTER" visible="true">
+            <padding><Insets top="40" right="60" bottom="40" left="60"/></padding>
+            
+            <Label text="Where is your backup data?" 
+                   style="-fx-font-size: 24px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            <Label text="Choose the source of your backup to restore from" 
+                   style="-fx-text-fill: #8b949e;"/>
+            
+            <!-- Source Cards -->
+            <HBox spacing="24" alignment="CENTER">
+                <padding><Insets top="20"/></padding>
+                
+                <!-- Database Card -->
+                <VBox fx:id="databaseCard" spacing="12" alignment="CENTER" 
+                      styleClass="source-card" prefWidth="280" prefHeight="200"
+                      onMouseClicked="#handleSelectDatabase">
+                    <Label text="🗄️" style="-fx-font-size: 48px;"/>
+                    <Label text="Database" style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+                    <Label text="Snowflake, PostgreSQL, SQL Server" 
+                           style="-fx-text-fill: #8b949e; -fx-font-size: 12px;" wrapText="true" textAlignment="CENTER"/>
+                    <ComboBox fx:id="databaseCombo" promptText="Select connection..." 
+                             prefWidth="220" styleClass="form-combo"/>
+                </VBox>
+                
+                <!-- Backup Folder Card -->
+                <VBox fx:id="folderCard" spacing="12" alignment="CENTER" 
+                      styleClass="source-card" prefWidth="280" prefHeight="200"
+                      onMouseClicked="#handleSelectFolder">
+                    <Label text="📁" style="-fx-font-size: 48px;"/>
+                    <Label text="Backup Folder" style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+                    <Label text="Local JSON/CSV backup files" 
+                           style="-fx-text-fill: #8b949e; -fx-font-size: 12px;"/>
+                    <Button fx:id="browseFolderBtn" text="Browse..." onAction="#handleBrowseFolder"
+                           styleClass="btn btn-ghost" prefWidth="220"/>
+                </VBox>
+            </HBox>
+            
+            <Label fx:id="step1StatusLabel" text="" style="-fx-text-fill: #3fb950;"/>
+        </VBox>
+        
+        <!-- ====== STEP 2: Find Records ====== -->
+        <VBox fx:id="step2Content" spacing="16" visible="false">
+            <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+            
+            <HBox spacing="16" alignment="CENTER_LEFT">
+                <Label text="Find Records to Restore" 
+                       style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="sourceInfoLabel" text="" style="-fx-text-fill: #8b949e;"/>
+            </HBox>
+            
+            <!-- Object Selection + Filter -->
+            <HBox spacing="16" VBox.vgrow="ALWAYS">
+                
+                <!-- Left: Object List -->
+                <VBox spacing="12" prefWidth="280" styleClass="panel">
+                    <Label text="📋 Backup Objects" styleClass="panel-header"/>
+                    <TextField fx:id="objectFilterField" promptText="🔍 Filter objects..." 
+                              styleClass="form-input"/>
+                    <ListView fx:id="objectListView" VBox.vgrow="ALWAYS" styleClass="list-view"/>
+                    <Label fx:id="objectCountLabel" text="0 objects" style="-fx-text-fill: #8b949e; -fx-font-size: 11px;"/>
+                </VBox>
+                
+                <!-- Right: Search & Results -->
+                <VBox spacing="12" HBox.hgrow="ALWAYS" styleClass="panel">
+                    <HBox spacing="12" alignment="CENTER_LEFT">
+                        <Label fx:id="selectedObjectLabel" text="Select an object" styleClass="panel-header"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="recordCountLabel" text="" style="-fx-text-fill: #8b949e;"/>
+                    </HBox>
+                    
+                    <!-- SQL WHERE Clause Filter -->
+                    <VBox spacing="8" styleClass="search-box">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="🔍 Filter Records" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                            <Label text="(SQL WHERE clause)" style="-fx-text-fill: #6e7681; -fx-font-size: 11px;"/>
+                        </HBox>
+                        <HBox spacing="8">
+                            <TextField fx:id="whereClauseField" HBox.hgrow="ALWAYS"
+                                      promptText="e.g. Name LIKE '%Acme%' OR Industry = 'Technology'"
+                                      styleClass="form-input code-input"/>
+                            <Button fx:id="searchBtn" text="Search" onAction="#handleSearch"
+                                   styleClass="btn btn-accent"/>
+                        </HBox>
+                        <HBox spacing="16">
+                            <Label text="Examples:" style="-fx-text-fill: #6e7681; -fx-font-size: 11px;"/>
+                            <Hyperlink text="Name contains" onAction="#handleExampleName" 
+                                      style="-fx-font-size: 11px;"/>
+                            <Hyperlink text="Created after date" onAction="#handleExampleDate"
+                                      style="-fx-font-size: 11px;"/>
+                            <Hyperlink text="By ID" onAction="#handleExampleId"
+                                      style="-fx-font-size: 11px;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <CheckBox fx:id="loadAllRecordsCheck" text="Load all matching records (up to 50K)"
+                                     style="-fx-text-fill: #e6edf3; -fx-font-size: 11px;"/>
+                        </HBox>
+                    </VBox>
+                    
+                    <!-- Results Table -->
+                    <TableView fx:id="resultsTable" VBox.vgrow="ALWAYS" styleClass="data-table">
+                        <columns>
+                            <TableColumn fx:id="selectCol" text="" prefWidth="40" minWidth="40" maxWidth="40"/>
+                            <TableColumn fx:id="nameCol" text="Name" prefWidth="200"/>
+                            <TableColumn fx:id="idCol" text="ID" prefWidth="180"/>
+                            <TableColumn fx:id="createdCol" text="Created" prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <VBox spacing="8" alignment="CENTER">
+                                <Label text="Select an object and search" style="-fx-text-fill: #6e7681;"/>
+                                <Label text="or click Search with no filter to see all records" 
+                                       style="-fx-text-fill: #484f58; -fx-font-size: 11px;"/>
+                            </VBox>
+                        </placeholder>
+                    </TableView>
+                    
+                    <!-- Selection Summary -->
+                    <HBox spacing="16" alignment="CENTER_LEFT" style="-fx-background-color: #161b22; -fx-padding: 8 12;">
+                        <Label fx:id="selectionLabel" text="0 records selected" 
+                               style="-fx-text-fill: #58a6ff; -fx-font-weight: 600;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="Select All" onAction="#handleSelectAllRecords" styleClass="btn btn-ghost btn-sm"/>
+                        <Button text="Clear" onAction="#handleClearSelection" styleClass="btn btn-ghost btn-sm"/>
+                    </HBox>
+                </VBox>
+            </HBox>
+        </VBox>
+        
+        <!-- ====== STEP 3: Relationships ====== -->
+        <VBox fx:id="step3Content" spacing="16" visible="false">
+            <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+            
+            <HBox spacing="16" alignment="CENTER_LEFT">
+                <Label text="Include Related Records" 
+                       style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="parentSummaryLabel" text="1 Account selected" style="-fx-text-fill: #3fb950;"/>
+            </HBox>
+            
+            <Label text="Review and select which related records to include in the restore. Click any record to view its details." 
+                   style="-fx-text-fill: #8b949e;"/>
+            
+            <!-- Split: Tree + Details -->
+            <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS">
+                <!-- Left: Relationship Tree -->
+                <VBox spacing="8">
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <Label text="📋 Related Records" style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="▼ Expand" onAction="#handleExpandAll" styleClass="btn btn-ghost btn-xs"/>
+                        <Button text="▲ Collapse" onAction="#handleCollapseAll" styleClass="btn btn-ghost btn-xs"/>
+                        <Separator orientation="VERTICAL"/>
+                        <Button text="✓ All" onAction="#handleSelectAllRelated" styleClass="btn btn-ghost btn-xs"/>
+                        <Button text="✗ None" onAction="#handleDeselectAllRelated" styleClass="btn btn-ghost btn-xs"/>
+                    </HBox>
+                    <TreeView fx:id="relationshipTree" VBox.vgrow="ALWAYS" styleClass="tree-view"/>
+                    <HBox spacing="8" alignment="CENTER_LEFT" style="-fx-background-color: #161b22; -fx-padding: 8;">
+                        <Label fx:id="relatedCountLabel" text="0 related records selected" 
+                               style="-fx-text-fill: #58a6ff; -fx-font-weight: 600;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="totalInMemoryLabel" text="" style="-fx-text-fill: #6e7681;"/>
+                    </HBox>
+                </VBox>
+                
+                <!-- Right: Details Panel -->
+                <VBox spacing="8" style="-fx-background-color: #161b22; -fx-padding: 12;">
+                    <Label fx:id="detailsTitle" text="📄 Record Details" 
+                           style="-fx-font-weight: 600; -fx-text-fill: #e6edf3;"/>
+                    <Separator/>
+                    <TableView fx:id="detailsTable" VBox.vgrow="ALWAYS" styleClass="table-view">
+                        <columns>
+                            <TableColumn fx:id="fieldNameCol" text="Field" prefWidth="140"/>
+                            <TableColumn fx:id="fieldValueCol" text="Value" prefWidth="260"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="Click a record to view details" style="-fx-text-fill: #6e7681;"/>
+                        </placeholder>
+                    </TableView>
+                    <HBox spacing="8" alignment="CENTER_RIGHT">
+                        <Button text="📋 Copy" onAction="#handleCopyDetails" styleClass="btn btn-ghost btn-sm"/>
+                    </HBox>
+                </VBox>
+            </SplitPane>
+        </VBox>
+        
+        <!-- ====== STEP 4: Review & Restore ====== -->
+        <VBox fx:id="step4Content" spacing="20" visible="false">
+            <padding><Insets top="20" right="40" bottom="20" left="40"/></padding>
+            
+            <Label text="Review &amp; Restore" 
+                   style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            
+            <!-- Summary Cards -->
+            <HBox spacing="20" alignment="CENTER">
+                <!-- Records Summary -->
+                <VBox spacing="8" alignment="CENTER" styleClass="summary-card" prefWidth="180">
+                    <Label fx:id="totalRecordsNumber" text="0" 
+                           style="-fx-font-size: 36px; -fx-font-weight: 700; -fx-text-fill: #3fb950;"/>
+                    <Label text="Total Records" style="-fx-text-fill: #8b949e;"/>
+                </VBox>
+                
+                <!-- Objects Summary -->
+                <VBox spacing="8" alignment="CENTER" styleClass="summary-card" prefWidth="180">
+                    <Label fx:id="totalObjectsNumber" text="0" 
+                           style="-fx-font-size: 36px; -fx-font-weight: 700; -fx-text-fill: #58a6ff;"/>
+                    <Label text="Objects" style="-fx-text-fill: #8b949e;"/>
+                </VBox>
+                
+                <!-- API Calls -->
+                <VBox spacing="8" alignment="CENTER" styleClass="summary-card" prefWidth="180">
+                    <Label fx:id="apiCallsNumber" text="0" 
+                           style="-fx-font-size: 36px; -fx-font-weight: 700; -fx-text-fill: #d29922;"/>
+                    <Label text="API Calls" style="-fx-text-fill: #8b949e;"/>
+                </VBox>
+            </HBox>
+            
+            <!-- Restore Options -->
+            <VBox spacing="12" styleClass="panel">
+                <Label text="Restore Options" styleClass="panel-header"/>
+                
+                <HBox spacing="40">
+                    <VBox spacing="8">
+                        <Label text="Mode" style="-fx-text-fill: #8b949e;"/>
+                        <fx:define><ToggleGroup fx:id="modeToggle"/></fx:define>
+                        <RadioButton fx:id="insertModeRadio" text="Insert (new records)" 
+                                    toggleGroup="$modeToggle" selected="true" styleClass="form-radio"/>
+                        <RadioButton fx:id="upsertModeRadio" text="Upsert (insert or update)" 
+                                    toggleGroup="$modeToggle" styleClass="form-radio"/>
+                        <RadioButton fx:id="updateModeRadio" text="Update only" 
+                                    toggleGroup="$modeToggle" styleClass="form-radio"/>
+                    </VBox>
+                    
+                    <VBox spacing="8">
+                        <Label text="Options" style="-fx-text-fill: #8b949e;"/>
+                        <CheckBox fx:id="useIdMappingCheck" text="Use ID mapping for lookups" 
+                                 selected="true" styleClass="form-checkbox"/>
+                        <CheckBox fx:id="stopOnErrorCheck" text="Stop on first error" 
+                                 styleClass="form-checkbox"/>
+                        <CheckBox fx:id="previewOnlyCheck" text="Preview only (dry run)" 
+                                 styleClass="form-checkbox"/>
+                    </VBox>
+                </HBox>
+            </VBox>
+            
+            <!-- Destination -->
+            <VBox spacing="8" styleClass="panel">
+                <Label text="Destination" styleClass="panel-header"/>
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label text="Salesforce Org:" style="-fx-text-fill: #8b949e;"/>
+                    <Label fx:id="destinationOrgLabel" text="Not connected" 
+                           style="-fx-text-fill: #e6edf3; -fx-font-weight: 600;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="Connect" onAction="#handleConnectOrg" styleClass="btn btn-ghost"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Warning callout for large restores -->
+            <VBox fx:id="warningPanel" spacing="8" styleClass="callout callout-warning" visible="false" managed="false">
+                <Label text="⚠️ Large Restore" styleClass="callout-title"/>
+                <Label fx:id="warningText" text="" styleClass="callout-text" wrapText="true"/>
+            </VBox>
+            
+            <!-- Progress Area (shown during restore) -->
+            <VBox fx:id="progressPanel" spacing="12" styleClass="panel" visible="false" managed="false">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label text="Restore Progress" styleClass="panel-header"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Label fx:id="progressPercentLabel" text="0%" style="-fx-text-fill: #3fb950; -fx-font-weight: 600;"/>
+                </HBox>
+                <ProgressBar fx:id="progressBar" prefWidth="Infinity" prefHeight="10"/>
+                <Label fx:id="progressStatusLabel" text="Preparing..." style="-fx-text-fill: #8b949e;"/>
+                <TextArea fx:id="logArea" prefHeight="150" editable="false" styleClass="log-area" VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </VBox>
+        
+        <!-- Loading Overlay -->
+        <VBox fx:id="loadingOverlay" alignment="CENTER" spacing="16" 
+              style="-fx-background-color: rgba(13, 17, 23, 0.95);" visible="false">
+            <ProgressIndicator prefWidth="48" prefHeight="48"/>
+            <Label fx:id="loadingLabel" text="Loading..." 
+                   style="-fx-font-size: 16px; -fx-text-fill: #e6edf3;"/>
+            <Label fx:id="loadingDetailLabel" text="" style="-fx-text-fill: #8b949e;"/>
+        </VBox>
+    </StackPane>
+    
+    <!-- Bottom Navigation -->
+    <HBox styleClass="status-bar" spacing="12" alignment="CENTER_RIGHT">
+        <padding><Insets top="12" right="24" bottom="12" left="24"/></padding>
+        
+        <Button fx:id="backBtn" text="← Back" onAction="#handleBack" 
+               styleClass="btn btn-ghost" prefWidth="100" visible="false"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="statusLabel" text="" style="-fx-text-fill: #8b949e;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="cancelBtn" text="Cancel" onAction="#handleCancel" 
+               styleClass="btn btn-ghost" prefWidth="100"/>
+        <Button fx:id="nextBtn" text="Next →" onAction="#handleNext" 
+               styleClass="btn btn-accent" prefWidth="140" disable="true"/>
+    </HBox>
+</VBox>

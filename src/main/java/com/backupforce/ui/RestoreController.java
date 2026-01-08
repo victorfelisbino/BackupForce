@@ -299,6 +299,27 @@ public class RestoreController {
     // Old handleBack() removed - navigation now handled by MainController sidebar
     
     @FXML
+    private void handleLaunchWizard() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/restore-wizard.fxml"));
+            Parent root = loader.load();
+            
+            RestoreWizardController wizardController = loader.getController();
+            // Note: RestoreWizardController uses database connections, not SF connections
+            
+            Stage wizardStage = new Stage();
+            wizardStage.setTitle("Data Restoration Wizard");
+            wizardStage.setScene(new Scene(root));
+            wizardStage.show();
+            
+            logger.info("Launched restore wizard");
+        } catch (IOException e) {
+            logger.error("Failed to launch restore wizard", e);
+            showError("Failed to launch wizard: " + e.getMessage());
+        }
+    }
+    
+    @FXML
     private void handleBrowseRestore() {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Select Backup Folder to Restore");

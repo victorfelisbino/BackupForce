@@ -61,7 +61,7 @@ public class MainController {
     // Controllers
     private DashboardContentController dashboardController;
     private BackupController backupController;
-    private RestoreController restoreController;
+    private Object restoreController; // Can be RestoreController or RestoreWizardController
     private ScheduleController scheduleController;
     private ConnectionsContentController connectionsController;
     private PreferencesContentController preferencesController;
@@ -155,17 +155,17 @@ public class MainController {
         setActiveNav(navRestore);
         try {
             if (restoreContent == null) {
-                // Load the content-only FXML (no sidebar, no navigation handlers)
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/restore-content.fxml"));
+                // Load the wizard as the main restore interface
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/restore-wizard.fxml"));
                 restoreContent = loader.load();
                 restoreController = loader.getController();
-                restoreController.setConnectionInfo(connectionInfo);
+                // Note: Wizard uses database connections, not Salesforce connections
             }
             setContent(restoreContent);
-            logger.info("Navigated to Restore");
+            logger.info("Navigated to Restore (Wizard)");
         } catch (IOException e) {
-            logger.error("Failed to load restore", e);
-            showError("Failed to load restore: " + e.getMessage());
+            logger.error("Failed to load restore wizard", e);
+            showError("Failed to load restore wizard: " + e.getMessage());
         }
     }
     
