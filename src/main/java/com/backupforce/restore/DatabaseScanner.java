@@ -81,7 +81,17 @@ public class DatabaseScanner {
         DriverManager.setLoginTimeout(60);
         
         log("Opening JDBC connection...");
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+        
+        // Build connection properties with SSL bypass for Snowflake
+        java.util.Properties props = new java.util.Properties();
+        if (username != null) props.put("user", username);
+        if (password != null) props.put("password", password);
+        if ("Snowflake".equals(connection.getType())) {
+            props.put("insecure_mode", "true");
+            props.put("ssl", "off");
+        }
+        
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
             log("✓ JDBC connection established successfully");
             log("Setting query timeout to 30 seconds...");
             

@@ -656,10 +656,11 @@ public class RestoreWizardController {
         
         // For Snowflake, set connection properties to disable SSL validation
         java.util.Properties props = new java.util.Properties();
-        props.put("user", username);
-        props.put("password", password);
+        if (username != null) props.put("user", username);
+        if (password != null) props.put("password", password);
         if ("Snowflake".equals(selectedConnection.getType())) {
             props.put("insecure_mode", "true");
+            props.put("ssl", "off");  // Alternative Snowflake SSL disable
         }
         
         try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
