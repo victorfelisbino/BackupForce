@@ -627,6 +627,10 @@ public class RestoreWizardController {
                 if (loadAll) {
                     row.setSelected(true);
                 }
+                // Add listener to update Next button when checkbox changes
+                row.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                    updateSelectionCount();
+                });
                 searchResults.add(row);
             }
             recordCountLabel.setText(String.format("Showing %,d of %,d records", 
@@ -654,13 +658,18 @@ public class RestoreWizardController {
         String username = selectedConnection.getUsername();
         String password = ConnectionManager.getInstance().getDecryptedPassword(selectedConnection);
         
-        // For Snowflake, set connection properties to disable SSL validation
+        // Build connection properties
         java.util.Properties props = new java.util.Properties();
-        if (username != null) props.put("user", username);
-        if (password != null) props.put("password", password);
         if ("Snowflake".equals(selectedConnection.getType())) {
+            // For Snowflake with externalbrowser, only need username
+            if (username != null) props.put("user", username);
+            // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
             props.put("insecure_mode", "true");
-            props.put("ssl", "off");  // Alternative Snowflake SSL disable
+            props.put("tracing", "OFF");
+        } else {
+            // For other databases, use username/password
+            if (username != null) props.put("user", username);
+            if (password != null) props.put("password", password);
         }
         
         try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {

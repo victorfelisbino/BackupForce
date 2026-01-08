@@ -82,13 +82,18 @@ public class DatabaseScanner {
         
         log("Opening JDBC connection...");
         
-        // Build connection properties with SSL bypass for Snowflake
+        // Build connection properties
         java.util.Properties props = new java.util.Properties();
-        if (username != null) props.put("user", username);
-        if (password != null) props.put("password", password);
         if ("Snowflake".equals(connection.getType())) {
+            // For Snowflake with externalbrowser, only need username
+            if (username != null) props.put("user", username);
+            // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
             props.put("insecure_mode", "true");
-            props.put("ssl", "off");
+            props.put("tracing", "OFF");
+        } else {
+            // For other databases, use username/password
+            if (username != null) props.put("user", username);
+            if (password != null) props.put("password", password);
         }
         
         try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
