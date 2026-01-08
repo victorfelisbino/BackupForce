@@ -27,12 +27,13 @@ public class JdbcHelper {
                     host, sqlPort, database);
                 
             case "Snowflake":
+                String account = conn.getAccount(); // Use account field for Snowflake, not host
                 String schema = conn.getSchema();
                 String warehouse = conn.getWarehouse();
                 boolean useSso = conn.isUseSso();
                 
                 StringBuilder url = new StringBuilder(String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s",
-                    host, warehouse != null ? warehouse : "COMPUTE_WH", database));
+                    account, warehouse != null ? warehouse : "COMPUTE_WH", database));
                 
                 if (schema != null && !schema.isEmpty()) {
                     url.append("&schema=").append(schema);
