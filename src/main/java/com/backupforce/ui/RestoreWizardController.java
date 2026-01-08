@@ -654,7 +654,15 @@ public class RestoreWizardController {
         String username = selectedConnection.getUsername();
         String password = ConnectionManager.getInstance().getDecryptedPassword(selectedConnection);
         
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+        // For Snowflake, set connection properties to disable SSL validation
+        java.util.Properties props = new java.util.Properties();
+        props.put("user", username);
+        props.put("password", password);
+        if ("Snowflake".equals(selectedConnection.getType())) {
+            props.put("insecure_mode", "true");
+        }
+        
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
             String schema = selectedConnection.getSchema();
             String qualifiedName = getQualifiedTableName(schema, object.getTableName());
             

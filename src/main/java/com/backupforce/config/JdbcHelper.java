@@ -43,6 +43,9 @@ public class JdbcHelper {
                     url.append("&authenticator=externalbrowser");
                 }
                 
+                // Disable SSL validation for Snowflake JDBC - needed for development/testing
+                url.append("&insecure_mode=true");
+                
                 return url.toString();
                 
             case "PostgreSQL":
