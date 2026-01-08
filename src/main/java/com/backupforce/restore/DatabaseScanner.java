@@ -89,6 +89,7 @@ public class DatabaseScanner {
             if (username != null) props.put("user", username);
             // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
             props.put("insecure_mode", "true");
+            props.put("ocspFailOpen", "true");  // Allow connection even if OCSP check fails
             props.put("tracing", "OFF");
         } else {
             // For other databases, use username/password

@@ -38,6 +38,13 @@
         <!-- Step 4 -->
         <VBox fx:id="step4Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step">
             <Label text="4" styleClass="wizard-step-number"/>
+            <Label text="Map Fields" styleClass="wizard-step-label"/>
+        </VBox>
+        <Region prefWidth="60" styleClass="wizard-connector"/>
+        
+        <!-- Step 5 -->
+        <VBox fx:id="step5Indicator" alignment="CENTER" spacing="4" styleClass="wizard-step">
+            <Label text="5" styleClass="wizard-step-number"/>
             <Label text="Restore" styleClass="wizard-step-label"/>
         </VBox>
     </HBox>
@@ -230,8 +237,44 @@
             </SplitPane>
         </VBox>
         
-        <!-- ====== STEP 4: Review & Restore ====== -->
+        <!-- ====== STEP 4: Map Fields ====== -->
         <VBox fx:id="step4Content" spacing="20" visible="false">
+            <padding><Insets top="20" right="40" bottom="20" left="40"/></padding>
+            
+            <Label text="Map Fields &amp; Transform Values" 
+                   style="-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #e6edf3;"/>
+            
+            <Label text="Configure field mappings and value transformations for your restore"
+                   style="-fx-font-size: 13px; -fx-text-fill: #8b949e;"/>
+            
+            <!-- Field Mapping Table -->
+            <VBox spacing="12" VBox.vgrow="ALWAYS">
+                <Label text="Field Mappings" styleClass="section-title"/>
+                <TableView fx:id="fieldMappingTable" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="sourceFieldCol" text="Source Field" prefWidth="200"/>
+                        <TableColumn fx:id="destFieldCol" text="Destination Field" prefWidth="200"/>
+                        <TableColumn fx:id="transformCol" text="Transformation" prefWidth="150"/>
+                        <TableColumn fx:id="sampleValueCol" text="Sample Value" prefWidth="150"/>
+                    </columns>
+                    <placeholder>
+                        <VBox alignment="CENTER" spacing="8">
+                            <Label text="🔄" style="-fx-font-size: 32px;"/>
+                            <Label text="Field mappings will be auto-detected" style="-fx-text-fill: #6e7681;"/>
+                        </VBox>
+                    </placeholder>
+                </TableView>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Button text="+ Add Mapping" onAction="#handleAddFieldMapping" styleClass="btn btn-ghost btn-sm"/>
+                    <Button text="Auto-Map" onAction="#handleAutoMap" styleClass="btn btn-ghost btn-sm"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="Manage Transformations" onAction="#handleManageTransformations" styleClass="btn btn-ghost btn-sm"/>
+                </HBox>
+            </VBox>
+        </VBox>
+        
+        <!-- ====== STEP 5: Review & Restore ====== -->
+        <VBox fx:id="step5Content" spacing="20" visible="false">
             <padding><Insets top="20" right="40" bottom="20" left="40"/></padding>
             
             <Label text="Review &amp; Restore" 

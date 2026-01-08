@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 
 /**
  * Wizard-based controller for guided data restoration.
- * Steps: 1) Choose Source → 2) Find Records → 3) Relationships → 4) Review & Restore
+ * Steps: 1) Choose Source → 2) Find Records → 3) Relationships → 4) Map Fields → 5) Review & Restore
  */
 public class RestoreWizardController {
     
@@ -52,9 +52,9 @@ public class RestoreWizardController {
     private File selectedFolder;
     
     // Step indicators
-    @FXML private VBox step1Indicator, step2Indicator, step3Indicator, step4Indicator;
+    @FXML private VBox step1Indicator, step2Indicator, step3Indicator, step4Indicator, step5Indicator;
     @FXML private StackPane contentStack;
-    @FXML private VBox step1Content, step2Content, step3Content, step4Content;
+    @FXML private VBox step1Content, step2Content, step3Content, step4Content, step5Content;
     @FXML private VBox loadingOverlay;
     @FXML private Label loadingLabel, loadingDetailLabel;
     
@@ -102,7 +102,16 @@ public class RestoreWizardController {
     private final Map<String, Set<String>> selectedRelatedRecordIds = new LinkedHashMap<>();
     
     // ============================================
-    // STEP 4: Review & Restore
+    // STEP 4: Map Fields
+    // ============================================
+    @FXML private TableView<FieldMapping> fieldMappingTable;
+    @FXML private TableColumn<FieldMapping, String> sourceFieldCol, destFieldCol, transformCol, sampleValueCol;
+    
+    // Data for Step 4
+    private ObservableList<FieldMapping> fieldMappings = FXCollections.observableArrayList();
+    
+    // ============================================
+    // STEP 5: Review & Restore
     // ============================================
     @FXML private Label totalRecordsNumber, totalObjectsNumber, apiCallsNumber, destinationOrgLabel;
     @FXML private RadioButton insertModeRadio, upsertModeRadio, updateModeRadio;
@@ -233,6 +242,37 @@ public class RestoreWizardController {
         }
         public String getField() { return field; }
         public String getValue() { return value; }
+    }
+    
+    /** Field mapping configuration */
+    public static class FieldMapping {
+        private final SimpleStringProperty sourceField;
+        private final SimpleStringProperty destField;
+        private final SimpleStringProperty transformation;
+        private final SimpleStringProperty sampleValue;
+        
+        public FieldMapping(String sourceField, String destField, String transformation, String sampleValue) {
+            this.sourceField = new SimpleStringProperty(sourceField);
+            this.destField = new SimpleStringProperty(destField);
+            this.transformation = new SimpleStringProperty(transformation != null ? transformation : "None");
+            this.sampleValue = new SimpleStringProperty(sampleValue != null ? sampleValue : "");
+        }
+        
+        public String getSourceField() { return sourceField.get(); }
+        public void setSourceField(String value) { sourceField.set(value); }
+        public SimpleStringProperty sourceFieldProperty() { return sourceField; }
+        
+        public String getDestField() { return destField.get(); }
+        public void setDestField(String value) { destField.set(value); }
+        public SimpleStringProperty destFieldProperty() { return destField; }
+        
+        public String getTransformation() { return transformation.get(); }
+        public void setTransformation(String value) { transformation.set(value); }
+        public SimpleStringProperty transformationProperty() { return transformation; }
+        
+        public String getSampleValue() { return sampleValue.get(); }
+        public void setSampleValue(String value) { sampleValue.set(value); }
+        public SimpleStringProperty sampleValueProperty() { return sampleValue; }
     }
     
     // ============================================
@@ -372,7 +412,24 @@ public class RestoreWizardController {
     }
     
     private void setupStep4() {
-        // Will be populated when we reach step 4
+        // Field mapping table columns
+        if (sourceFieldCol != null) {
+            sourceFieldCol.setCellValueFactory(data -> data.getValue().sourceFieldProperty());
+        }
+        if (destFieldCol != null) {
+            destFieldCol.setCellValueFactory(data -> data.getValue().destFieldProperty());
+        }
+        if (transformCol != null) {
+            transformCol.setCellValueFactory(data -> data.getValue().transformationProperty());
+        }
+        if (sampleValueCol != null) {
+            sampleValueCol.setCellValueFactory(data -> data.getValue().sampleValueProperty());
+        }
+        
+        // Bind table to observable list
+        if (fieldMappingTable != null) {
+            fieldMappingTable.setItems(fieldMappings);
+        }
     }
     
     // ============================================
@@ -397,9 +454,13 @@ public class RestoreWizardController {
                 break;
             case 3:
                 goToStep(4);
-                prepareRestoreSummary();
+                prepareFieldMappings();
                 break;
             case 4:
+                goToStep(5);
+                prepareRestoreSummary();
+                break;
+            case 5:
                 startRestore();
                 break;
         }
@@ -428,6 +489,7 @@ public class RestoreWizardController {
         step2Content.setVisible(false);
         step3Content.setVisible(false);
         step4Content.setVisible(false);
+        step5Content.setVisible(false);
         
         // Show current step
         switch (step) {
@@ -435,6 +497,7 @@ public class RestoreWizardController {
             case 2: step2Content.setVisible(true); break;
             case 3: step3Content.setVisible(true); break;
             case 4: step4Content.setVisible(true); break;
+            case 5: step5Content.setVisible(true); break;
         }
         
         updateStepIndicators();
@@ -443,7 +506,7 @@ public class RestoreWizardController {
     
     private void updateStepIndicators() {
         // Remove all style classes first
-        for (VBox indicator : Arrays.asList(step1Indicator, step2Indicator, step3Indicator, step4Indicator)) {
+        for (VBox indicator : Arrays.asList(step1Indicator, step2Indicator, step3Indicator, step4Indicator, step5Indicator)) {
             if (indicator != null) {
                 indicator.getStyleClass().removeAll("active", "completed");
             }
@@ -453,6 +516,7 @@ public class RestoreWizardController {
         if (currentStep > 1 && step1Indicator != null) step1Indicator.getStyleClass().add("completed");
         if (currentStep > 2 && step2Indicator != null) step2Indicator.getStyleClass().add("completed");
         if (currentStep > 3 && step3Indicator != null) step3Indicator.getStyleClass().add("completed");
+        if (currentStep > 4 && step4Indicator != null) step4Indicator.getStyleClass().add("completed");
         
         // Mark current step
         switch (currentStep) {
@@ -460,6 +524,7 @@ public class RestoreWizardController {
             case 2: if (step2Indicator != null) step2Indicator.getStyleClass().add("active"); break;
             case 3: if (step3Indicator != null) step3Indicator.getStyleClass().add("active"); break;
             case 4: if (step4Indicator != null) step4Indicator.getStyleClass().add("active"); break;
+            case 5: if (step5Indicator != null) step5Indicator.getStyleClass().add("active"); break;
         }
     }
     
@@ -478,10 +543,14 @@ public class RestoreWizardController {
                 nextBtn.setDisable(getSelectedRecords().isEmpty());
                 break;
             case 3:
-                nextBtn.setText("Review →");
+                nextBtn.setText("Next →");
                 nextBtn.setDisable(false);
                 break;
             case 4:
+                nextBtn.setText("Next →");
+                nextBtn.setDisable(false);
+                break;
+            case 5:
                 nextBtn.setText("🚀 Start Restore");
                 nextBtn.setDisable(false);
                 break;
@@ -665,6 +734,7 @@ public class RestoreWizardController {
             if (username != null) props.put("user", username);
             // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
             props.put("insecure_mode", "true");
+            props.put("ocspFailOpen", "true");  // Allow connection even if OCSP check fails
             props.put("tracing", "OFF");
         } else {
             // For other databases, use username/password
@@ -1034,7 +1104,73 @@ public class RestoreWizardController {
     }
     
     // ============================================
-    // STEP 4: REVIEW & RESTORE
+    // STEP 4: MAP FIELDS & TRANSFORMATIONS
+    // ============================================
+    
+    private void prepareFieldMappings() {
+        fieldMappings.clear();
+        
+        // Auto-detect field mappings from selected records
+        List<RecordRow> selectedRecords = getSelectedRecords();
+        if (!selectedRecords.isEmpty()) {
+            RecordRow firstRecord = selectedRecords.get(0);
+            
+            // Get field names from the first record's data
+            Map<String, Object> recordData = firstRecord.getData();
+            
+            for (Map.Entry<String, Object> entry : recordData.entrySet()) {
+                String sourceField = entry.getKey();
+                String sampleValue = entry.getValue() != null ? entry.getValue().toString() : "";
+                
+                // Truncate long sample values
+                if (sampleValue.length() > 50) {
+                    sampleValue = sampleValue.substring(0, 47) + "...";
+                }
+                
+                // Auto-map to same field name by default
+                String destField = sourceField;
+                String transformation = "None";
+                
+                // Create mapping
+                FieldMapping mapping = new FieldMapping(sourceField, destField, transformation, sampleValue);
+                fieldMappings.add(mapping);
+            }
+        }
+        
+        // If no records selected yet, show placeholder
+        if (fieldMappings.isEmpty()) {
+            FieldMapping placeholder = new FieldMapping(
+                "Select records first", 
+                "to auto-detect fields", 
+                "N/A", 
+                "N/A"
+            );
+            fieldMappings.add(placeholder);
+        }
+    }
+    
+    @FXML
+    private void handleAddFieldMapping() {
+        // Add a new empty mapping row for manual entry
+        FieldMapping newMapping = new FieldMapping("", "", "None", "");
+        fieldMappings.add(newMapping);
+        fieldMappingTable.scrollTo(newMapping);
+    }
+    
+    @FXML
+    private void handleAutoMap() {
+        // Re-run auto-detection
+        prepareFieldMappings();
+    }
+    
+    @FXML
+    private void handleManageTransformations() {
+        // TODO: Open value translation dialog
+        showError("Value transformations dialog will be implemented");
+    }
+    
+    // ============================================
+    // STEP 5: REVIEW & RESTORE
     // ============================================
     
     private void prepareRestoreSummary() {
