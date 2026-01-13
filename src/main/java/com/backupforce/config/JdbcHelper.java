@@ -43,6 +43,9 @@ public class JdbcHelper {
                     url.append("&authenticator=externalbrowser");
                 }
                 
+                // Critical: Add insecureMode to bypass SSL validation for chunk downloads
+                url.append("&insecureMode=true");
+                
                 return url.toString();
                 
             case "PostgreSQL":

@@ -841,43 +841,97 @@ public class BulkV2Client implements AutoCloseable {
     
     /**
      * Extract record IDs from a CSV file
+     * Uses proper CSV parsing to handle multi-line fields and special characters
      */
     private java.util.Set<String> extractRecordIdsFromCsv(Path csvPath) throws IOException {
         java.util.Set<String> recordIds = new java.util.LinkedHashSet<>();
-        java.util.List<String> lines = Files.readAllLines(csvPath);
         
-        if (lines.isEmpty()) return recordIds;
-        
-        // Find Id column index
-        String header = lines.get(0);
-        String[] headers = header.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-        int idColumnIndex = -1;
-        
-        for (int i = 0; i < headers.length; i++) {
-            if (headers[i].replace("\"", "").trim().equalsIgnoreCase("Id")) {
-                idColumnIndex = i;
-                break;
+        try (java.io.BufferedReader reader = Files.newBufferedReader(csvPath, java.nio.charset.StandardCharsets.UTF_8)) {
+            // Read and parse header line
+            String headerLine = reader.readLine();
+            if (headerLine == null || headerLine.isEmpty()) return recordIds;
+            
+            String[] headers = parseCsvLine(headerLine);
+            int idColumnIndex = -1;
+            
+            for (int i = 0; i < headers.length; i++) {
+                if (headers[i].replace("\"", "").trim().equalsIgnoreCase("Id")) {
+                    idColumnIndex = i;
+                    break;
+                }
             }
-        }
-        
-        if (idColumnIndex == -1) {
-            logger.warn("Could not find Id column in CSV");
-            return recordIds;
-        }
-        
-        // Extract IDs from data rows
-        for (int i = 1; i < lines.size(); i++) {
-            String line = lines.get(i);
-            String[] values = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-            if (values.length > idColumnIndex) {
-                String id = values[idColumnIndex].replace("\"", "").trim();
-                if (!id.isEmpty()) {
-                    recordIds.add(id);
+            
+            if (idColumnIndex == -1) {
+                logger.warn("Could not find Id column in CSV");
+                return recordIds;
+            }
+            
+            // Read data rows, handling multi-line CSV fields
+            String line;
+            StringBuilder currentRecord = new StringBuilder();
+            boolean inQuotedField = false;
+            
+            while ((line = reader.readLine()) != null) {
+                if (currentRecord.length() > 0) {
+                    currentRecord.append("\n");
+                }
+                currentRecord.append(line);
+                
+                // Count quotes to determine if we're still inside a quoted field
+                int quoteCount = 0;
+                for (char c : currentRecord.toString().toCharArray()) {
+                    if (c == '"') quoteCount++;
+                }
+                inQuotedField = (quoteCount % 2 != 0);
+                
+                if (!inQuotedField) {
+                    // Complete record - parse it
+                    String[] values = parseCsvLine(currentRecord.toString());
+                    if (values.length > idColumnIndex) {
+                        String id = values[idColumnIndex].replace("\"", "").trim();
+                        // Validate it looks like a Salesforce ID (15 or 18 chars, alphanumeric)
+                        if (!id.isEmpty() && id.length() >= 15 && id.length() <= 18 && id.matches("[a-zA-Z0-9]+")) {
+                            recordIds.add(id);
+                        }
+                    }
+                    currentRecord.setLength(0);
                 }
             }
         }
         
         return recordIds;
+    }
+    
+    /**
+     * Parse a CSV line properly handling quoted fields with commas, quotes, and newlines
+     */
+    private String[] parseCsvLine(String line) {
+        java.util.List<String> values = new java.util.ArrayList<>();
+        StringBuilder currentValue = new StringBuilder();
+        boolean inQuotes = false;
+        
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            
+            if (c == '"') {
+                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    // Escaped quote
+                    currentValue.append('"');
+                    i++;
+                } else {
+                    // Toggle quote mode
+                    inQuotes = !inQuotes;
+                }
+            } else if (c == ',' && !inQuotes) {
+                values.add(currentValue.toString());
+                currentValue.setLength(0);
+            } else {
+                currentValue.append(c);
+            }
+        }
+        values.add(currentValue.toString());
+        
+        return values.toArray(new String[0]);
     }
     
     /**

@@ -25,6 +25,9 @@ import java.util.prefs.Preferences;
 public class LoginController {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
     private static final Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
+    
+    // Store last successful connection for other controllers to access
+    private static ConnectionInfo lastConnectionInfo;
 
     @FXML private TextField usernameField;
     @FXML private PasswordField passwordField;
@@ -246,6 +249,9 @@ public class LoginController {
                 logger.info("Successfully authenticated to Salesforce");
                 statusLabel.setText("Authentication successful!");
                 
+                // Store for other controllers
+                lastConnectionInfo = connInfo;
+                
                 // Save credentials if remember is checked
                 saveCredentials(username, password, token, environmentCombo.getSelectionModel().getSelectedIndex());
             
@@ -433,6 +439,9 @@ public class LoginController {
                         loginUrl
                     );
                     
+                    // Store for other controllers
+                    lastConnectionInfo = connInfo;
+                    
                     // Load main container
                     Platform.runLater(() -> {
                         try {
@@ -552,8 +561,11 @@ public class LoginController {
             alert.setContentText(message);
             alert.showAndWait();
         });
+    }    
+    // Static method to get last connection info for other controllers
+    public static ConnectionInfo getLastConnectionInfo() {
+        return lastConnectionInfo;
     }
-
     // Inner class to hold connection information
     public static class ConnectionInfo {
         private final PartnerConnection connection;

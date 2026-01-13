@@ -88,6 +88,8 @@ public class DatabaseScanner {
             // For Snowflake with externalbrowser, only need username
             if (username != null) props.put("user", username);
             // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
+            // Use both naming conventions for maximum compatibility
+            props.put("insecureMode", "true");
             props.put("insecure_mode", "true");
             props.put("ocspFailOpen", "true");  // Allow connection even if OCSP check fails
             props.put("tracing", "OFF");
@@ -136,7 +138,8 @@ public class DatabaseScanner {
             "FROM INFORMATION_SCHEMA.TABLES " +
             "WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE' " +
             "AND (TABLE_NAME LIKE 'SF_%' OR TABLE_NAME LIKE 'SALESFORCE_%' OR TABLE_NAME LIKE '%__C' " +
-            "OR TABLE_NAME IN ('ACCOUNT', 'CONTACT', 'LEAD', 'OPPORTUNITY', 'CASE', 'USER', 'PROFILE')) " +
+            "OR TABLE_NAME IN ('ACCOUNT', 'CONTACT', 'LEAD', 'OPPORTUNITY', 'CASE', 'USER', 'PROFILE', " +
+            "'CONTENTVERSION', 'CONTENTDOCUMENT', 'CONTENTDOCUMENTLINK', 'ATTACHMENT', 'DOCUMENT')) " +
             "ORDER BY TABLE_NAME";
         
         log("Preparing query with Salesforce table name filters...");
@@ -454,11 +457,12 @@ public class DatabaseScanner {
                 String warehouse = connection.getWarehouse();
                 String database = connection.getDatabase();
                 String schema = connection.getSchema();
+                // insecureMode=true is critical for SSL bypass on chunk downloads
                 if (connection.isUseSso()) {
-                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s&authenticator=externalbrowser",
+                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s&authenticator=externalbrowser&insecureMode=true",
                         account, warehouse, database, schema);
                 } else {
-                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s",
+                    return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?warehouse=%s&db=%s&schema=%s&insecureMode=true",
                         account, warehouse, database, schema);
                 }
                 

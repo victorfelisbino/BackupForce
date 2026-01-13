@@ -14,7 +14,6 @@
     <HBox styleClass="status-bar" spacing="12" alignment="CENTER_LEFT">
         <Label text="Data Restoration" styleClass="page-header-title"/>
         <Region HBox.hgrow="ALWAYS"/>
-        <Button text="🧙 Launch Wizard" onAction="#handleLaunchWizard" styleClass="btn btn-primary"/>
         <Label fx:id="targetOrgLabel" text="No org connected" styleClass="status-text"/>
     </HBox>
     

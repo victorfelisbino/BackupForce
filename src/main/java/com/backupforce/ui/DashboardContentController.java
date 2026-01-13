@@ -76,7 +76,7 @@ public class DashboardContentController {
     public void initialize() {
         // Setup card hover effects
         setupCardHoverEffect(dataBackupCard);
-        // dataRestoreCard is now disabled, no hover effect needed
+        setupCardHoverEffect(dataRestoreCard);
     }
     
     public void setMainController(MainController mainController) {

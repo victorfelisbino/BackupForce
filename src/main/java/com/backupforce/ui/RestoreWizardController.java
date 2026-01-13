@@ -6,6 +6,10 @@ import com.backupforce.config.ConnectionManager.SavedConnection;
 import com.backupforce.config.JdbcHelper;
 import com.backupforce.config.SSLHelper;
 import com.backupforce.restore.DatabaseScanner;
+import com.backupforce.restore.RestoreExecutor;
+import com.sforce.soap.partner.DescribeSObjectResult;
+import com.sforce.soap.partner.Field;
+import com.sforce.soap.partner.PartnerConnection;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -15,17 +19,25 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.control.cell.ComboBoxTableCell;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -98,6 +110,7 @@ public class RestoreWizardController {
     
     // Data for Step 3
     private final Map<String, List<Map<String, Object>>> recordsByTable = new LinkedHashMap<>();
+    private LoginController.ConnectionInfo salesforceConnection;
     private final Map<String, String> lookupFieldByTable = new LinkedHashMap<>();
     private final Map<String, Set<String>> selectedRelatedRecordIds = new LinkedHashMap<>();
     
@@ -106,9 +119,18 @@ public class RestoreWizardController {
     // ============================================
     @FXML private TableView<FieldMapping> fieldMappingTable;
     @FXML private TableColumn<FieldMapping, String> sourceFieldCol, destFieldCol, transformCol, sampleValueCol;
+    @FXML private TableColumn<FieldMapping, String> destFieldTypeCol, mappingStatusCol;
+    @FXML private Label orgMetadataStatusLabel;
+    @FXML private Button refreshMetadataBtn;
     
     // Data for Step 4
     private ObservableList<FieldMapping> fieldMappings = FXCollections.observableArrayList();
+    
+    // Target org metadata cache
+    private Map<String, DescribeSObjectResult> targetOrgMetadataCache = new HashMap<>();
+    private Map<String, List<String>> targetFieldsByObject = new HashMap<>();
+    private Map<String, Map<String, Field>> targetFieldDetailsByObject = new HashMap<>();
+    private boolean metadataLoaded = false;
     
     // ============================================
     // STEP 5: Review & Restore
@@ -250,12 +272,22 @@ public class RestoreWizardController {
         private final SimpleStringProperty destField;
         private final SimpleStringProperty transformation;
         private final SimpleStringProperty sampleValue;
+        private final SimpleStringProperty destFieldType;
+        private final SimpleStringProperty mappingStatus;
+        private final SimpleStringProperty sourceFieldType;
+        private boolean isRequired;
+        private List<String> picklistValues;
         
         public FieldMapping(String sourceField, String destField, String transformation, String sampleValue) {
             this.sourceField = new SimpleStringProperty(sourceField);
             this.destField = new SimpleStringProperty(destField);
             this.transformation = new SimpleStringProperty(transformation != null ? transformation : "None");
             this.sampleValue = new SimpleStringProperty(sampleValue != null ? sampleValue : "");
+            this.destFieldType = new SimpleStringProperty("");
+            this.mappingStatus = new SimpleStringProperty("Unmapped");
+            this.sourceFieldType = new SimpleStringProperty("");
+            this.isRequired = false;
+            this.picklistValues = new ArrayList<>();
         }
         
         public String getSourceField() { return sourceField.get(); }
@@ -273,6 +305,24 @@ public class RestoreWizardController {
         public String getSampleValue() { return sampleValue.get(); }
         public void setSampleValue(String value) { sampleValue.set(value); }
         public SimpleStringProperty sampleValueProperty() { return sampleValue; }
+        
+        public String getDestFieldType() { return destFieldType.get(); }
+        public void setDestFieldType(String value) { destFieldType.set(value); }
+        public SimpleStringProperty destFieldTypeProperty() { return destFieldType; }
+        
+        public String getMappingStatus() { return mappingStatus.get(); }
+        public void setMappingStatus(String value) { mappingStatus.set(value); }
+        public SimpleStringProperty mappingStatusProperty() { return mappingStatus; }
+        
+        public String getSourceFieldType() { return sourceFieldType.get(); }
+        public void setSourceFieldType(String value) { sourceFieldType.set(value); }
+        public SimpleStringProperty sourceFieldTypeProperty() { return sourceFieldType; }
+        
+        public boolean isRequired() { return isRequired; }
+        public void setRequired(boolean required) { this.isRequired = required; }
+        
+        public List<String> getPicklistValues() { return picklistValues; }
+        public void setPicklistValues(List<String> values) { this.picklistValues = values; }
     }
     
     // ============================================
@@ -415,21 +465,242 @@ public class RestoreWizardController {
         // Field mapping table columns
         if (sourceFieldCol != null) {
             sourceFieldCol.setCellValueFactory(data -> data.getValue().sourceFieldProperty());
+            sourceFieldCol.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        FieldMapping mapping = getTableView().getItems().get(getIndex());
+                        String type = mapping.getSourceFieldType();
+                        setText(item + (type.isEmpty() ? "" : " (" + type + ")"));
+                        setStyle("-fx-text-fill: #e6edf3;");
+                    }
+                }
+            });
         }
+        
         if (destFieldCol != null) {
             destFieldCol.setCellValueFactory(data -> data.getValue().destFieldProperty());
+            destFieldCol.setCellFactory(col -> new TableCell<>() {
+                private final ComboBox<String> comboBox = new ComboBox<>();
+                
+                {
+                    comboBox.setMaxWidth(Double.MAX_VALUE);
+                    comboBox.setStyle("-fx-background-color: #21262d; -fx-text-fill: #e6edf3;");
+                    comboBox.setOnAction(e -> {
+                        if (getIndex() >= 0 && getIndex() < getTableView().getItems().size()) {
+                            FieldMapping mapping = getTableView().getItems().get(getIndex());
+                            String selected = comboBox.getValue();
+                            mapping.setDestField(selected != null ? selected : "");
+                            updateMappingStatus(mapping);
+                        }
+                    });
+                }
+                
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) {
+                        setGraphic(null);
+                        setText(null);
+                    } else {
+                        FieldMapping mapping = getTableView().getItems().get(getIndex());
+                        List<String> availableFields = getAvailableDestFields();
+                        comboBox.getItems().setAll(availableFields);
+                        comboBox.setValue(item);
+                        setGraphic(comboBox);
+                        setText(null);
+                    }
+                }
+            });
+            destFieldCol.setEditable(true);
         }
+        
         if (transformCol != null) {
             transformCol.setCellValueFactory(data -> data.getValue().transformationProperty());
+            // Make transformation editable with ComboBox
+            transformCol.setCellFactory(col -> new TableCell<>() {
+                private final ComboBox<String> comboBox = new ComboBox<>();
+                
+                {
+                    comboBox.getItems().addAll("None", "RecordType Mapping", "User Mapping", "Value Translation", "Default Value", "Skip Field");
+                    comboBox.setStyle("-fx-background-color: #21262d; -fx-text-fill: #e6edf3;");
+                    comboBox.setOnAction(e -> {
+                        if (getIndex() >= 0 && getIndex() < getTableView().getItems().size()) {
+                            FieldMapping mapping = getTableView().getItems().get(getIndex());
+                            mapping.setTransformation(comboBox.getValue());
+                        }
+                    });
+                }
+                
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) {
+                        setGraphic(null);
+                        setText(null);
+                    } else {
+                        comboBox.setValue(item);
+                        setGraphic(comboBox);
+                        setText(null);
+                    }
+                }
+            });
         }
+        
         if (sampleValueCol != null) {
             sampleValueCol.setCellValueFactory(data -> data.getValue().sampleValueProperty());
+        }
+        
+        // Setup new columns if they exist in FXML
+        if (destFieldTypeCol != null) {
+            destFieldTypeCol.setCellValueFactory(data -> data.getValue().destFieldTypeProperty());
+            destFieldTypeCol.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null || item.isEmpty()) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        // Color-code by type
+                        if (item.contains("Required")) {
+                            setStyle("-fx-text-fill: #f85149;"); // Red for required
+                        } else if (item.contains("Picklist")) {
+                            setStyle("-fx-text-fill: #a371f7;"); // Purple for picklist
+                        } else if (item.contains("Reference")) {
+                            setStyle("-fx-text-fill: #58a6ff;"); // Blue for reference/lookup
+                        } else {
+                            setStyle("-fx-text-fill: #8b949e;");
+                        }
+                    }
+                }
+            });
+        }
+        
+        if (mappingStatusCol != null) {
+            mappingStatusCol.setCellValueFactory(data -> data.getValue().mappingStatusProperty());
+            mappingStatusCol.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        switch (item) {
+                            case "Mapped":
+                                setStyle("-fx-text-fill: #3fb950;"); // Green
+                                break;
+                            case "Type Mismatch":
+                                setStyle("-fx-text-fill: #d29922;"); // Yellow/orange warning
+                                break;
+                            case "Unmapped":
+                                setStyle("-fx-text-fill: #8b949e;"); // Gray
+                                break;
+                            case "Skipped":
+                                setStyle("-fx-text-fill: #6e7681;"); // Dimmer gray
+                                break;
+                            default:
+                                setStyle("-fx-text-fill: #e6edf3;");
+                        }
+                    }
+                }
+            });
         }
         
         // Bind table to observable list
         if (fieldMappingTable != null) {
             fieldMappingTable.setItems(fieldMappings);
+            fieldMappingTable.setEditable(true);
         }
+    }
+    
+    /** Get available destination fields from org metadata */
+    private List<String> getAvailableDestFields() {
+        List<String> fields = new ArrayList<>();
+        fields.add(""); // Empty option to skip field
+        fields.add("-- Do Not Map --");
+        
+        // Get the current object being restored
+        String objectName = getCurrentRestoreObjectName();
+        if (objectName != null && targetFieldsByObject.containsKey(objectName)) {
+            fields.addAll(targetFieldsByObject.get(objectName));
+        }
+        
+        return fields;
+    }
+    
+    /** Get the current object name being restored */
+    private String getCurrentRestoreObjectName() {
+        // Try to determine from selected records or object tree selection
+        if (!recordsByTable.isEmpty()) {
+            return recordsByTable.keySet().iterator().next();
+        }
+        return null;
+    }
+    
+    /** Update the mapping status based on field selection */
+    private void updateMappingStatus(FieldMapping mapping) {
+        String destField = mapping.getDestField();
+        if (destField == null || destField.isEmpty() || destField.equals("-- Do Not Map --")) {
+            mapping.setMappingStatus("Skipped");
+            mapping.setDestFieldType("");
+            return;
+        }
+        
+        String objectName = getCurrentRestoreObjectName();
+        if (objectName != null && targetFieldDetailsByObject.containsKey(objectName)) {
+            Map<String, Field> fieldDetails = targetFieldDetailsByObject.get(objectName);
+            Field field = fieldDetails.get(destField);
+            if (field != null) {
+                String typeInfo = field.getType().toString();
+                if (!field.isNillable() && field.isCreateable()) {
+                    typeInfo += " (Required)";
+                    mapping.setRequired(true);
+                }
+                mapping.setDestFieldType(typeInfo);
+                mapping.setMappingStatus("Mapped");
+                
+                // Check for type compatibility
+                String sourceType = mapping.getSourceFieldType().toLowerCase();
+                String destType = field.getType().toString().toLowerCase();
+                if (!sourceType.isEmpty() && !areTypesCompatible(sourceType, destType)) {
+                    mapping.setMappingStatus("Type Mismatch");
+                }
+            } else {
+                mapping.setMappingStatus("Unmapped");
+                mapping.setDestFieldType("");
+            }
+        } else {
+            mapping.setMappingStatus("Mapped");
+        }
+    }
+    
+    /** Check if source and destination types are compatible */
+    private boolean areTypesCompatible(String sourceType, String destType) {
+        // Normalize types for comparison
+        sourceType = sourceType.toLowerCase();
+        destType = destType.toLowerCase();
+        
+        // Exact match
+        if (sourceType.equals(destType)) return true;
+        
+        // Common compatible types
+        if (sourceType.contains("string") && destType.contains("string")) return true;
+        if (sourceType.contains("text") && (destType.contains("string") || destType.contains("textarea"))) return true;
+        if (sourceType.contains("int") && destType.contains("double")) return true;
+        if (sourceType.contains("number") && (destType.contains("double") || destType.contains("currency"))) return true;
+        if (sourceType.contains("bool") && destType.contains("boolean")) return true;
+        if (sourceType.contains("date") && destType.contains("date")) return true;
+        if (sourceType.contains("id") && destType.contains("reference")) return true;
+        
+        return false;
     }
     
     // ============================================
@@ -660,8 +931,75 @@ public class RestoreWizardController {
     }
     
     private void loadFolderObjects() {
-        // TODO: Implement folder scanning
-        showError("Folder restore not yet implemented in wizard mode");
+        if (selectedFolder == null) {
+            showError("No folder selected");
+            return;
+        }
+        
+        showLoading(true, "Scanning Folder", "Reading CSV files from " + selectedFolder.getName());
+        
+        Task<List<BackupObject>> task = new Task<>() {
+            @Override
+            protected List<BackupObject> call() throws Exception {
+                List<BackupObject> objects = new ArrayList<>();
+                File[] csvFiles = selectedFolder.listFiles((dir, name) -> 
+                    name.toLowerCase().endsWith(".csv"));
+                
+                if (csvFiles == null || csvFiles.length == 0) {
+                    return objects;
+                }
+                
+                for (File csvFile : csvFiles) {
+                    try {
+                        // Object name is filename without .csv extension
+                        String objectName = csvFile.getName().replaceAll("\\.csv$", "");
+                        long recordCount = countCsvRecords(csvFile);
+                        
+                        BackupObject obj = new BackupObject(objectName, objectName, recordCount, null);
+                        objects.add(obj);
+                        logger.info("Found CSV: {} with {} records", objectName, recordCount);
+                    } catch (Exception e) {
+                        logger.warn("Failed to read CSV: {}", csvFile.getName(), e);
+                    }
+                }
+                
+                return objects;
+            }
+        };
+        
+        task.setOnSucceeded(e -> {
+            List<BackupObject> objects = task.getValue();
+            backupObjects.clear();
+            backupObjects.addAll(objects);
+            showLoading(false, "", "");
+            
+            if (objects.isEmpty()) {
+                showError("No CSV files found in selected folder");
+            } else {
+                sourceInfoLabel.setText("Source: " + selectedFolder.getName());
+                objectCountLabel.setText(String.valueOf(objects.size()));
+                statusLabel.setText("Found " + objects.size() + " CSV file(s)");
+            }
+        });
+        
+        task.setOnFailed(e -> {
+            showLoading(false, "", "");
+            logger.error("Failed to scan folder", task.getException());
+            showError("Failed to scan folder: " + task.getException().getMessage());
+        });
+        
+        new Thread(task).start();
+    }
+    
+    private long countCsvRecords(File csvFile) throws Exception {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            long count = 0;
+            String line = reader.readLine(); // Skip header
+            while (reader.readLine() != null) {
+                count++;
+            }
+            return count;
+        }
     }
     
     @FXML
@@ -720,10 +1058,18 @@ public class RestoreWizardController {
             throws SQLException {
         List<Map<String, Object>> records = new ArrayList<>();
         
-        // Use higher limit if loading all (50K), otherwise default (200)
-        int limit = loadAll ? 50000 : MAX_SEARCH_RESULTS;
+        // Determine limit based on query type
+        // For open searches (no WHERE clause), limit to 100 to avoid SSL chunk download issues
+        // With WHERE clause, use standard limits (200 or 50K if loadAll)
+        int limit;
+        boolean isOpenSearch = (whereClause == null || whereClause.isEmpty());
+        if (isOpenSearch) {
+            limit = 100;  // Very conservative limit for open searches to fit in single chunk
+        } else {
+            limit = loadAll ? 50000 : MAX_SEARCH_RESULTS;
+        }
         
-        String jdbcUrl = buildJdbcUrl(selectedConnection);
+        String jdbcUrl = JdbcHelper.buildJdbcUrl(selectedConnection);
         String username = selectedConnection.getUsername();
         String password = ConnectionManager.getInstance().getDecryptedPassword(selectedConnection);
         
@@ -733,6 +1079,8 @@ public class RestoreWizardController {
             // For Snowflake with externalbrowser, only need username
             if (username != null) props.put("user", username);
             // Critical: Disable SSL validation for Snowflake JDBC internal HttpClient
+            // Use both naming conventions for maximum compatibility
+            props.put("insecureMode", "true");
             props.put("insecure_mode", "true");
             props.put("ocspFailOpen", "true");  // Allow connection even if OCSP check fails
             props.put("tracing", "OFF");
@@ -744,7 +1092,7 @@ public class RestoreWizardController {
         
         try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
             String schema = selectedConnection.getSchema();
-            String qualifiedName = getQualifiedTableName(schema, object.getTableName());
+            String qualifiedName = JdbcHelper.getQualifiedTableName(selectedConnection, schema, object.getTableName());
             
             StringBuilder sql = new StringBuilder();
             
@@ -847,11 +1195,22 @@ public class RestoreWizardController {
                 lookupFieldByTable.clear();
                 selectedRelatedRecordIds.clear();
                 
-                String jdbcUrl = buildJdbcUrl(selectedConnection);
+                String jdbcUrl = JdbcHelper.buildJdbcUrl(selectedConnection);
                 String username = selectedConnection.getUsername();
                 String password = ConnectionManager.getInstance().getDecryptedPassword(selectedConnection);
                 
-                try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+                // Build connection properties with SSL settings for Snowflake
+                java.util.Properties props = new java.util.Properties();
+                if (username != null) props.put("user", username);
+                if (password != null) props.put("password", password);
+                if ("Snowflake".equals(selectedConnection.getType())) {
+                    // Both naming conventions for compatibility
+                    props.put("insecureMode", "true");
+                    props.put("insecure_mode", "true");
+                    props.put("ocspFailOpen", "true");
+                }
+                
+                try (Connection conn = DriverManager.getConnection(jdbcUrl, props)) {
                     String schema = selectedConnection.getSchema();
                     
                     // Load column metadata
@@ -874,22 +1233,25 @@ public class RestoreWizardController {
                         }
                     }
                     
-                    // Load related records for each selected parent record
-                    for (RecordRow parent : selectedRecords) {
-                        String parentId = parent.getId();
+                    // OPTIMIZED: Batch load related records instead of N*M individual queries
+                    // Collect all parent IDs once
+                    List<String> allParentIds = selectedRecords.stream()
+                        .map(RecordRow::getId)
+                        .collect(Collectors.toList());
+                    
+                    // Load related records for ALL parent IDs at once per table
+                    for (Map.Entry<String, String> entry : lookupFieldByTable.entrySet()) {
+                        String tableName = entry.getKey();
+                        String lookupField = entry.getValue();
                         
-                        for (Map.Entry<String, String> entry : lookupFieldByTable.entrySet()) {
-                            String tableName = entry.getKey();
-                            String lookupField = entry.getValue();
-                            
-                            List<Map<String, Object>> related = loadRelatedRecords(
-                                conn, schema, tableName, lookupField, parentId
-                            );
-                            
-                            if (!related.isEmpty()) {
-                                recordsByTable.computeIfAbsent(tableName, k -> new ArrayList<>())
-                                    .addAll(related);
-                            }
+                        // Single batch query for all parent IDs (much faster than N queries)
+                        List<Map<String, Object>> related = loadRelatedRecordsBatch(
+                            conn, schema, tableName, lookupField, allParentIds
+                        );
+                        
+                        if (!related.isEmpty()) {
+                            recordsByTable.computeIfAbsent(tableName, k -> new ArrayList<>())
+                                .addAll(related);
                         }
                     }
                 }
@@ -919,7 +1281,7 @@ public class RestoreWizardController {
                                                           String tableName, String lookupField,
                                                           String parentId) throws SQLException {
         List<Map<String, Object>> records = new ArrayList<>();
-        String qualifiedName = getQualifiedTableName(schema, tableName);
+        String qualifiedName = JdbcHelper.getQualifiedTableName(selectedConnection, schema, tableName);
         
         String query;
         switch (selectedConnection.getType()) {
@@ -935,6 +1297,60 @@ public class RestoreWizardController {
         
         try (PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, parentId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                ResultSetMetaData meta = rs.getMetaData();
+                int colCount = meta.getColumnCount();
+                
+                while (rs.next()) {
+                    Map<String, Object> record = new LinkedHashMap<>();
+                    for (int i = 1; i <= colCount; i++) {
+                        record.put(meta.getColumnName(i).toUpperCase(), rs.getObject(i));
+                    }
+                    records.add(record);
+                }
+            }
+        }
+        
+        return records;
+    }
+    
+    /**
+     * OPTIMIZED: Batch load related records for multiple parent IDs at once.
+     * This replaces N*M individual queries with M batch queries (one per table).
+     * Dramatically improves performance when dealing with many parent records.
+     */
+    private List<Map<String, Object>> loadRelatedRecordsBatch(Connection conn, String schema,
+                                                               String tableName, String lookupField,
+                                                               List<String> parentIds) throws SQLException {
+        if (parentIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        List<Map<String, Object>> records = new ArrayList<>();
+        String qualifiedName = JdbcHelper.getQualifiedTableName(selectedConnection, schema, tableName);
+        String quotedField = JdbcHelper.quoteIdentifier(selectedConnection, lookupField);
+        
+        // Build IN clause with all parent IDs
+        String placeholders = String.join(",", Collections.nCopies(parentIds.size(), "?"));
+        
+        String query;
+        switch (selectedConnection.getType()) {
+            case "SQL Server":
+                query = "SELECT TOP " + MAX_RECORDS_PER_TABLE + " * FROM " + qualifiedName +
+                       " WHERE " + quotedField + " IN (" + placeholders + ")";
+                break;
+            default:
+                query = "SELECT * FROM " + qualifiedName +
+                       " WHERE " + quotedField + " IN (" + placeholders + ") LIMIT " + MAX_RECORDS_PER_TABLE;
+                break;
+        }
+        
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            // Bind all parent IDs to the IN clause
+            for (int i = 0; i < parentIds.size(); i++) {
+                stmt.setString(i + 1, parentIds.get(i));
+            }
+            
             try (ResultSet rs = stmt.executeQuery()) {
                 ResultSetMetaData meta = rs.getMetaData();
                 int colCount = meta.getColumnCount();
@@ -1110,35 +1526,117 @@ public class RestoreWizardController {
     private void prepareFieldMappings() {
         fieldMappings.clear();
         
-        // Auto-detect field mappings from selected records
-        List<RecordRow> selectedRecords = getSelectedRecords();
-        if (!selectedRecords.isEmpty()) {
-            RecordRow firstRecord = selectedRecords.get(0);
-            
-            // Get field names from the first record's data
-            Map<String, Object> recordData = firstRecord.getData();
-            
-            for (Map.Entry<String, Object> entry : recordData.entrySet()) {
-                String sourceField = entry.getKey();
-                String sampleValue = entry.getValue() != null ? entry.getValue().toString() : "";
-                
-                // Truncate long sample values
-                if (sampleValue.length() > 50) {
-                    sampleValue = sampleValue.substring(0, 47) + "...";
-                }
-                
-                // Auto-map to same field name by default
-                String destField = sourceField;
-                String transformation = "None";
-                
-                // Create mapping
-                FieldMapping mapping = new FieldMapping(sourceField, destField, transformation, sampleValue);
-                fieldMappings.add(mapping);
-            }
+        // Update org metadata status
+        if (orgMetadataStatusLabel != null) {
+            orgMetadataStatusLabel.setText("Loading org metadata...");
+            orgMetadataStatusLabel.setStyle("-fx-text-fill: #d29922;");
         }
         
-        // If no records selected yet, show placeholder
-        if (fieldMappings.isEmpty()) {
+        // First, fetch target org metadata in background
+        Task<Void> metadataTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                fetchTargetOrgMetadata();
+                return null;
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    populateFieldMappings();
+                    if (orgMetadataStatusLabel != null) {
+                        if (metadataLoaded) {
+                            orgMetadataStatusLabel.setText("✓ Org metadata loaded - " + targetFieldsByObject.size() + " object(s)");
+                            orgMetadataStatusLabel.setStyle("-fx-text-fill: #3fb950;");
+                        } else {
+                            orgMetadataStatusLabel.setText("⚠ Could not load org metadata");
+                            orgMetadataStatusLabel.setStyle("-fx-text-fill: #d29922;");
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    populateFieldMappings();
+                    if (orgMetadataStatusLabel != null) {
+                        orgMetadataStatusLabel.setText("✗ Failed to load org metadata: " + getException().getMessage());
+                        orgMetadataStatusLabel.setStyle("-fx-text-fill: #f85149;");
+                    }
+                    logger.error("Failed to fetch org metadata", getException());
+                });
+            }
+        };
+        
+        new Thread(metadataTask).start();
+    }
+    
+    /** Fetch metadata from the target Salesforce org */
+    private void fetchTargetOrgMetadata() {
+        if (salesforceConnection == null || salesforceConnection.getConnection() == null) {
+            logger.warn("No Salesforce connection available for metadata fetch");
+            return;
+        }
+        
+        try {
+            PartnerConnection conn = salesforceConnection.getConnection();
+            
+            // Get the objects we're trying to restore
+            Set<String> objectsToDescribe = new HashSet<>(recordsByTable.keySet());
+            
+            if (objectsToDescribe.isEmpty()) {
+                logger.warn("No objects to describe");
+                return;
+            }
+            
+            logger.info("Fetching metadata for objects: {}", objectsToDescribe);
+            
+            for (String objectName : objectsToDescribe) {
+                try {
+                    DescribeSObjectResult describeResult = conn.describeSObject(objectName);
+                    targetOrgMetadataCache.put(objectName, describeResult);
+                    
+                    // Extract field names and details
+                    List<String> fieldNames = new ArrayList<>();
+                    Map<String, Field> fieldDetails = new HashMap<>();
+                    
+                    for (Field field : describeResult.getFields()) {
+                        // Only include createable fields (can be set on insert)
+                        if (field.isCreateable() || field.isUpdateable()) {
+                            String fieldName = field.getName();
+                            fieldNames.add(fieldName);
+                            fieldDetails.put(fieldName, field);
+                        }
+                    }
+                    
+                    // Sort field names alphabetically
+                    Collections.sort(fieldNames, String.CASE_INSENSITIVE_ORDER);
+                    
+                    targetFieldsByObject.put(objectName, fieldNames);
+                    targetFieldDetailsByObject.put(objectName, fieldDetails);
+                    
+                    logger.info("Loaded {} fields for object {}", fieldNames.size(), objectName);
+                    
+                } catch (Exception e) {
+                    logger.error("Failed to describe object: {}", objectName, e);
+                }
+            }
+            
+            metadataLoaded = !targetFieldsByObject.isEmpty();
+            
+        } catch (Exception e) {
+            logger.error("Failed to fetch target org metadata", e);
+            throw new RuntimeException("Failed to fetch org metadata: " + e.getMessage(), e);
+        }
+    }
+    
+    /** Populate field mappings after metadata is loaded */
+    private void populateFieldMappings() {
+        fieldMappings.clear();
+        
+        List<RecordRow> selectedRecords = getSelectedRecords();
+        if (selectedRecords.isEmpty()) {
             FieldMapping placeholder = new FieldMapping(
                 "Select records first", 
                 "to auto-detect fields", 
@@ -1146,7 +1644,158 @@ public class RestoreWizardController {
                 "N/A"
             );
             fieldMappings.add(placeholder);
+            return;
         }
+        
+        RecordRow firstRecord = selectedRecords.get(0);
+        Map<String, Object> recordData = firstRecord.getData();
+        String objectName = getCurrentRestoreObjectName();
+        
+        // Get target org fields for intelligent mapping
+        Map<String, Field> targetFields = targetFieldDetailsByObject.getOrDefault(objectName, new HashMap<>());
+        Set<String> targetFieldNamesLower = targetFields.keySet().stream()
+            .map(String::toLowerCase)
+            .collect(Collectors.toSet());
+        
+        for (Map.Entry<String, Object> entry : recordData.entrySet()) {
+            String sourceField = entry.getKey();
+            String sampleValue = entry.getValue() != null ? entry.getValue().toString() : "";
+            
+            // Truncate long sample values
+            if (sampleValue.length() > 50) {
+                sampleValue = sampleValue.substring(0, 47) + "...";
+            }
+            
+            // Intelligent auto-mapping
+            String destField = findBestMatchingField(sourceField, targetFields);
+            String transformation = "None";
+            
+            // Detect if transformation is needed
+            if (sourceField.equalsIgnoreCase("RecordTypeId") || sourceField.equalsIgnoreCase("RecordType")) {
+                transformation = "RecordType Mapping";
+            } else if (sourceField.equalsIgnoreCase("OwnerId") || sourceField.equalsIgnoreCase("CreatedById") || 
+                       sourceField.equalsIgnoreCase("LastModifiedById")) {
+                transformation = "User Mapping";
+            }
+            
+            FieldMapping mapping = new FieldMapping(sourceField, destField, transformation, sampleValue);
+            
+            // Set source field type (infer from sample value)
+            mapping.setSourceFieldType(inferFieldType(sampleValue));
+            
+            // Set destination field details if available
+            if (destField != null && !destField.isEmpty() && targetFields.containsKey(destField)) {
+                Field targetField = targetFields.get(destField);
+                String typeInfo = targetField.getType().toString();
+                if (!targetField.isNillable() && targetField.isCreateable()) {
+                    typeInfo += " (Required)";
+                    mapping.setRequired(true);
+                }
+                mapping.setDestFieldType(typeInfo);
+                mapping.setMappingStatus("Mapped");
+                
+                // Check type compatibility
+                if (!areTypesCompatible(mapping.getSourceFieldType(), targetField.getType().toString())) {
+                    mapping.setMappingStatus("Type Mismatch");
+                }
+            } else if (destField == null || destField.isEmpty()) {
+                mapping.setMappingStatus("Unmapped");
+            }
+            
+            fieldMappings.add(mapping);
+        }
+        
+        // Sort mappings: mapped first, then unmapped
+        fieldMappings.sort((a, b) -> {
+            if (a.getMappingStatus().equals("Mapped") && !b.getMappingStatus().equals("Mapped")) return -1;
+            if (!a.getMappingStatus().equals("Mapped") && b.getMappingStatus().equals("Mapped")) return 1;
+            return a.getSourceField().compareToIgnoreCase(b.getSourceField());
+        });
+        
+        logger.info("Prepared {} field mappings", fieldMappings.size());
+    }
+    
+    /** Find the best matching target field for a source field */
+    private String findBestMatchingField(String sourceField, Map<String, Field> targetFields) {
+        if (targetFields.isEmpty()) {
+            return sourceField; // Fall back to same name if no metadata
+        }
+        
+        // Exact match (case-insensitive)
+        for (String targetField : targetFields.keySet()) {
+            if (targetField.equalsIgnoreCase(sourceField)) {
+                return targetField;
+            }
+        }
+        
+        // Try without common prefixes/suffixes
+        String normalizedSource = sourceField.replaceAll("__c$", "").replaceAll("__r$", "");
+        for (String targetField : targetFields.keySet()) {
+            String normalizedTarget = targetField.replaceAll("__c$", "").replaceAll("__r$", "");
+            if (normalizedTarget.equalsIgnoreCase(normalizedSource)) {
+                return targetField;
+            }
+        }
+        
+        // Skip system fields that shouldn't be mapped
+        if (isSystemField(sourceField)) {
+            return "";
+        }
+        
+        return ""; // No match found
+    }
+    
+    /** Check if a field is a system field that shouldn't be mapped */
+    private boolean isSystemField(String fieldName) {
+        Set<String> systemFields = Set.of(
+            "Id", "ID", "CreatedDate", "CreatedById", "LastModifiedDate", "LastModifiedById",
+            "SystemModstamp", "IsDeleted", "SYSTEMMODSTAMP", "ISDELETED"
+        );
+        return systemFields.contains(fieldName);
+    }
+    
+    /** Infer field type from sample value */
+    private String inferFieldType(String value) {
+        if (value == null || value.isEmpty() || value.equals("(null)")) {
+            return "";
+        }
+        
+        // Check for ID pattern (15 or 18 char Salesforce ID)
+        if (value.matches("[a-zA-Z0-9]{15}|[a-zA-Z0-9]{18}")) {
+            return "id";
+        }
+        
+        // Check for boolean
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return "boolean";
+        }
+        
+        // Check for date/datetime patterns
+        if (value.matches("\\d{4}-\\d{2}-\\d{2}.*")) {
+            return "datetime";
+        }
+        
+        // Check for number
+        try {
+            Double.parseDouble(value);
+            if (value.contains(".")) {
+                return "double";
+            }
+            return "int";
+        } catch (NumberFormatException ignored) {}
+        
+        return "string";
+    }
+    
+    @FXML
+    private void handleRefreshMetadata() {
+        // Clear cached metadata and reload
+        targetOrgMetadataCache.clear();
+        targetFieldsByObject.clear();
+        targetFieldDetailsByObject.clear();
+        metadataLoaded = false;
+        
+        prepareFieldMappings();
     }
     
     @FXML
@@ -1159,14 +1808,33 @@ public class RestoreWizardController {
     
     @FXML
     private void handleAutoMap() {
-        // Re-run auto-detection
-        prepareFieldMappings();
+        // Re-run auto-detection with fresh metadata
+        handleRefreshMetadata();
     }
     
     @FXML
     private void handleManageTransformations() {
-        // TODO: Open value translation dialog
-        showError("Value transformations dialog will be implemented");
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/transformation.fxml"));
+            Parent root = loader.load();
+            
+            // Create modal dialog
+            Stage dialogStage = new Stage();
+            dialogStage.setTitle("Manage Value Transformations");
+            dialogStage.setScene(new Scene(root));
+            dialogStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            dialogStage.initOwner(fieldMappingTable.getScene().getWindow());
+            
+            // Show dialog and wait
+            dialogStage.showAndWait();
+            
+            // Refresh field mappings if transformations were added
+            populateFieldMappings();
+            
+        } catch (IOException e) {
+            logger.error("Failed to open transformations dialog", e);
+            showError("Transformations dialog not available: " + e.getMessage());
+        }
     }
     
     // ============================================
@@ -1198,25 +1866,171 @@ public class RestoreWizardController {
     
     @FXML
     private void handleConnectOrg() {
-        // TODO: Open Salesforce login
-        showError("Salesforce connection will be implemented");
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            Parent root = loader.load();
+            LoginController loginController = loader.getController();
+            
+            // Create modal dialog
+            Stage loginStage = new Stage();
+            loginStage.setTitle("Connect to Salesforce");
+            loginStage.setScene(new Scene(root));
+            loginStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            loginStage.initOwner(nextBtn.getScene().getWindow());
+            
+            // Wait for login completion
+            loginStage.showAndWait();
+            
+            // Check if successfully connected (LoginController sets static connectionInfo)
+            LoginController.ConnectionInfo connInfo = LoginController.getLastConnectionInfo();
+            if (connInfo != null && connInfo.getConnection() != null) {
+                salesforceConnection = connInfo;
+                String username = connInfo.getUsername();
+                String instanceUrl = connInfo.getInstanceUrl();
+                destinationOrgLabel.setText("Connected: " + username + " (" + instanceUrl + ")");
+                destinationOrgLabel.setStyle("-fx-text-fill: green;");
+                statusLabel.setText("Successfully connected to Salesforce");
+                nextBtn.setDisable(false);
+            } else {
+                showError("Login cancelled or failed");
+            }
+            
+        } catch (Exception e) {
+            logger.error("Failed to open login dialog", e);
+            showError("Failed to open login dialog: " + e.getMessage());
+        }
     }
     
     private void startRestore() {
-        // TODO: Implement actual restore
+        // Validate connection
+        if (salesforceConnection == null || salesforceConnection.getConnection() == null) {
+            showError("Please connect to Salesforce first");
+            return;
+        }
+        
         progressPanel.setVisible(true);
         progressPanel.setManaged(true);
         nextBtn.setDisable(true);
+        backBtn.setDisable(true);
+        cancelBtn.setText("Cancel Restore");
+        
+        // Determine restore mode
+        RestoreExecutor.RestoreMode mode = insertModeRadio.isSelected() ? RestoreExecutor.RestoreMode.INSERT :
+                                            upsertModeRadio.isSelected() ? RestoreExecutor.RestoreMode.UPSERT :
+                                            RestoreExecutor.RestoreMode.UPDATE;
         
         logArea.appendText("Starting restore...\n");
-        logArea.appendText("Mode: " + (insertModeRadio.isSelected() ? "Insert" : 
-                          upsertModeRadio.isSelected() ? "Upsert" : "Update") + "\n");
+        logArea.appendText("Mode: " + mode + "\n");
         logArea.appendText("Records to restore: " + totalRecordsNumber.getText() + "\n");
+        logArea.appendText("Destination: " + salesforceConnection.getInstanceUrl() + "\n\n");
         
-        // Simulate progress for now
-        progressBar.setProgress(0.5);
-        progressPercentLabel.setText("50%");
-        progressStatusLabel.setText("Restore simulation - not yet implemented");
+        Task<Void> restoreTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                try {
+                    RestoreExecutor executor = new RestoreExecutor(
+                        salesforceConnection.getInstanceUrl(),
+                        salesforceConnection.getSessionId(),
+                        "62.0"
+                    );
+                    
+                    // Set up callbacks
+                    executor.setLogCallback(msg -> Platform.runLater(() -> 
+                        logArea.appendText(msg + "\n")));
+                    
+                    executor.setProgressCallback(progress -> Platform.runLater(() -> {
+                        double percent = progress.getTotalRecords() > 0 ? 
+                            (double) progress.getProcessedRecords() / progress.getTotalRecords() : 0;
+                        progressBar.setProgress(percent);
+                        progressPercentLabel.setText(String.format("%.0f%%", percent * 100));
+                        progressStatusLabel.setText("Processing: " + progress.getCurrentObject());
+                    }));
+                    
+                    RestoreExecutor.RestoreOptions options = new RestoreExecutor.RestoreOptions();
+                    options.setBatchSize(200);
+                    options.setStopOnError(stopOnErrorCheck.isSelected());
+                    options.setValidateBeforeRestore(true);
+                    
+                    // Get selected records to restore
+                    List<Map<String, Object>> recordsToRestore = new ArrayList<>();
+                    for (RecordRow row : searchResults) {
+                        if (row.isSelected()) {
+                            recordsToRestore.add(row.getData());
+                        }
+                    }
+                    
+                    if (recordsToRestore.isEmpty()) {
+                        Platform.runLater(() -> logArea.appendText("No records selected for restore\n"));
+                        return null;
+                    }
+                    
+                    // Create temporary CSV for restore
+                    Path tempCsv = Files.createTempFile("restore_", ".csv");
+                    writeCsvForRestore(recordsToRestore, tempCsv);
+                    
+                    // Execute restore
+                    RestoreExecutor.RestoreResult result = executor.restoreFromCsv(
+                        selectedObject.getObjectName(), tempCsv, mode, options);
+                    
+                    // Cleanup temp file
+                    Files.deleteIfExists(tempCsv);
+                    
+                    // Show results
+                    Platform.runLater(() -> {
+                        String summary = String.format("✓ Success: %d, ✗ Failed: %d", 
+                            result.getSuccessCount(), result.getFailureCount());
+                        logArea.appendText("\n" + summary + "\n");
+                        progressBar.setProgress(1.0);
+                        progressPercentLabel.setText("100%");
+                        boolean isSuccess = result.getFailureCount() == 0;
+                        progressStatusLabel.setText(isSuccess ? "Restore completed" : "Restore completed with errors");
+                        cancelBtn.setText("Close");
+                    });
+                    
+                } catch (Exception e) {
+                    throw e;
+                }
+                return null;
+            }
+        };
+        
+        restoreTask.setOnFailed(e -> {
+            Throwable ex = restoreTask.getException();
+            logger.error("Restore failed", ex);
+            logArea.appendText("\n❌ RESTORE FAILED: " + ex.getMessage() + "\n");
+            progressStatusLabel.setText("Restore failed");
+            cancelBtn.setText("Close");
+            backBtn.setDisable(false);
+        });
+        
+        new Thread(restoreTask).start();
+    }
+    
+    private void writeCsvForRestore(List<Map<String, Object>> records, Path csvPath) throws IOException {
+        if (records.isEmpty()) return;
+        
+        try (java.io.BufferedWriter writer = Files.newBufferedWriter(csvPath)) {
+            // Write header
+            List<String> headers = new ArrayList<>(records.get(0).keySet());
+            writer.write(String.join(",", headers));
+            writer.newLine();
+            
+            // Write data rows
+            for (Map<String, Object> record : records) {
+                List<String> values = new ArrayList<>();
+                for (String header : headers) {
+                    Object value = record.get(header);
+                    String strValue = value != null ? value.toString() : "";
+                    // Escape commas and quotes
+                    if (strValue.contains(",") || strValue.contains("\"")) {
+                        strValue = "\"" + strValue.replace("\"", "\"\"") + "\"";
+                    }
+                    values.add(strValue);
+                }
+                writer.write(String.join(",", values));
+                writer.newLine();
+            }
+        }
     }
     
     // ============================================
@@ -1319,23 +2133,10 @@ public class RestoreWizardController {
     }
     
     /**
-     * @deprecated Use JdbcHelper.buildJdbcUrl() instead
-     */
-    private String buildJdbcUrl(SavedConnection conn) {
-        return JdbcHelper.buildJdbcUrl(conn);
-    }
-    
-    /**
-     * @deprecated Use JdbcHelper.getQualifiedTableName() instead
-     */
-    private String getQualifiedTableName(String schema, String tableName) {
-        return JdbcHelper.getQualifiedTableName(selectedConnection, schema, tableName);
-    }
-    
-    /**
      * @deprecated Use JdbcHelper.quoteIdentifier() instead
      */
     private String quoteIdentifier(String identifier) {
         return JdbcHelper.quoteIdentifier(selectedConnection, identifier);
     }
 }
+

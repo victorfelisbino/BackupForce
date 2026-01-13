@@ -74,6 +74,10 @@ public class BackupForceApp extends Application {
         System.setProperty("javax.net.ssl.trustStorePassword", "");
         System.setProperty("com.sun.net.ssl.checkRevocation", "false");
         
+        // Snowflake-specific SSL bypass properties for OCSP and chunk downloads
+        System.setProperty("net.snowflake.jdbc.ocsp_fail_open", "true");
+        System.setProperty("net.snowflake.jdbc.insecure_mode", "true");
+        
         launch(args);
     }
 }

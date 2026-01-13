@@ -121,11 +121,11 @@
                                fx:id="lastBackupBadge"/>
                     </VBox>
                     
-                    <!-- Data Restore Card - Coming Soon -->
-                    <VBox fx:id="dataRestoreCard" styleClass="action-card action-card-disabled" spacing="16" 
-                          HBox.hgrow="ALWAYS">
+                    <!-- Data Restore Card -->
+                    <VBox fx:id="dataRestoreCard" styleClass="action-card" spacing="16" 
+                          HBox.hgrow="ALWAYS" onMouseClicked="#handleDataRestore">
                         <HBox spacing="16" alignment="CENTER_LEFT">
-                            <StackPane styleClass="card-icon card-icon-muted">
+                            <StackPane styleClass="card-icon card-icon-restore">
                                 <Label text="📥"/>
                             </StackPane>
                             <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -134,7 +134,7 @@
                                        styleClass="card-description" wrapText="true"/>
                             </VBox>
                         </HBox>
-                        <Label text="Coming Soon" styleClass="badge badge-muted"/>
+                        <Label text="Ready" styleClass="badge badge-success"/>
                     </VBox>
                 </HBox>
                 
